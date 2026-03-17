@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý phòng - GOAT HOTEL</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    
+    <style>
+        :root { --primary-color: #4e31aa; --accent-color: #f7a400; --bg-admin: #f8faff; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg-admin); }
+        .main-wrapper { margin-left: 280px; padding: 40px; }
+        
+        .card-table { background: white; border-radius: 24px; padding: 0; border: none; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03); overflow: hidden; }
+        .table thead th { background: #f8f9fa; font-weight: 700; color: #6c757d; border-bottom: none; padding: 15px 25px; }
+        .table tbody td { padding: 20px 25px; vertical-align: middle; border-bottom: 1px solid #f0f0f0; }
+
+        .badge-status { padding: 8px 12px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; }
+        .status-available { background: #d1e7dd; color: #0f5132; }
+        .status-booked { background: #f8d7da; color: #842029; }
+        .status-maintenance { background: #e2e3e5; color: #41464b; }
+
+        .btn-action { width: 35px; height: 35px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; border: none; transition: 0.2s; }
+        .btn-edit { background: #e0e7ff; color: var(--primary-color); }
+        .btn-delete { background: #fee2e2; color: #dc2626; }
+
+        .pagination .page-link { border: none; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px; margin: 0 3px; color: var(--primary-color); font-weight: 600; }
+        .pagination .active .page-link { background: var(--primary-color); color: white; }
+
+        /* Custom Item Selection CSS */
+        .selected-items-container { min-height: 50px; border: 1px dashed #ced4da; border-radius: 12px; padding: 10px; background: #fff; display: flex; flex-wrap: wrap; gap: 10px; }
+        .item-brick { background: #f0f2f5; border-radius: 20px; padding: 5px 12px 5px 6px; display: flex; align-items: center; font-size: 0.9rem; font-weight: 600; color: #333; border: 1px solid #e0e0e0; animation: fadeIn 0.2s; }
+        .item-brick img { width: 24px; height: 24px; object-fit: contain; margin-right: 8px; border-radius: 50%; }
+        .item-brick .remove-btn { margin-left: 8px; cursor: pointer; color: #dc2626; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+        .item-brick .remove-btn:hover { background: #fee2e2; }
+
+        .item-list-container { max-height: 300px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; background: #fff; }
+        .item-option { cursor: pointer; border-radius: 12px; padding: 10px; border: 1px solid transparent; transition: all 0.2s; position: relative; }
+        .item-option:hover { background: #f8f9fa; }
+        .item-option.active { background: #f0f7ff; border-color: var(--primary-color); }
+        .item-option .check-mark { position: absolute; top: 10px; right: 10px; width: 20px; height: 20px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; opacity: 0; transform: scale(0); transition: all 0.2s; }
+        .item-option.active .check-mark { opacity: 1; transform: scale(1); }
+        .item-option img { width: 40px; height: 40px; object-fit: contain; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+<div th:replace="~{fragments/admin-sidebar :: sidebar}"></div>
+
+<div class="main-wrapper">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">Quản lý phòng</h2>
+            <p class="text-muted mb-0">Danh sách và trạng thái phòng nghỉ</p>
+        </div>
+        <button class="btn btn-primary px-4 py-2 rounded-3 fw-bold shadow-sm" style="background: var(--primary-color); border: none;" onclick="openModal()">
+            + Thêm phòng mới
+        </button>
+    </div>
+
+    <div class="card-table">
+        <div class="p-4 border-bottom">
+            <form class="d-flex gap-3" method="GET" th:action="@{/admin/rooms}">
+                <input type="text" name="q" class="form-control" style="border-radius:12px; max-width: 300px;" placeholder="Tìm số phòng..." th:value="${search}">
+                <select name="status" class="form-select" style="border-radius:12px; max-width: 200px;" onchange="this.form.submit()">
+                    <option value="">Tất cả trạng thái</option>
+                    <option value="available" th:selected="${statusFilter == 'available'}">Phòng trống</option>
+                    <option value="booked" th:selected="${statusFilter == 'booked'}">Đang thuê</option>
+                    <option value="maintenance" th:selected="${statusFilter == 'maintenance'}">Bảo trì</option>
+                </select>
+            </form>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Số phòng</th>
+                        <th>Loại phòng</th>
+                        <th>Giá</th>
+                        <th>Đồ đi kèm</th>
+                        <th>Trạng thái</th>
+                        <th class="text-end">Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:if="${#lists.isEmpty(rooms)}">
+                        <td colspan="7" class="text-center py-5 text-muted">Chưa có dữ liệu.</td>
+                    </tr>
+                    <tr th:each="r : ${rooms}">
+                        <td th:text="${r.id}"></td>
+                        <td class="fw-bold text-primary" th:text="${r.roomNumber}"></td>
+                        <td th:text="${r.roomType.typeName}"></td>
+                        <td th:text="${#numbers.formatInteger(r.roomType.pricePerNight, 1, 'COMMA')} + 'đ'"></td>
+                        <td><span class="badge bg-light text-dark border" th:text="${#lists.size(r.roomItems)} + ' món'"></span></td>
+                        <td>
+                            <th:block th:switch="${r.status}">
+                                <span th:case="'available'" class="badge-status status-available">Sẵn sàng</span>
+                                <span th:case="'booked'" class="badge-status status-booked">Đang có khách</span>
+                                <span th:case="'maintenance'" class="badge-status status-maintenance">Đang sửa</span>
+                            </th:block>
+                        </td>
+                        <td class="text-end">
+                            <button class="btn-action btn-edit me-1" th:attr="onclick=|editRoom(${r.id}, '${r.roomNumber}', ${r.roomType.id}, '${r.status}', [${#strings.listJoin(r.roomItems.![itemId], ',')}])|">✎</button>
+                            <button class="btn-action btn-delete" th:attr="onclick=|deleteRoom(${r.id})|">🗑</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div th:if="${totalPages > 1}" class="p-4 d-flex justify-content-between align-items-center border-top">
+            <div class="text-muted small">
+                Hiển thị trang <span th:text="${currentPage}"></span> / <span th:text="${totalPages}"></span> (Tổng <span th:text="${totalRows}"></span> bản ghi)
+            </div>
+            <nav>
+                <ul class="pagination mb-0">
+                    <li th:class="${currentPage <= 1 ? 'page-item disabled' : 'page-item'}">
+                        <a class="page-link" th:href="@{/admin/rooms(page=${currentPage - 1}, q=${search}, status=${statusFilter})}">‹</a>
+                    </li>
+                    <li th:each="i : ${#numbers.sequence(1, totalPages)}" th:class="${i == currentPage ? 'page-item active' : 'page-item'}">
+                        <a class="page-link" th:href="@{/admin/rooms(page=${i}, q=${search}, status=${statusFilter})}" th:text="${i}"></a>
+                    </li>
+                    <li th:class="${currentPage >= totalPages ? 'page-item disabled' : 'page-item'}">
+                        <a class="page-link" th:href="@{/admin/rooms(page=${currentPage + 1}, q=${search}, status=${statusFilter})}">›</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="roomModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content" style="border-radius: 20px;">
+            <div class="modal-header border-bottom-0 p-4">
+                <h5 class="modal-title fw-bold" id="modalTitle">Thêm phòng mới</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 pt-0">
+                <form method="POST" id="roomForm" th:action="@{/admin/rooms}">
+                    <input type="hidden" name="action" value="save">
+                    <input type="hidden" name="room_id" id="roomId">
+                    <input type="hidden" name="items_ids" id="itemsIds">
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Loại phòng</label>
+                            <select name="type_id" id="roomType" class="form-select rounded-3 p-2" required>
+                                <option th:each="t : ${types}" th:value="${t.id}" th:text="${t.typeName} + ' - ' + ${#numbers.formatInteger(t.pricePerNight, 1, 'COMMA')} + 'đ'"></option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Trạng thái</label>
+                            <select name="status" id="roomStatus" class="form-select rounded-3 p-2">
+                                <option value="available">Sẵn sàng</option>
+                                <option value="booked">Đang có khách</option>
+                                <option value="maintenance">Đang bảo trì</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Đồ đi kèm đã chọn:</label>
+                        <div class="selected-items-container" id="selectedContainer">
+                            <span class="text-muted small ms-2 mt-1 fst-italic placeholder-text">Chưa chọn đồ vật nào...</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <input type="text" id="itemSearch" class="form-control rounded-3" placeholder="🔍 Tìm kiếm đồ vật..." onkeyup="filterItems()">
+                    </div>
+
+                    <div class="item-list-container">
+                        <div class="row g-2" id="itemList">
+                            <div class="col-md-4 col-sm-6 item-wrapper" th:each="item : ${all_items}">
+                                <div class="item-option d-flex align-items-center"
+                                     th:attr="onclick=|toggleItem(${item.id})|, id='item-opt-' + ${item.id}, data-name=${#strings.toLowerCase(item.name)}">
+                                    <div class="check-mark">✔</div>
+                                    <img th:src="@{${item.image}}" class="rounded bg-light">
+                                    <div class="ms-3 fw-bold small" th:text="${item.name}">Name</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-primary py-2 rounded-3 fw-bold" style="background: var(--primary-color); border: none;">Lưu thông tin</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<form id="deleteForm" method="POST" th:action="@{/admin/rooms}" style="display:none;">
+    <input type="hidden" name="action" value="delete">
+    <input type="hidden" name="id" id="deleteId">
+</form>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    let selectedItems = []; // Mang chua ID item da chon
+    const modal = new bootstrap.Modal(document.getElementById('roomModal'));
+
+    function renderSelectedItems() {
+        const container = document.getElementById('selectedContainer');
+        const inputIds = document.getElementById('itemsIds');
+        const listItems = document.querySelectorAll('.item-option');
+
+        container.innerHTML = '';
+        inputIds.value = selectedItems.join(',');
+
+        listItems.forEach(el => el.classList.remove('active'));
+
+        if (selectedItems.length === 0) {
+            container.innerHTML = '<span class="text-muted small ms-2 mt-1 fst-italic placeholder-text">Chưa chọn đồ vật nào...</span>';
+            return;
+        }
+
+        selectedItems.forEach(id => {
+            const opt = document.getElementById('item-opt-' + id);
+            if (opt) {
+                opt.classList.add('active');
+                const img = opt.querySelector('img').src;
+                const name = opt.querySelector('.fw-bold').innerText;
+
+                const brick = document.createElement('div');
+                brick.className = 'item-brick';
+                brick.innerHTML = `<img src="${img}"> ${name} <span class="remove-btn" onclick="toggleItem(${id})">×</span>`;
+                container.appendChild(brick);
+            }
+        });
+    }
+
+    function toggleItem(id) {
+        const index = selectedItems.indexOf(id);
+        if (index > -1) {
+            selectedItems.splice(index, 1);
+        } else {
+            selectedItems.push(id);
+        }
+        renderSelectedItems();
+    }
+
+    function filterItems() {
+        const term = document.getElementById('itemSearch').value.toLowerCase();
+        const wrappers = document.querySelectorAll('.item-wrapper');
+
+        wrappers.forEach(w => {
+            const name = w.querySelector('.item-option').getAttribute('data-name');
+            if (name.includes(term)) {
+                w.style.display = 'block';
+            } else {
+                w.style.display = 'none';
+            }
+        });
+    }
+
+    function openModal() {
+        document.getElementById('modalTitle').innerText = 'Thêm phòng mới';
+        document.getElementById('roomForm').reset();
+        document.getElementById('roomId').value = '';
+        selectedItems = [];
+        renderSelectedItems();
+        modal.show();
+    }
+
+    function editRoom(id, room_number, type_id, status, items) {
+        document.getElementById('modalTitle').innerText = 'Cập nhật phòng ' + room_number;
+        document.getElementById('roomId').value = id;
+        document.getElementById('roomType').value = type_id;
+        document.getElementById('roomStatus').value = status;
+
+        selectedItems = items; // Load saved items (int array)
+        renderSelectedItems();
+        modal.show();
+    }
+
+    function deleteRoom(id) {
+        Swal.fire({
+            title: 'Cảnh báo xóa!',
+            text: "Phòng này sẽ bị xóa vĩnh viễn.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Xóa',
+            cancelButtonText: 'Hủy'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('deleteId').value = id;
+                document.getElementById('deleteForm').submit();
+            }
+        })
+    }
+</script>
+<script th:inline="javascript">
+    /*[# th:if="${message != null}"]*/
+    Swal.fire({ icon: 'success', title: 'Thành công', text: /*[[${message}]]*/ '', timer: 1500, showConfirmButton: false });
+    /*[/]*/
+    /*[# th:if="${error != null}"]*/
+    Swal.fire({ icon: 'error', title: 'Lỗi', text: /*[[${error}]]*/ '' });
+    /*[/]*/
+</script>
+</body>
+</html>

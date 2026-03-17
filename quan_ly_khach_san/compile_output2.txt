@@ -1,0 +1,75 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ---------------------< com.hotel:hotel-management >---------------------
+[INFO] Building Hotel Management 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ hotel-management ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 26 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ hotel-management ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 35 source files with javac [debug release 17] to target\classes
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /E:/hotel/hotel - 2/springboot-hotel/src/main/java/com/hotel/service/BookingService.java:[132,9] cannot find symbol
+  symbol:   class Optional
+  location: class com.hotel.service.BookingService
+[ERROR] /E:/hotel/hotel - 2/springboot-hotel/src/main/java/com/hotel/service/BookingService.java:[169,9] cannot find symbol
+  symbol:   class Optional
+  location: class com.hotel.service.BookingService
+[ERROR] /E:/hotel/hotel - 2/springboot-hotel/src/main/java/com/hotel/controller/NewsController.java:[32,9] cannot find symbol
+  symbol:   class Optional
+  location: class com.hotel.controller.NewsController
+[ERROR] /E:/hotel/hotel - 2/springboot-hotel/src/main/java/com/hotel/service/AuthService.java:[33,9] cannot find symbol
+  symbol:   class Optional
+  location: class com.hotel.service.AuthService
+[ERROR] /E:/hotel/hotel - 2/springboot-hotel/src/main/java/com/hotel/controller/admin/AdminBookingController.java:[96,9] cannot find symbol
+  symbol:   class Optional
+  location: class com.hotel.controller.admin.AdminBookingController
+[ERROR] /E:/hotel/hotel - 2/springboot-hotel/src/main/java/com/hotel/controller/admin/AdminBookingController.java:[109,13] cannot find symbol
+  symbol:   class Optional
+  location: class com.hotel.controller.admin.AdminBookingController
+[ERROR] /E:/hotel/hotel - 2/springboot-hotel/src/main/java/com/hotel/controller/admin/AdminBookingController.java:[157,9] cannot find symbol
+  symbol:   class Optional
+  location: class com.hotel.controller.admin.AdminBookingController
+[INFO] 7 errors 
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  2.569 s
+[INFO] Finished at: 2026-03-17T23:50:56+07:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.11.0:compile (default-compile) on project hotel-management: Compilation failure: Compilation failure: 
+[ERROR] /E:/hotel/hotel - 2/springboot-hotel/src/main/java/com/hotel/service/BookingService.java:[132,9] cannot find symbol
+[ERROR]   symbol:   class Optional
+[ERROR]   location: class com.hotel.service.BookingService
+[ERROR] /E:/hotel/hotel - 2/springboot-hotel/src/main/java/com/hotel/service/BookingService.java:[169,9] cannot find symbol
+[ERROR]   symbol:   class Optional
+[ERROR]   location: class com.hotel.service.BookingService
+[ERROR] /E:/hotel/hotel - 2/springboot-hotel/src/main/java/com/hotel/controller/NewsController.java:[32,9] cannot find symbol
+[ERROR]   symbol:   class Optional
+[ERROR]   location: class com.hotel.controller.NewsController
+[ERROR] /E:/hotel/hotel - 2/springboot-hotel/src/main/java/com/hotel/service/AuthService.java:[33,9] cannot find symbol
+[ERROR]   symbol:   class Optional
+[ERROR]   location: class com.hotel.service.AuthService
+[ERROR] /E:/hotel/hotel - 2/springboot-hotel/src/main/java/com/hotel/controller/admin/AdminBookingController.java:[96,9] cannot find symbol
+[ERROR]   symbol:   class Optional
+[ERROR]   location: class com.hotel.controller.admin.AdminBookingController
+[ERROR] /E:/hotel/hotel - 2/springboot-hotel/src/main/java/com/hotel/controller/admin/AdminBookingController.java:[109,13] cannot find symbol
+[ERROR]   symbol:   class Optional
+[ERROR]   location: class com.hotel.controller.admin.AdminBookingController
+[ERROR] /E:/hotel/hotel - 2/springboot-hotel/src/main/java/com/hotel/controller/admin/AdminBookingController.java:[157,9] cannot find symbol
+[ERROR]   symbol:   class Optional
+[ERROR]   location: class com.hotel.controller.admin.AdminBookingController
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

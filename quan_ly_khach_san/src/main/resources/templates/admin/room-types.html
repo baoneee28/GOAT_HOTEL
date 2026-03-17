@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý loại phòng - GOAT HOTEL</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    
+    <style>
+        :root { --primary-color: #4e31aa; --accent-color: #f7a400; --bg-admin: #f8faff; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg-admin); }
+        .main-wrapper { margin-left: 280px; padding: 40px; }
+        .card-table { background: white; border-radius: 24px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.03); overflow: hidden; }
+        .table thead th { background: #f8f9fa; color: #6c757d; padding: 15px 25px; border: none; }
+        .table tbody td { padding: 20px 25px; vertical-align: middle; border-bottom: 1px solid #f0f0f0; }
+        .type-img { width: 60px; height: 60px; object-fit: cover; border-radius: 12px; }
+        .btn-action { width: 35px; height: 35px; border-radius: 8px; border: none; transition: 0.2s; }
+        .btn-edit { background: #e0e7ff; color: var(--primary-color); }
+        .btn-delete { background: #fee2e2; color: #dc2626; }
+        .pagination .page-link { border: none; border-radius: 8px; margin: 0 3px; color: var(--primary-color); font-weight: 600; }
+        .pagination .active .page-link { background: var(--primary-color); color: white; }
+    </style>
+</head>
+<body>
+
+<div th:replace="~{fragments/admin-sidebar :: sidebar}"></div>
+
+<div class="main-wrapper">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">Quản lý loại phòng</h2>
+            <p class="text-muted mb-0">Thiết lập giá và thông tin hạng phòng</p>
+        </div>
+        <button class="btn btn-primary px-4 py-2 rounded-3 fw-bold" style="background: var(--primary-color); border: none;" onclick="openModal()">
+            + Thêm loại phòng
+        </button>
+    </div>
+
+    <div class="card-table">
+        <div class="p-4 border-bottom">
+            <form method="GET" th:action="@{/admin/room-types}" style="max-width: 400px;">
+                <input type="text" name="q" class="form-control rounded-3" placeholder="Tìm tên loại phòng..." th:value="${search}">
+            </form>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th>Ảnh</th>
+                        <th>Tên loại</th>
+                        <th>Giá/h</th>
+                        <th>Sức chứa</th>
+                        <th>Mô tả</th>
+                        <th class="text-end">Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="t : ${roomTypes}">
+                        <td>
+                            <img th:src="${t.image != null and !#strings.isEmpty(t.image)} ? @{/uploads/{img}(img=${t.image})} : 'https://via.placeholder.com/60'" class="type-img">
+                        </td>
+                        <td class="fw-bold" th:text="${t.typeName}"></td>
+                        <td class="text-primary fw-bold" th:text="${#numbers.formatInteger(t.pricePerNight, 1, 'COMMA')} + 'đ'"></td>
+                        <td th:text="${t.capacity} + ' người'"></td>
+                        <td class="text-muted small" style="max-width: 250px;" th:text="${t.description}"></td>
+                        <td class="text-end">
+                            
+                            <button class="btn-action btn-edit me-1" th:attr="onclick=|editType(${t.id}, '${#strings.escapeJavaScript(t.typeName)}', ${t.pricePerNight}, ${t.capacity}, '${#strings.escapeJavaScript(t.description != null ? t.description : '')}', '${#strings.escapeJavaScript(t.image != null ? t.image : '')}')|">✎</button>
+                            <button class="btn-action btn-delete" th:attr="onclick=|deleteType(${t.id})|">🗑</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div th:if="${totalPages > 1}" class="p-4 d-flex justify-content-end">
+            <nav><ul class="pagination mb-0">
+                <li th:each="i : ${#numbers.sequence(1, totalPages)}" th:class="${i == currentPage ? 'page-item active' : 'page-item'}">
+                    <a class="page-link" th:href="@{/admin/room-types(page=${i}, q=${search})}" th:text="${i}">1</a>
+                </li>
+            </ul></nav>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="typeModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 24px; border: none;">
+            <div class="modal-header border-0 p-4 pb-0">
+                <h5 class="fw-bold" id="modalTitle">Loại phòng</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form method="POST" id="typeForm" th:action="@{/admin/room-types}" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="save">
+                    <input type="hidden" name="type_id" id="typeId">
+                    <input type="hidden" name="current_image" id="currentImage">
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Tên loại phòng</label>
+                        <input type="text" name="type_name" id="typeName" class="form-control rounded-3" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Giá thuê (VNĐ)</label>
+                            <input type="number" name="price_per_night" id="typePrice" class="form-control rounded-3" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Sức chứa</label>
+                            <input type="number" name="capacity" id="typeCapacity" class="form-control rounded-3" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Ảnh đại diện</label>
+                        <input type="file" name="image" class="form-control rounded-3">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Mô tả ngắn</label>
+                        <textarea name="description" id="typeDesc" class="form-control rounded-3" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 py-2 fw-bold" style="background: var(--primary-color); border: none; border-radius: 12px;">Lưu dữ liệu</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<form id="delForm" th:action="@{/admin/room-types}" method="POST" style="display:none;">
+    <input type="hidden" name="action" value="delete">
+    <input type="hidden" name="id" id="delId">
+</form>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    const modal = new bootstrap.Modal(document.getElementById('typeModal'));
+
+    function openModal() {
+        document.getElementById('modalTitle').innerText = 'Thêm loại phòng mới';
+        document.getElementById('typeForm').reset();
+        document.getElementById('typeId').value = '';
+        modal.show();
+    }
+
+    function editType(id, type_name, price_per_night, capacity, description, image) {
+        document.getElementById('modalTitle').innerText = 'Sửa: ' + type_name;
+        document.getElementById('typeId').value = id;
+        document.getElementById('typeName').value = type_name;
+        document.getElementById('typePrice').value = price_per_night;
+        document.getElementById('typeCapacity').value = capacity;
+        document.getElementById('typeDesc').value = description;
+        document.getElementById('currentImage').value = image;
+        modal.show();
+    }
+
+    function deleteType(id) {
+        Swal.fire({
+            title: 'Xác nhận xóa?',
+            text: "Dữ liệu liên quan có thể bị ảnh hưởng!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            confirmButtonText: 'Xóa ngay',
+            cancelButtonText: 'Hủy'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('delId').value = id;
+                document.getElementById('delForm').submit();
+            }
+        })
+    }
+</script>
+<script th:inline="javascript">
+    /*[# th:if="${message != null}"]*/
+    Swal.fire({ icon: 'success', title: 'Thành công', text: /*[[${message}]]*/ '', timer: 1500, showConfirmButton: false });
+    /*[/]*/
+    /*[# th:if="${error != null}"]*/
+    Swal.fire({ icon: 'error', title: 'Lỗi', text: /*[[${error}]]*/ '' });
+    /*[/]*/
+</script>
+</body>
+</html>

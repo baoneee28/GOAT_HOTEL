@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+
+<body>
+<div th:fragment="sidebar">
+    
+    <style>
+        :root { --primary-color: #4e31aa; --accent-color: #f7a400; }
+        .sidebar { width: 280px; height: 100vh; background: #1a1c2e; position: fixed; left: 0; top: 0; z-index: 1000; transition: 0.3s; }
+        .logo-circle { width: 50px; height: 50px; background: var(--accent-color); border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; color: #fff; }
+        .menu-item { display: flex; align-items: center; padding: 14px 20px; color: rgba(255,255,255,0.7); text-decoration: none; border-radius: 12px; margin-bottom: 8px; transition: 0.3s; }
+        .menu-item i { margin-right: 15px; font-style: normal; font-size: 1.2rem; }
+        .menu-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .menu-item.active { background: var(--primary-color); color: #fff; box-shadow: 0 4px 15px rgba(78,49,170,0.4); }
+    </style>
+
+    
+    <div class="sidebar p-4 shadow-lg">
+        <div class="text-center mb-5">
+            <h5 class="fw-bold text-white mb-0" style="padding-bottom: 10px;">GOAT ADMIN</h5>
+            <small style="color: rgba(255,255,255,0.5)">Hệ thống quản lý khách sạn</small>
+        </div>
+
+        <div class="menu-list">
+            
+            <a th:href="@{/admin}" class="menu-item">
+                <i></i> <span>Bảng điều khiển</span>
+            </a>
+            <a th:href="@{/admin/rooms}" class="menu-item">
+                <i></i> <span>Quản lý phòng</span>
+            </a>
+            <a th:href="@{/admin/bookings}" class="menu-item">
+                <i></i> <span>Đơn đặt phòng</span>
+            </a>
+            <a th:href="@{/admin/news}" class="menu-item">
+                <i></i> <span>Tin tức &amp; Sự kiện</span>
+            </a>
+            <a th:href="@{/admin/room-types}" class="menu-item">
+                <i></i> <span>Loại phòng</span>
+            </a>
+            <a th:href="@{/admin/users}" class="menu-item">
+                <i></i> <span>Người dùng</span>
+            </a>
+            <a th:href="@{/admin/items}" class="menu-item">
+                <i></i> <span>Vật phẩm</span>
+            </a>
+            <div class="mt-5 pt-5">
+                
+                <a th:href="@{/logout}" class="menu-item text-danger">
+                    <i></i> <span>Đăng xuất</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

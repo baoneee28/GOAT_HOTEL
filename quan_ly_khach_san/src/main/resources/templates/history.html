@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lịch sử đặt phòng - GOAT HOTEL</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <style>
+        :root {
+            --primary-color: #4e31aa;
+            --secondary-color: #8b5cf6;
+            --accent-color: #f7a400;
+            --bg-body: #f8faff;
+            --text-dark: #1e293b;
+        }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg-body); color: var(--text-dark); }
+        .navbar { background: rgba(255,255,255,0.95); padding: 18px 0; box-shadow: 0 4px 30px rgba(0,0,0,0.03); backdrop-filter: blur(10px); transition: all 0.3s; }
+        .navbar-brand { color: var(--primary-color) !important; font-weight: 800; font-size: 1.6rem; letter-spacing: -0.5px; text-transform: uppercase; background: linear-gradient(45deg, var(--primary-color), var(--secondary-color)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav-link { color: #64748b !important; font-weight: 600; padding: 8px 20px !important; transition: all 0.3s; border-radius: 50px; }
+        .nav-link:hover, .nav-link.active { color: var(--primary-color) !important; background: rgba(78,49,170,0.05); }
+        .user-avatar-nav { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; border: 2px solid #e0e7ff; transition: 0.2s; }
+        .user-dropdown { position: relative; }
+        .user-dropdown .dropdown-menu { display: none; position: absolute; right: 0; top: 120%; border: none; box-shadow: 0 20px 40px rgba(0,0,0,0.08); border-radius: 20px; padding: 15px; min-width: 220px; background: #fff; z-index: 1050; }
+        .user-dropdown:hover .dropdown-menu { display: block; top: 100%; }
+        .dropdown-item { border-radius: 12px; padding: 12px 15px; font-weight: 600; color: #475569; transition: 0.2s; }
+        .dropdown-item:hover { background: #f1f5f9; color: var(--primary-color); transform: translateX(5px); }
+        .dropdown-divider { margin: 10px 0; border-top: 1px solid #f1f5f9; }
+        .btn-login { background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%); color: white !important; padding: 12px 30px; border-radius: 50px; font-weight: 700; box-shadow: 0 10px 20px rgba(78,49,170,0.2); transition: all 0.3s; border: none; }
+
+        /* CSS giu nguyen 100% tu history.php */
+        .filter-btn {
+            border-radius: 50px;
+            padding: 10px 24px;
+            font-weight: 600;
+            border: 2px solid #edf2f7;
+            color: #718096;
+            background: white;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            margin: 0 8px 8px 0;
+        }
+        .filter-btn:hover, .filter-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+            box-shadow: 0 4px 12px rgba(78, 49, 170, 0.25);
+        }
+        .booking-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+            border: 1px solid #f1f5f9;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        .booking-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 25px rgba(78, 49, 170, 0.12);
+        }
+        .booking-img-container {
+            width: 200px;
+            min-height: 180px;
+        }
+        .booking-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            border-left: 5px solid #10b981;
+        }
+    </style>
+</head>
+<body>
+
+
+<nav class="navbar navbar-expand-lg sticky-top">
+    <div class="container">
+        <a class="navbar-brand" th:href="@{/}">GOAT HOTEL</a>
+        <button class="navbar-toggler border-0 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav mx-auto align-items-center">
+                <li class="nav-item"><a class="nav-link" th:href="@{/}">Trang chủ</a></li>
+                <li class="nav-item"><a class="nav-link" th:href="@{/#booking-section}">Đặt phòng</a></li>
+                <li class="nav-item"><a class="nav-link" th:href="@{/#newsCarousel}">Tin tức</a></li>
+                <li class="nav-item"><a class="nav-link" href="#">Liên hệ</a></li>
+            </ul>
+            <ul class="navbar-nav align-items-center mt-3 mt-lg-0">
+                <li th:if="${session.user != null}" class="nav-item user-dropdown ms-lg-3">
+                    <a class="nav-link p-0 d-flex align-items-center gap-3" href="#">
+                        <span class="text-end d-none d-lg-block">
+                            <small class="d-block text-muted" style="font-size: 0.75rem; line-height: 1;">Xin chào,</small>
+                            <span class="fw-bold text-dark" th:text="${session.user.fullName}">Khách</span>
+                        </span>
+                        <img th:if="${session.user.image != null and !session.user.image.isEmpty()}"
+                             th:src="@{/uploads/} + ${session.user.image}" class="user-avatar-nav" alt="avatar">
+                        <img th:unless="${session.user.image != null and !session.user.image.isEmpty()}"
+                             th:src="@{'https://ui-avatars.com/api/?background=4e31aa&color=fff&size=128&name=' + ${session.user.fullName}}"
+                             class="user-avatar-nav" alt="avatar">
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" th:href="@{/profile}">👤 Hồ sơ cá nhân</a></li>
+                        <li><a class="dropdown-item" th:href="@{/history}">📅 Lịch sử đặt phòng</a></li>
+                        <th:block th:if="${session.user.role == 'admin'}">
+                            <li><div class="dropdown-divider"></div></li>
+                            <li><a class="dropdown-item text-primary" th:href="@{/admin}">⚡ Trang quản trị</a></li>
+                        </th:block>
+                        <li><div class="dropdown-divider"></div></li>
+                        <li><a class="dropdown-item text-danger" th:href="@{/logout}">🚪 Đăng xuất</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+
+<div class="container my-5">
+    <div class="row align-items-center mb-5">
+        <div class="col-md-8">
+            <h2 class="fw-bold text-dark mb-1">Lịch sử đặt phòng</h2>
+            <p class="text-muted mb-0">Theo dõi và quản lý các kỳ nghỉ của bạn</p>
+        </div>
+        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+            <div class="stat-card shadow-sm border">
+                <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.75rem;">Tổng chi tiêu</small>
+                
+                <span class="fw-bold text-success fs-4">
+                    <span th:text="${#numbers.formatInteger(total_spent, 1, 'COMMA')}">0</span>đ
+                </span>
+            </div>
+        </div>
+    </div>
+
+    
+    <div class="mb-5">
+        
+        <a th:href="@{/history(status='all', page=1)}"
+           th:class="${status_filter == 'all' or status_filter == null} ? 'filter-btn active' : 'filter-btn'">Tất cả</a>
+        <a th:href="@{/history(status='pending', page=1)}"
+           th:class="${status_filter == 'pending'} ? 'filter-btn active' : 'filter-btn'">Chờ duyệt</a>
+        <a th:href="@{/history(status='confirmed', page=1)}"
+           th:class="${status_filter == 'confirmed'} ? 'filter-btn active' : 'filter-btn'">Đã xác nhận</a>
+        <a th:href="@{/history(status='completed', page=1)}"
+           th:class="${status_filter == 'completed'} ? 'filter-btn active' : 'filter-btn'">Hoàn thành</a>
+        <a th:href="@{/history(status='cancelled', page=1)}"
+           th:class="${status_filter == 'cancelled'} ? 'filter-btn active' : 'filter-btn'">Đã hủy</a>
+    </div>
+
+    
+    <div class="row">
+        
+        <th:block th:if="${bookings != null and !bookings.isEmpty()}">
+            <div th:each="b : ${bookings}" class="col-12">
+                <div class="booking-card d-md-flex">
+                    
+                    <div class="booking-img-container d-none d-md-block">
+                        <img th:if="${b.room.roomType.image != null and !b.room.roomType.image.isEmpty()}"
+                             th:src="@{/uploads/} + ${b.room.roomType.image}" class="booking-img">
+                    </div>
+                    <div class="p-4 flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-start mb-4">
+                            <div>
+                                
+                                <h4 class="fw-bold text-dark mb-1" th:text="${b.room.roomType.typeName}">Loại phòng</h4>
+                                <span class="text-muted small">Phòng: <b class="text-primary" th:text="${b.room.roomNumber}">P001</b></span>
+                            </div>
+                            <div class="text-end">
+                                
+                                <div class="fs-5 fw-bold text-primary">
+                                    <span th:text="${#numbers.formatInteger(b.totalPrice, 1, 'COMMA')}">0</span>đ
+                                </div>
+                                
+                                <span class="badge bg-light text-dark border" th:text="${b.totalHours} + ' giờ ở'">0 giờ ở</span>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4 g-3">
+                            <div class="col-6 col-md-4 border-end">
+                                <small class="text-muted d-block mb-1">Nhận phòng</small>
+                                
+                                <span class="fw-bold" th:text="${#temporals.format(b.checkIn, 'HH:mm')}">-</span>
+                                <br/>
+                                <span class="text-muted small" th:text="${#temporals.format(b.checkIn, 'dd/MM/yyyy')}">-</span>
+                            </div>
+                            <div class="col-6 col-md-4 border-end">
+                                <small class="text-muted d-block mb-1">Trả phòng</small>
+                                <span class="fw-bold" th:text="${#temporals.format(b.checkOut, 'HH:mm')}">-</span>
+                                <br/>
+                                <span class="text-muted small" th:text="${#temporals.format(b.checkOut, 'dd/MM/yyyy')}">-</span>
+                            </div>
+                            <div class="col-12 col-md-4 text-md-center">
+                                <small class="text-muted d-block mb-1">Trạng thái</small>
+                                
+                                
+                                <span th:class="${b.status == 'pending'} ? 'badge bg-warning px-3 py-2 rounded-pill' :
+                                               (${b.status == 'confirmed'} ? 'badge bg-primary px-3 py-2 rounded-pill' :
+                                               (${b.status == 'completed'} ? 'badge bg-success px-3 py-2 rounded-pill' : 'badge bg-danger px-3 py-2 rounded-pill'))"
+                                      th:text="${b.status == 'pending'} ? 'Chờ duyệt' :
+                                               (${b.status == 'confirmed'} ? 'Đã xác nhận' :
+                                               (${b.status == 'completed'} ? 'Hoàn thành' : 'Đã hủy'))">
+                                </span>
+                            </div>
+                        </div>
+
+                        
+                        <th:block th:if="${b.status == 'pending'}">
+                            <div class="border-top pt-3 d-flex justify-content-end">
+                                
+                                <button th:attr="onclick='confirmCancel(' + ${b.id} + ')'"
+                                        class="btn btn-sm btn-outline-danger rounded-pill px-4 fw-bold">Hủy đơn đặt</button>
+                            </div>
+                        </th:block>
+                    </div>
+                </div>
+            </div>
+        </th:block>
+
+        
+        <th:block th:unless="${bookings != null and !bookings.isEmpty()}">
+            <div class="col-12 text-center py-5 bg-white rounded-4 border shadow-sm">
+                <img src="https://cdn-icons-png.flaticon.com/512/4076/4076432.png" width="120" class="opacity-25 mb-4">
+                <h5 class="text-muted fw-bold">Không tìm thấy yêu cầu đặt phòng nào</h5>
+                <a th:href="@{/}" class="btn btn-primary rounded-pill mt-3 px-5 py-2 fw-bold">Đặt ngay</a>
+            </div>
+        </th:block>
+    </div>
+
+    
+    <div th:if="${total_pages > 1}" class="mt-5">
+        <ul class="pagination justify-content-center">
+            <li th:if="${page > 1}" class="page-item">
+                <a class="page-link" th:href="@{/history(page=${page-1}, status=${status_filter})}">‹</a>
+            </li>
+            <li th:each="i : ${#numbers.sequence(1, total_pages)}"
+                th:class="${i == page} ? 'page-item active' : 'page-item'">
+                <a class="page-link" th:href="@{/history(page=${i}, status=${status_filter})}" th:text="${i}">1</a>
+            </li>
+            <li th:if="${page < total_pages}" class="page-item">
+                <a class="page-link" th:href="@{/history(page=${page+1}, status=${status_filter})}">›</a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+
+<form id="cancelForm" th:action="@{/cancel-booking}" method="POST" style="display:none;">
+    <input type="hidden" name="cancel_id" id="cancelIdInput">
+</form>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script th:inline="javascript">
+    // Tuong duong PHP: function confirmCancel - giu nguyen text, icons
+    function confirmCancel(id) {
+        Swal.fire({
+            title: 'Hủy đơn hàng?',
+            text: "Bạn có chắc chắn muốn hủy đặt phòng này?",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#e53e3e',
+            cancelButtonColor: '#718096',
+            confirmButtonText: 'Đồng ý hủy',
+            cancelButtonText: 'Giữ lại',
+            borderRadius: '15px'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('cancelIdInput').value = id;
+                document.getElementById('cancelForm').submit();
+            }
+        });
+    }
+
+    // Tuong duong PHP: if ($msg === 'success') ... elseif ($msg === 'error')
+    /*[# th:if="${cancel_success}"]*/
+    Swal.fire({ icon: 'success', title: 'Đã hủy!', text: 'Đơn đặt phòng đã được hủy thành công.', timer: 2000, showConfirmButton: false });
+    /*[/]*/
+    /*[# th:if="${cancel_error}"]*/
+    Swal.fire({ icon: 'error', title: 'Lỗi', text: 'Không thể xử lý yêu cầu hủy lúc này.', confirmButtonColor: '#4e31aa' });
+    /*[/]*/
+</script>
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tin tức - GOAT HOTEL</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <style>
+        :root {
+            --primary-color: #4e31aa;
+            --secondary-color: #8b5cf6;
+            --accent-color: #f7a400;
+            --bg-body: #f8faff;
+            --text-dark: #1e293b;
+        }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg-body); color: var(--text-dark); }
+
+        /* Navbar CSS tu header.php */
+        .navbar { background: rgba(255,255,255,0.95); padding: 18px 0; box-shadow: 0 4px 30px rgba(0,0,0,0.03); backdrop-filter: blur(10px); }
+        .navbar-brand { color: var(--primary-color) !important; font-weight: 800; font-size: 1.6rem; text-transform: uppercase; background: linear-gradient(45deg, var(--primary-color), var(--secondary-color)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav-link { color: #64748b !important; font-weight: 600; padding: 8px 20px !important; border-radius: 50px; }
+        .nav-link:hover { color: var(--primary-color) !important; background: rgba(78,49,170,0.05); }
+        .user-avatar-nav { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; border: 2px solid #e0e7ff; }
+        .user-dropdown { position: relative; }
+        .user-dropdown .dropdown-menu { display: none; position: absolute; right: 0; top: 120%; border: none; box-shadow: 0 20px 40px rgba(0,0,0,0.08); border-radius: 20px; padding: 15px; min-width: 220px; background: #fff; z-index: 1050; }
+        .user-dropdown:hover .dropdown-menu { display: block; top: 100%; }
+        .dropdown-item { border-radius: 12px; padding: 12px 15px; font-weight: 600; color: #475569; transition: 0.2s; }
+        .dropdown-item:hover { background: #f1f5f9; color: var(--primary-color); transform: translateX(5px); }
+        .dropdown-divider { margin: 10px 0; border-top: 1px solid #f1f5f9; }
+        .btn-login { background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%); color: white !important; padding: 12px 30px; border-radius: 50px; font-weight: 700; border: none; }
+
+        /* CSS giu nguyen 100% tu news_detail.php */
+        .news-title {
+            color: var(--primary-color);
+            font-weight: 800;
+            line-height: 1.3;
+            margin-bottom: 1rem;
+        }
+        .news-image-col img {
+            width: 100%;
+            height: 100%;
+            min-height: 400px;
+            object-fit: cover;
+            border-radius: 16px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.1);
+        }
+        .news-text-col {
+            background: #fff;
+            border: 1px solid #f1f5f9;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.02);
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+        }
+        .news-summary {
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+            border-bottom: 1px dashed #e2e8f0;
+            font-style: italic;
+            color: #64748b;
+            font-weight: 600;
+        }
+        .news-scroll-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding-right: 15px;
+            font-size: 1.05rem;
+            line-height: 1.8;
+            color: #334155;
+            text-align: justify;
+        }
+        .news-scroll-content::-webkit-scrollbar { width: 6px; }
+        .news-scroll-content::-webkit-scrollbar-track { background: #f8fafc; border-radius: 10px; }
+        .news-scroll-content::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .news-scroll-content::-webkit-scrollbar-thumb:hover { background: var(--primary-color); }
+        .news-scroll-content img { max-width: 100%; height: auto; border-radius: 8px; margin: 15px 0; }
+        .news-scroll-content h2, .news-scroll-content h3 { color: #1e293b; font-weight: 700; font-size: 1.25rem; margin-top: 20px; }
+
+        .sidebar-card { background: white; border-radius: 16px; padding: 25px; border: 1px solid #f1f5f9; }
+        .related-news-item {
+            display: flex; gap: 15px;
+            margin-bottom: 20px; padding-bottom: 20px;
+            border-bottom: 1px solid #f1f5f9;
+            text-decoration: none; transition: 0.2s;
+        }
+        .related-news-item:last-child { border: none; margin: 0; padding: 0; }
+        .related-news-item:hover { transform: translateX(5px); }
+        .related-thumb { width: 70px; height: 70px; object-fit: cover; border-radius: 10px; }
+        .related-title { font-size: 0.9rem; font-weight: 700; color: #1e293b; line-height: 1.4; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .related-title:hover { color: var(--primary-color); }
+    </style>
+</head>
+<body>
+
+
+<nav class="navbar navbar-expand-lg sticky-top">
+    <div class="container">
+        <a class="navbar-brand" th:href="@{/}">GOAT HOTEL</a>
+        <button class="navbar-toggler border-0 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav mx-auto align-items-center">
+                <li class="nav-item"><a class="nav-link" th:href="@{/}">Trang chủ</a></li>
+                <li class="nav-item"><a class="nav-link" th:href="@{/#booking-section}">Đặt phòng</a></li>
+                <li class="nav-item"><a class="nav-link" th:href="@{/#newsCarousel}">Tin tức</a></li>
+                <li class="nav-item"><a class="nav-link" href="#">Liên hệ</a></li>
+            </ul>
+            <ul class="navbar-nav align-items-center mt-3 mt-lg-0">
+                <li th:if="${session.user != null}" class="nav-item user-dropdown ms-lg-3">
+                    <a class="nav-link p-0 d-flex align-items-center gap-3" href="#">
+                        <span class="text-end d-none d-lg-block">
+                            <small class="d-block text-muted" style="font-size: 0.75rem; line-height: 1;">Xin chào,</small>
+                            <span class="fw-bold text-dark" th:text="${session.user.fullName}">Khách</span>
+                        </span>
+                        <img th:if="${session.user.image != null and !session.user.image.isEmpty()}"
+                             th:src="@{/uploads/} + ${session.user.image}" class="user-avatar-nav" alt="avatar">
+                        <img th:unless="${session.user.image != null and !session.user.image.isEmpty()}"
+                             th:src="@{'https://ui-avatars.com/api/?background=4e31aa&color=fff&size=128&name=' + ${session.user.fullName}}"
+                             class="user-avatar-nav" alt="avatar">
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" th:href="@{/profile}">👤 Hồ sơ cá nhân</a></li>
+                        <li><a class="dropdown-item" th:href="@{/history}">📅 Lịch sử đặt phòng</a></li>
+                        <th:block th:if="${session.user.role == 'admin'}">
+                            <li><div class="dropdown-divider"></div></li>
+                            <li><a class="dropdown-item text-primary" th:href="@{/admin}">⚡ Trang quản trị</a></li>
+                        </th:block>
+                        <li><div class="dropdown-divider"></div></li>
+                        <li><a class="dropdown-item text-danger" th:href="@{/logout}">🚪 Đăng xuất</a></li>
+                    </ul>
+                </li>
+                <li th:unless="${session.user != null}" class="nav-item ms-lg-3">
+                    <a th:href="@{/login}" class="btn btn-login nav-link text-white">Đăng nhập</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+
+<div class="container my-5 pt-4">
+    <div class="row">
+        
+        <div class="col-lg-8 mb-5 mb-lg-0">
+            
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a th:href="@{/}" class="text-decoration-none text-muted small fw-bold">Trang chủ</a>
+                    </li>
+                    <li class="breadcrumb-item active small fw-bold text-primary" aria-current="page">Tin tức chi tiết</li>
+                </ol>
+            </nav>
+
+            
+            <h1 class="news-title display-6" th:text="${news.title}">Tiêu đề</h1>
+
+            <div class="d-flex align-items-center gap-3 text-muted mb-4 small">
+                
+                <span class="d-flex align-items-center gap-1">
+                    <i class="bi bi-calendar3"></i>
+                    <span th:text="${#temporals.format(news.createdAt, 'dd/MM/yyyy')}">01/01/2025</span>
+                </span>
+                <span class="d-flex align-items-center gap-1">
+                    <i class="bi bi-person-circle"></i> Đăng bởi: <b>Admin</b>
+                </span>
+            </div>
+
+            
+            <div class="row g-4 align-items-stretch">
+                <div class="col-md-5 news-image-col">
+                    
+                    <img th:src="@{/uploads/} + ${news.image}" th:alt="${news.title}">
+                </div>
+
+                <div class="col-md-7">
+                    <div class="news-text-col">
+                        <div class="news-summary" th:text="${news.summary}">Tóm tắt</div>
+                        
+                        <div class="news-scroll-content" th:utext="${news.content}">Nội dung</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 d-flex justify-content-between align-items-center">
+                <a th:href="@{/}" class="btn btn-outline-secondary rounded-pill px-4 fw-bold shadow-sm">← Về trang chủ</a>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-white border rounded-circle shadow-sm text-primary"><i class="bi bi-share-fill"></i></button>
+                    <button class="btn btn-white border rounded-circle shadow-sm text-danger"><i class="bi bi-heart-fill"></i></button>
+                </div>
+            </div>
+        </div>
+
+        
+        <div class="col-lg-4">
+            <div class="sidebar-card sticky-top" style="top: 100px; z-index: 10;">
+                <h5 class="fw-bold mb-4 d-flex align-items-center gap-2" style="color: var(--primary-color);">
+                    <i class="bi bi-newspaper"></i> Tin tức khác
+                </h5>
+
+                
+                <th:block th:if="${related_news != null and !related_news.isEmpty()}">
+                    <a th:each="item : ${related_news}"
+                       th:href="@{/news/{id}(id=${item.id})}" class="related-news-item">
+                        
+                        <img th:src="@{/uploads/} + ${item.image}" class="related-thumb" th:alt="${item.title}">
+                        <div>
+                            <div class="related-title" th:text="${item.title}">Tiêu đề</div>
+                            
+                            <div class="related-date text-muted">
+                                <small>📅 <span th:text="${#temporals.format(item.createdAt, 'dd/MM/yyyy')}">-</span></small>
+                            </div>
+                        </div>
+                    </a>
+                </th:block>
+
+                
+                <div th:unless="${related_news != null and !related_news.isEmpty()}" class="text-center py-4 text-muted">
+                    <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
+                    Chưa có tin tức nào khác.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

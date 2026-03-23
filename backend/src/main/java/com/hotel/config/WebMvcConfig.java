@@ -41,14 +41,13 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // Ánh xạ thư mục chứa CSS/JS/Images của giao diện (thư mục gốc)
-        registry.addResourceHandler("/static/**")
-                .addResourceLocations("classpath:/static/");
+        // Ánh xạ thư mục chứa CSS/JS/Images của giao diện (bây giờ nằm ở ../frontend/static/)
+        registry.addResourceHandler("/**")
+                .addResourceLocations("file:../frontend/static/");
 
         // Hàm này rất quan trọng: Cấu hình để website có thể đọc được ảnh người dùng upload
-        // Biến đường dẫn http://localhost:8080/uploads/... trỏ thẳng vào thư mục lấy ảnh vật lý trên server
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("classpath:/static/uploads/");
+                .addResourceLocations("file:../frontend/static/uploads/");
     }
 
     @Override

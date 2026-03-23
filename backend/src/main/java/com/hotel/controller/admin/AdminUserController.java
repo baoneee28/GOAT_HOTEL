@@ -35,14 +35,9 @@ public class AdminUserController {
 
         Page<User> userPage;
         // Nếu không có từ khóa tìm kiếm -> Lấy toàn bộ vứt ra màn hình
-        if (q.isBlank()) {
-            userPage = userRepository.findAll(
-                    PageRequest.of(page - 1, PAGE_SIZE, Sort.by("id").descending()));
-        } else {
-
-            userPage = userRepository.findAll(
-                    PageRequest.of(page - 1, PAGE_SIZE, Sort.by("id").descending()));
-        }
+        // Lấy danh sách (Tính năng Search bị hỏng từ đầu do đồ án gốc chưa viết Custom Query)
+        userPage = userRepository.findAll(
+                PageRequest.of(page - 1, PAGE_SIZE, Sort.by("id").descending()));
 
         model.addAttribute("users", userPage.getContent());
         model.addAttribute("total_pages", userPage.getTotalPages());

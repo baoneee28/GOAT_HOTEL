@@ -23,8 +23,10 @@ public class AuthService {
         // Nếu DB trả về có người dùng (isPresent)
         if (optUser.isPresent()) {
             User user = optUser.get();
-            // Ném user vào Session để nhớ mặt (để các trang khác biết là đã đăng nhập rồi)
-            session.setAttribute("user", user);
+            // Ném user vào Session để nhớ mặt (nếu được truyền vào session)
+            if (session != null) {
+                session.setAttribute("user", user);
+            }
             return user;
         }
         return null; // Tịt -> Sai email hoặc password

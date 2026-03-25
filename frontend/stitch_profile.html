@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Profile &amp; Bookings | GOAT HOTEL</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary-fixed": "#e5e2e1",
+              "on-tertiary-container": "#7c839b",
+              "surface-container": "#edeeef",
+              "error": "#ba1a1a",
+              "on-primary-container": "#858383",
+              "on-background": "#191c1d",
+              "tertiary-container": "#131b2e",
+              "surface-variant": "#e1e3e4",
+              "on-tertiary-fixed": "#131b2e",
+              "on-tertiary": "#ffffff",
+              "primary-container": "#1c1b1b",
+              "on-error": "#ffffff",
+              "tertiary": "#000000",
+              "secondary-fixed-dim": "#e9c176",
+              "on-secondary-container": "#785a1a",
+              "outline": "#747878",
+              "on-primary-fixed-variant": "#474746",
+              "secondary-container": "#fed488",
+              "secondary": "#775a19",
+              "on-tertiary-fixed-variant": "#3f465c",
+              "tertiary-fixed": "#dae2fd",
+              "surface-dim": "#d9dadb",
+              "secondary-fixed": "#ffdea5",
+              "primary": "#000000",
+              "inverse-primary": "#c8c6c5",
+              "on-surface-variant": "#444748",
+              "on-primary-fixed": "#1c1b1b",
+              "on-surface": "#191c1d",
+              "on-primary": "#ffffff",
+              "background": "#f8f9fa",
+              "surface-container-lowest": "#ffffff",
+              "tertiary-fixed-dim": "#bec6e0",
+              "surface-container-high": "#e7e8e9",
+              "on-secondary-fixed-variant": "#5d4201",
+              "on-error-container": "#93000a",
+              "primary-fixed-dim": "#c8c6c5",
+              "inverse-surface": "#2e3132",
+              "surface-tint": "#5f5e5e",
+              "surface": "#f8f9fa",
+              "error-container": "#ffdad6",
+              "on-secondary": "#ffffff",
+              "surface-bright": "#f8f9fa",
+              "inverse-on-surface": "#f0f1f2",
+              "surface-container-low": "#f3f4f5",
+              "outline-variant": "#c4c7c7",
+              "on-secondary-fixed": "#261900",
+              "surface-container-highest": "#e1e3e4"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .glass-effect {
+            background: rgba(248, 249, 250, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        input:focus + label,
+        input:not(:placeholder-shown) + label {
+            transform: translateY(-1.5rem) scale(0.85);
+            color: #775a19;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface antialiased">
+<!-- TopAppBar from JSON -->
+<nav class="fixed top-0 w-full z-50 bg-stone-50/70 dark:bg-stone-950/70 backdrop-blur-xl flex items-center justify-between px-6 h-16 w-full">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-stone-900 dark:text-stone-50 active:scale-95 duration-200 transition-opacity hover:opacity-70 cursor-pointer" data-icon="arrow_back">arrow_back</span>
+<h1 class="font-manrope tracking-tight text-lg font-bold text-stone-900 dark:text-stone-50">Profile</h1>
+</div>
+<div class="font-manrope uppercase tracking-widest text-sm font-semibold text-stone-900 dark:text-stone-50">
+            The Concierge
+        </div>
+</nav>
+<main class="pt-24 pb-32 px-6 max-w-md mx-auto">
+<!-- Profile Header Section -->
+<section class="flex flex-col items-center mb-12">
+<div class="relative mb-4">
+<div class="w-24 h-24 rounded-full overflow-hidden bg-surface-container-low border border-outline-variant/20">
+<img alt="Guest Profile" class="w-full h-full object-cover" data-alt="close-up studio portrait of a sophisticated man with soft dramatic lighting against a dark neutral background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCNqP0VehOnTxWoj2XGywhDiKMdbx5Pav2NDIkclyU1HDS3vA7oFVVBclbtRC_h9mn7XPo_mwAJqpbL48BDPdzFKw3Vy7IydKZt0q7CijDFBnPPDD6ZECWGtC67AgDCZC_fbKNm5fGvcys5QIhGDiQPcqpayjx0p85DFKaKKuTVsDJo6-WJJcOVnU9c0kuyu_mBH2R7ZZqzJw3j8K-cXLyIJmMZEXoaY2L9Pt6Gl2C1qjEOMlR7BlUZ7dyHj_NbaGajCgobmHl7iWXb"/>
+</div>
+<div class="absolute bottom-0 right-0 bg-secondary-fixed p-1 rounded-full shadow-sm">
+<span class="material-symbols-outlined text-[16px] text-on-secondary-fixed" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+</div>
+<h2 class="font-headline text-2xl font-bold tracking-tight text-primary">Julian Sterling</h2>
+<div class="mt-1 flex items-center gap-2">
+<span class="font-label text-[10px] uppercase tracking-widest text-secondary font-semibold bg-secondary-fixed/30 px-2 py-0.5 rounded-full">Gold Member</span>
+</div>
+</section>
+<!-- Sub-Navigation Glass Menu -->
+<nav class="glass-effect rounded-full p-1 flex justify-between mb-12 border border-outline-variant/10 shadow-sm">
+<a class="flex-1 py-2 text-center text-on-surface font-label text-[11px] uppercase tracking-widest font-bold" href="#">Profile</a>
+<a class="flex-1 py-2 text-center text-on-surface-variant font-label text-[11px] uppercase tracking-widest hover:text-primary transition-colors" href="#">Bookings</a>
+<a class="flex-1 py-2 text-center text-on-surface-variant font-label text-[11px] uppercase tracking-widest hover:text-primary transition-colors" href="#">Sign Out</a>
+</nav>
+<!-- Profile Settings Section -->
+<section class="mb-16">
+<h3 class="font-headline text-xs uppercase tracking-[0.2em] text-on-surface-variant mb-8 font-semibold">Personal Details</h3>
+<div class="space-y-10">
+<div class="relative">
+<input class="w-full bg-transparent border-t-0 border-l-0 border-r-0 border-b border-outline-variant/20 py-2 px-0 focus:ring-0 focus:border-primary transition-all font-headline text-lg" id="name" placeholder=" " type="text" value="Julian Sterling"/>
+<label class="absolute left-0 top-2 font-label text-xs uppercase tracking-wider text-on-surface-variant transition-all pointer-events-none origin-left" for="name">Full Name</label>
+</div>
+<div class="relative">
+<input class="w-full bg-transparent border-t-0 border-l-0 border-r-0 border-b border-outline-variant/20 py-2 px-0 focus:ring-0 focus:border-primary transition-all font-headline text-lg" id="email" placeholder=" " type="email" value="j.sterling@editorial.com"/>
+<label class="absolute left-0 top-2 font-label text-xs uppercase tracking-wider text-on-surface-variant transition-all pointer-events-none origin-left" for="email">Email Address</label>
+</div>
+<div class="relative">
+<input class="w-full bg-transparent border-t-0 border-l-0 border-r-0 border-b border-outline-variant/20 py-2 px-0 focus:ring-0 focus:border-primary transition-all font-headline text-lg" id="phone" placeholder=" " type="tel" value="+44 20 7946 0123"/>
+<label class="absolute left-0 top-2 font-label text-xs uppercase tracking-wider text-on-surface-variant transition-all pointer-events-none origin-left" for="phone">Phone Number</label>
+</div>
+</div>
+<button class="mt-12 w-full bg-primary text-on-primary py-4 rounded-xl font-label text-xs uppercase tracking-[0.2em] font-bold active:scale-95 transition-transform">
+                Update Profile
+            </button>
+</section>
+<!-- Booking History Section -->
+<section class="pb-12">
+<div class="flex items-center justify-between mb-8">
+<h3 class="font-headline text-xs uppercase tracking-[0.2em] text-on-surface-variant font-semibold">Recent Stays</h3>
+<span class="text-[10px] uppercase tracking-widest text-secondary font-bold cursor-pointer">View All</span>
+</div>
+<div class="space-y-12">
+<!-- Booking Entry 1 -->
+<div class="group cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<div class="space-y-1">
+<p class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant font-medium">12 Oct — 15 Oct, 2024</p>
+<h4 class="font-headline text-xl font-bold tracking-tight text-primary">The Obsidian Suite</h4>
+</div>
+<span class="bg-primary text-on-primary text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded">Confirmed</span>
+</div>
+<div class="flex items-center justify-between py-4 border-t border-outline-variant/10">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="payments">payments</span>
+<span class="font-headline text-base font-semibold">£2,450.00</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant transition-transform group-hover:translate-x-1" data-icon="arrow_forward_ios" style="font-size: 14px;">arrow_forward_ios</span>
+</div>
+</div>
+<!-- Booking Entry 2 (Subtle bg shift via surface-container-low) -->
+<div class="group cursor-pointer p-4 -mx-4 rounded-xl bg-surface-container-low/50">
+<div class="flex justify-between items-start mb-4">
+<div class="space-y-1">
+<p class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant font-medium">04 Aug — 08 Aug, 2024</p>
+<h4 class="font-headline text-xl font-bold tracking-tight text-primary">Sky Garden Loft</h4>
+</div>
+<span class="bg-surface-variant text-on-surface-variant text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded">Completed</span>
+</div>
+<div class="flex items-center justify-between py-4 border-t border-outline-variant/10">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="payments">payments</span>
+<span class="font-headline text-base font-semibold">£1,890.00</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant transition-transform group-hover:translate-x-1" data-icon="arrow_forward_ios" style="font-size: 14px;">arrow_forward_ios</span>
+</div>
+</div>
+<!-- Booking Entry 3 -->
+<div class="group cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<div class="space-y-1">
+<p class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant font-medium">15 May — 16 May, 2024</p>
+<h4 class="font-headline text-xl font-bold tracking-tight text-primary">Terrace Premier</h4>
+</div>
+<span class="bg-surface-variant text-on-surface-variant text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded">Completed</span>
+</div>
+<div class="flex items-center justify-between py-4 border-t border-outline-variant/10">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="payments">payments</span>
+<span class="font-headline text-base font-semibold">£750.00</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant transition-transform group-hover:translate-x-1" data-icon="arrow_forward_ios" style="font-size: 14px;">arrow_forward_ios</span>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar from JSON -->
+<nav class="fixed bottom-0 w-full z-50 rounded-t-xl bg-stone-50 dark:bg-stone-950 shadow-2xl border-t border-stone-200/20 dark:border-stone-800/20 flex justify-around items-center h-20 px-4 pb-safe transition-all duration-300 ease-in-out">
+<div class="flex flex-col items-center justify-center text-stone-400 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300">
+<span class="material-symbols-outlined" data-icon="explore">explore</span>
+<span class="font-manrope uppercase tracking-widest text-[10px] font-medium">Discover</span>
+</div>
+<div class="flex flex-col items-center justify-center text-stone-400 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300">
+<span class="material-symbols-outlined" data-icon="calendar_month">calendar_month</span>
+<span class="font-manrope uppercase tracking-widest text-[10px] font-medium">Bookings</span>
+</div>
+<div class="flex flex-col items-center justify-center text-stone-900 dark:text-stone-50 font-bold">
+<span class="material-symbols-outlined" data-icon="person_outline" style="font-variation-settings: 'FILL' 1;">person_outline</span>
+<span class="font-manrope uppercase tracking-widest text-[10px] font-medium">Profile</span>
+</div>
+<div class="flex flex-col items-center justify-center text-stone-400 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+<span class="font-manrope uppercase tracking-widest text-[10px] font-medium">Menu</span>
+</div>
+</nav>
+<!-- Footer from JSON -->
+<footer class="w-full py-12 px-8 bg-stone-100 dark:bg-stone-900 flex flex-col items-center gap-4 text-center">
+<div class="flex gap-6">
+<a class="font-inter text-xs tracking-normal text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 transition-colors" href="#">Privacy</a>
+<a class="font-inter text-xs tracking-normal text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 transition-colors" href="#">Terms</a>
+<a class="font-inter text-xs tracking-normal text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 transition-colors" href="#">Support</a>
+</div>
+<p class="font-inter text-xs tracking-normal text-stone-500 dark:text-stone-400">© 2024 The Editorial Concierge. All Rights Reserved.</p>
+</footer>
+</body></html>

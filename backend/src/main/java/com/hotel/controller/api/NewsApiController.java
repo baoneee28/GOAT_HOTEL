@@ -9,7 +9,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/news")
-@CrossOrigin(origins = "*")
+
 public class NewsApiController {
 
     @Autowired
@@ -29,7 +29,7 @@ public class NewsApiController {
 
     // Lấy chi tiết tin tức theo ID
     @GetMapping("/{id}")
-    public News getNewsById(@PathVariable int id) {
+    public News getNewsById(@PathVariable("id") int id) {
         return newsRepository.findById(id).orElse(null);
     }
 
@@ -41,8 +41,8 @@ public class NewsApiController {
 
     @GetMapping("/admin")
     public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> listNewsForAdmin(
-            @RequestParam(defaultValue = "") String q,
-            @RequestParam(defaultValue = "1") int page) {
+            @RequestParam(value = "q", defaultValue = "") String q,
+            @RequestParam(value = "page", defaultValue = "1") int page) {
         int pageSize = 5;
         org.springframework.data.domain.Page<News> newsPage = newsRepository.findWithSearch(
                 q.isBlank() ? null : q,
@@ -76,7 +76,7 @@ public class NewsApiController {
     }
 
     @DeleteMapping("/admin/{id}")
-    public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> deleteNews(@PathVariable Integer id) {
+    public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> deleteNews(@PathVariable("id") Integer id) {
         java.util.Map<String, Object> response = new java.util.HashMap<>();
         try {
             newsRepository.deleteById(id);

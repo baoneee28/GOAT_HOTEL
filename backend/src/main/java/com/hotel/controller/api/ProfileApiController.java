@@ -13,7 +13,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/profile")
-@CrossOrigin(origins = "*")
+
 public class ProfileApiController {
 
     @Autowired
@@ -24,7 +24,7 @@ public class ProfileApiController {
 
     // FE gọi API này để lấy cục data JSON của User lên form Đổi thông tin
     @GetMapping("/{userId}")
-    public ResponseEntity<Map<String, Object>> getProfile(@PathVariable Integer userId) {
+    public ResponseEntity<Map<String, Object>> getProfile(@PathVariable("userId") Integer userId) {
         User user = userRepository.findById(userId).orElse(null);
         Map<String, Object> response = new HashMap<>();
         if (user == null) {
@@ -42,7 +42,7 @@ public class ProfileApiController {
     // Luồng 1: FE Cập nhật TEXT (Tên, SĐT, Tên file ảnh từ luồng Avatar)
     @PostMapping("/{userId}")
     public ResponseEntity<Map<String, Object>> updateProfile(
-            @PathVariable Integer userId,
+            @PathVariable("userId") Integer userId,
             @RequestBody Map<String, String> payload) {
         User user = userRepository.findById(userId).orElse(null);
         Map<String, Object> response = new HashMap<>();
@@ -70,7 +70,7 @@ public class ProfileApiController {
     // Backend sẽ gọi FileUpload bảo dọn rác avatar cũ và đặt tên file avatar mới
     @PostMapping("/{userId}/avatar")
     public ResponseEntity<Map<String, Object>> uploadAvatar(
-            @PathVariable Integer userId,
+            @PathVariable("userId") Integer userId,
             @RequestParam("avatar") MultipartFile avatar) {
         Map<String, Object> response = new HashMap<>();
         try {

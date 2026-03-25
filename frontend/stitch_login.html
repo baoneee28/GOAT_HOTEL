@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;400;600;800&amp;family=Inter:wght@300;400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-variant": "#e1e3e4",
+              "tertiary-fixed": "#dae2fd",
+              "surface-bright": "#f8f9fa",
+              "error": "#ba1a1a",
+              "primary": "#000000",
+              "on-primary-fixed": "#1c1b1b",
+              "on-tertiary-container": "#7c839b",
+              "on-primary": "#ffffff",
+              "surface-container-highest": "#e1e3e4",
+              "on-primary-fixed-variant": "#474746",
+              "surface-tint": "#5f5e5e",
+              "surface-dim": "#d9dadb",
+              "tertiary": "#000000",
+              "inverse-primary": "#c8c6c5",
+              "error-container": "#ffdad6",
+              "on-primary-container": "#858383",
+              "surface-container-low": "#f3f4f5",
+              "outline-variant": "#c4c7c7",
+              "secondary-container": "#fed488",
+              "secondary-fixed-dim": "#e9c176",
+              "on-error": "#ffffff",
+              "surface-container": "#edeeef",
+              "primary-fixed-dim": "#c8c6c5",
+              "on-secondary-fixed-variant": "#5d4201",
+              "primary-fixed": "#e5e2e1",
+              "on-error-container": "#93000a",
+              "on-secondary-container": "#785a1a",
+              "on-surface-variant": "#444748",
+              "on-secondary": "#ffffff",
+              "secondary-fixed": "#ffdea5",
+              "on-secondary-fixed": "#261900",
+              "inverse-on-surface": "#f0f1f2",
+              "tertiary-fixed-dim": "#bec6e0",
+              "background": "#f8f9fa",
+              "surface-container-high": "#e7e8e9",
+              "on-background": "#191c1d",
+              "on-tertiary": "#ffffff",
+              "outline": "#747878",
+              "on-surface": "#191c1d",
+              "secondary": "#775a19",
+              "inverse-surface": "#2e3132",
+              "tertiary-container": "#131b2e",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary-fixed-variant": "#3f465c",
+              "surface": "#f8f9fa",
+              "primary-container": "#1c1b1b",
+              "on-tertiary-fixed": "#131b2e"
+            },
+            fontFamily: {
+              "headline": ["Manrope", "sans-serif"],
+              "body": ["Inter", "sans-serif"],
+              "label": ["Inter", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Floating label logic */
+        .floating-input:focus-within label,
+        .floating-input input:not(:placeholder-shown) + label {
+            transform: translateY(-1.5rem) scale(0.85);
+            color: var(--tw-color-primary);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface antialiased overflow-hidden">
+<!-- TopAppBar (Suppressed as per Transactional Rule, but using branding for the header) -->
+<header class="fixed top-0 w-full z-50 bg-white/10 backdrop-blur-md flex items-center justify-between px-6 h-20">
+<div class="text-xl font-bold tracking-[0.2em] text-stone-900 font-headline uppercase">
+            GOAT HOTEL
+        </div>
+<a class="text-stone-400 hover:opacity-70 transition-opacity duration-300" href="/">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</a>
+</header>
+<main class="flex min-h-screen">
+<!-- Left Column: Image (Editorial Asymmetric Layout) -->
+<div class="hidden lg:block lg:w-7/12 relative overflow-hidden bg-surface-container">
+<img alt="Luxury hotel lobby" class="absolute inset-0 w-full h-full object-cover" data-alt="Cinematic wide shot of a minimalist luxury hotel lobby with warm ambient lighting, marble floors, and sculptural modern furniture in soft morning light." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDz9rjWA-4lI0ot3meW_1JoCd3_WqJhY5nBbeYyheFFnkkS8VtFnhbS9vpCAT6pTWiRABg7K2oq2LGVMlehf9KzbURqWLsy5yEbhX3AD1sUTdDrHWts84m9NMn7-tc1hiXZoMVPziSoI3f9KEkkwQJSjE1MFqUxC8Izbz5qNAha7vG7cbqlLJX5k7xTEBF4e8qHbfvydb9HK8LkjhDJv8x_AiACTOjEMWL-krIA9qE77lovO5q48ce43Jlll5KuM6u49MRwMFSs1Bpy"/>
+<div class="absolute inset-0 bg-primary/10"></div>
+<!-- Editorial Quote Overlay -->
+<div class="absolute bottom-12 left-12 max-w-md">
+<span class="font-label text-[10px] tracking-widest uppercase text-white/60 mb-4 block">Private Collection</span>
+<h2 class="font-headline text-white text-4xl font-extralight tracking-tight leading-tight">
+                    Experience the art of <br/><span class="italic">intentional</span> living.
+                </h2>
+</div>
+</div>
+<!-- Right Column: Login Form -->
+<div class="w-full lg:w-5/12 flex flex-col justify-center px-8 md:px-24 bg-surface pt-20">
+<div class="max-w-md w-full mx-auto">
+<header class="mb-16">
+<span class="font-label text-[10px] tracking-[0.2em] text-secondary uppercase mb-2 block font-semibold">Welcome Back</span>
+<h1 class="font-headline text-5xl font-bold tracking-[-0.04em] text-primary">Đăng nhập</h1>
+</header>
+<form class="space-y-10">
+<!-- Email Field -->
+<div class="relative floating-input group">
+<input class="peer w-full bg-transparent border-0 border-b border-outline-variant/30 py-3 px-0 focus:ring-0 focus:border-primary transition-colors text-on-surface font-headline text-lg" id="email" name="email" placeholder=" " type="email"/>
+<label class="absolute left-0 top-3 text-on-surface-variant pointer-events-none transition-all duration-300 origin-left uppercase text-[10px] tracking-widest font-label" for="email">
+                            Email Address
+                        </label>
+</div>
+<!-- Password Field -->
+<div class="relative floating-input group">
+<input class="peer w-full bg-transparent border-0 border-b border-outline-variant/30 py-3 px-0 focus:ring-0 focus:border-primary transition-colors text-on-surface font-headline text-lg" id="password" name="password" placeholder=" " type="password"/>
+<label class="absolute left-0 top-3 text-on-surface-variant pointer-events-none transition-all duration-300 origin-left uppercase text-[10px] tracking-widest font-label" for="password">
+                            Password
+                        </label>
+</div>
+<div class="flex items-center justify-between pt-2">
+<label class="flex items-center space-x-3 cursor-pointer">
+<input class="w-4 h-4 rounded-sm border-outline-variant text-primary focus:ring-primary/20" type="checkbox"/>
+<span class="text-[10px] uppercase tracking-widest font-label text-on-surface-variant">Remember me</span>
+</label>
+<a class="text-[10px] uppercase tracking-widest font-label text-secondary hover:opacity-70 transition-opacity" href="#">Forgot?</a>
+</div>
+<div class="pt-8 flex flex-col gap-6">
+<button class="w-full py-5 bg-primary text-on-primary font-headline font-bold uppercase tracking-[0.2em] text-xs hover:opacity-90 active:scale-[0.98] transition-all duration-200 rounded-xl" type="submit">
+                            Đăng nhập
+                        </button>
+<div class="relative py-4">
+<div class="absolute inset-0 flex items-center"><div class="w-full border-t border-outline-variant/20"></div></div>
+<div class="relative flex justify-center text-[10px] uppercase tracking-widest font-label">
+<span class="bg-surface px-4 text-on-surface-variant">Or continue with</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<button class="flex items-center justify-center py-4 border border-outline-variant/20 rounded-xl hover:bg-surface-container-low transition-colors" type="button">
+<span class="text-[10px] uppercase tracking-widest font-label">Google</span>
+</button>
+<button class="flex items-center justify-center py-4 border border-outline-variant/20 rounded-xl hover:bg-surface-container-low transition-colors" type="button">
+<span class="text-[10px] uppercase tracking-widest font-label">Apple</span>
+</button>
+</div>
+</div>
+</form>
+<footer class="mt-16 text-center">
+<p class="text-[11px] uppercase tracking-widest font-label text-on-surface-variant">
+                        Don't have an account? 
+                        <a class="text-primary font-bold ml-2 underline decoration-secondary underline-offset-4 hover:text-secondary transition-colors" href="/register">Đăng ký</a>
+</p>
+</footer>
+</div>
+</div>
+</main>
+<!-- Footer - Editorial Minimalist -->
+<footer class="fixed bottom-0 w-full lg:w-5/12 right-0 bg-transparent flex flex-row justify-between items-center px-10 py-8 gap-6 z-10 pointer-events-none">
+<div class="text-on-surface-variant text-[9px] tracking-[0.2em] uppercase font-label">
+            © 2024 GOAT HOTEL.
+        </div>
+<div class="flex gap-6 pointer-events-auto">
+<a class="text-on-surface-variant text-[9px] tracking-[0.2em] uppercase font-label hover:text-primary transition-colors" href="#">Privacy</a>
+<a class="text-on-surface-variant text-[9px] tracking-[0.2em] uppercase font-label hover:text-primary transition-colors" href="#">Terms</a>
+</div>
+</footer>
+</body></html>

@@ -1,11 +1,7 @@
 package com.hotel.controller.admin;
 
-import com.hotel.entity.Item;
 import com.hotel.entity.Room;
-import com.hotel.entity.RoomItem;
 import com.hotel.entity.RoomType;
-import com.hotel.repository.ItemRepository;
-import com.hotel.repository.RoomItemRepository;
 import com.hotel.repository.RoomRepository;
 import com.hotel.repository.RoomTypeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,12 +30,6 @@ public class AdminRoomController {
     @Autowired
     private RoomTypeRepository roomTypeRepository;
 
-    @Autowired
-    private RoomItemRepository roomItemRepository;
-
-    @Autowired
-    private ItemRepository itemRepository;
-
     private static final int PAGE_SIZE = 5;
 
     @GetMapping
@@ -54,9 +44,6 @@ public class AdminRoomController {
 
 
         List<RoomType> types = roomTypeRepository.findAll();
-        List<Item> allItems = itemRepository.findAll();
-
-
 
         model.addAttribute("rooms", roomPage.getContent());
         model.addAttribute("totalPages", roomPage.getTotalPages());
@@ -65,7 +52,6 @@ public class AdminRoomController {
         model.addAttribute("search", q);
         model.addAttribute("statusFilter", status);
         model.addAttribute("types", types);
-        model.addAttribute("all_items", allItems);
 
         return "admin/rooms";
     }
@@ -103,24 +89,6 @@ public class AdminRoomController {
         room.setStatus(status);
         room = roomRepository.save(room);
 
-        // --- XỬ LÝ TIỆN ÍCH TRONG PHÒNG CỦA MỐI QUAN HỆ NHIỀU-NHIỀU ---
-        // Xoá sạch tiện ích cũ của phòng này trong DB
-        roomItemRepository.deleteByRoomId(room.getId());
-        
-        // Cắt chuỗi "1,3,5" thành mảng và lưu lại từng dòng tiện ích mới
-        if (!items_ids.isBlank()) {
-            String[] idArr = items_ids.split(",");
-            for (String idStr : idArr) {
-                try {
-                    int itemId = Integer.parseInt(idStr.trim());
-                    RoomItem ri = new RoomItem();
-                    ri.setRoomId(room.getId());
-                    ri.setItemId(itemId);
-                    roomItemRepository.save(ri);
-                } catch (NumberFormatException ignored) {}
-            }
-        }
-
         return "redirect:/admin/rooms";
     }
 
@@ -128,12 +96,5 @@ public class AdminRoomController {
     public String deleteRoom(@RequestParam Integer id) {
         roomRepository.deleteById(id);
         return "redirect:/admin/rooms";
-    }
-
-    
-    @GetMapping("/items/{roomId}")
-    @ResponseBody
-    public List<Integer> getRoomItems(@PathVariable Integer roomId) {
-        return roomItemRepository.findItemIdsByRoomId(roomId);
     }
 }

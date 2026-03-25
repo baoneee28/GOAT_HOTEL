@@ -10,15 +10,21 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/users")
-@CrossOrigin(origins = "*")
+
 public class UserApiController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @GetMapping("/all")
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
+    }
 
     @GetMapping
     public ResponseEntity<Map<String, Object>> listUsers(

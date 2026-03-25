@@ -9,7 +9,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/rooms")
-@CrossOrigin(origins = "*") // ⚠️ Quan trọng: Mở CORS để React/Vue có thể gọi API mà không bị chặn
+
 public class RoomApiController {
 
     @Autowired
@@ -23,13 +23,13 @@ public class RoomApiController {
 
     // Lấy chi tiết 1 phòng theo ID
     @GetMapping("/{id}")
-    public Room getRoomById(@PathVariable Integer id) {
+    public Room getRoomById(@PathVariable("id") Integer id) {
         return roomRepository.findById(id).orElse(null);
     }
 
     // Lấy danh sách phòng lọc theo Loại phòng (Standard, VIP)
     @GetMapping("/type/{typeId}")
-    public List<Room> getRoomsByType(@PathVariable Integer typeId) {
+    public List<Room> getRoomsByType(@PathVariable("typeId") Integer typeId) {
         return roomRepository.findByRoomTypeIdOrderByRoomNumberAsc(typeId);
     }
 
@@ -38,9 +38,6 @@ public class RoomApiController {
     // ==========================================
     @Autowired
     private com.hotel.repository.RoomTypeRepository roomTypeRepository;
-
-    @Autowired
-    private com.hotel.repository.RoomItemRepository roomItemRepository;
 
     @GetMapping("/admin")
     public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> listRoomsForAdmin(
@@ -58,12 +55,6 @@ public class RoomApiController {
         response.put("rooms", roomPage.getContent());
         response.put("totalPages", roomPage.getTotalPages());
         return org.springframework.http.ResponseEntity.ok(response);
-    }
-
-    // Lấy mảng ID danh sách tiện ích của một phòng (Dùng cho FE hiển thị lại Checkbox khi bấm Edit)
-    @GetMapping("/admin/items/{roomId}")
-    public List<Integer> getRoomItems(@PathVariable Integer roomId) {
-        return roomItemRepository.findItemIdsByRoomId(roomId);
     }
 
     @PostMapping("/admin")
@@ -96,27 +87,13 @@ public class RoomApiController {
         room.setStatus(status);
         room = roomRepository.save(room);
 
-        roomItemRepository.deleteByRoomId(room.getId());
-        if (!itemsIds.isBlank()) {
-            String[] idArr = itemsIds.split(",");
-            for (String idStr : idArr) {
-                try {
-                    int itemId = Integer.parseInt(idStr.trim());
-                    com.hotel.entity.RoomItem ri = new com.hotel.entity.RoomItem();
-                    ri.setRoomId(room.getId());
-                    ri.setItemId(itemId);
-                    roomItemRepository.save(ri);
-                } catch (NumberFormatException ignored) {}
-            }
-        }
-
         java.util.Map<String, Object> response = new java.util.HashMap<>();
         response.put("success", true);
         return org.springframework.http.ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/admin/{id}")
-    public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> deleteRoom(@PathVariable Integer id) {
+    public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> deleteRoom(@PathVariable("id") Integer id) {
         java.util.Map<String, Object> response = new java.util.HashMap<>();
         try {
             roomRepository.deleteById(id);

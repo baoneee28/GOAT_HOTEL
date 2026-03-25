@@ -14,11 +14,16 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/items")
-@CrossOrigin(origins = "*")
+
 public class ItemApiController {
 
     @Autowired
     private ItemRepository itemRepository;
+
+    @GetMapping("/all")
+    public java.util.List<Item> getAllItems() {
+        return itemRepository.findAll();
+    }
 
     @GetMapping
     public ResponseEntity<Map<String, Object>> listItems(
@@ -58,7 +63,7 @@ public class ItemApiController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> deleteItem(@PathVariable Integer id) {
+    public ResponseEntity<Map<String, Object>> deleteItem(@PathVariable("id") Integer id) {
         Map<String, Object> response = new HashMap<>();
         try {
             itemRepository.deleteById(id);

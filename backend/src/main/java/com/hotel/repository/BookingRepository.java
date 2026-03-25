@@ -18,7 +18,6 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
 
     @Query("SELECT b FROM Booking b " +
-           "JOIN FETCH b.room r JOIN FETCH r.roomType t " +
            "WHERE b.user.id = :userId AND b.status IN ('pending', 'confirmed') " +
            "ORDER BY b.id DESC")
     List<Booking> findActiveBookingByUserId(@Param("userId") Integer userId);
@@ -26,7 +25,7 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
 
 
-    @Query(value = "SELECT b FROM Booking b JOIN FETCH b.room r JOIN FETCH r.roomType t " +
+    @Query(value = "SELECT b FROM Booking b " +
            "WHERE b.user.id = :userId AND (:status IS NULL OR :status = 'all' OR b.status = :status) " +
            "ORDER BY b.id DESC",
            countQuery = "SELECT COUNT(b) FROM Booking b WHERE b.user.id = :userId AND (:status IS NULL OR :status = 'all' OR b.status = :status)")
@@ -54,9 +53,9 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     long countByStatus(String status);
 
 
-    @Query("SELECT b FROM Booking b JOIN FETCH b.user u JOIN FETCH b.room r JOIN FETCH r.roomType t " +
+    @Query(value = "SELECT b FROM Booking b JOIN FETCH b.user u " +
            "WHERE (:status IS NULL OR :status = '' OR b.status = :status) " +
-           "ORDER BY b.id DESC")
+           "ORDER BY b.id DESC", countQuery = "SELECT COUNT(b) FROM Booking b WHERE (:status IS NULL OR :status = '' OR b.status = :status)")
     Page<Booking> findAdminBookings(@Param("status") String status, Pageable pageable);
 
     @Query("SELECT COUNT(b) FROM Booking b " +

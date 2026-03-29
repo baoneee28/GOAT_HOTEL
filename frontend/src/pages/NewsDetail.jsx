@@ -48,7 +48,7 @@ export default function NewsDetail() {
 
   if (!news) return (
     <div className="min-h-screen flex items-center justify-center bg-surface">
-      <p className="font-label uppercase tracking-widest text-xs text-on-surface-variant animate-pulse">Loading...</p>
+      <p className="font-label uppercase tracking-widest text-xs text-on-surface-variant animate-pulse">Đang tải...</p>
     </div>
   );
 
@@ -87,7 +87,7 @@ export default function NewsDetail() {
             className="inline-flex items-center gap-2 font-label uppercase tracking-widest text-xs text-on-surface-variant hover:text-secondary transition-colors"
           >
             <span className="material-symbols-outlined text-base">arrow_back</span>
-            Back to News
+            Quay lại Tin tức
           </Link>
           <span className="font-label text-xs text-on-surface-variant uppercase tracking-widest">
             {news.date ?? STATIC.date}
@@ -144,7 +144,7 @@ export default function NewsDetail() {
                 schedule
               </span>
               <p className="font-label text-xs uppercase tracking-widest text-on-surface-variant">
-                Tradition preserved: The Sovereign's evening ritual at 18:45 daily.
+                Truyền thống được gìn giữ: Nghi thức buổi tối của The Sovereign diễn ra lúc 18:45 hàng ngày.
               </p>
             </div>
           )}
@@ -156,7 +156,7 @@ export default function NewsDetail() {
           {/* Related Articles */}
           <div>
             <p className="font-label uppercase tracking-[0.25em] text-secondary text-xs mb-6">
-              Related Articles
+              Bài viết Liên quan
             </p>
             <div className="space-y-6">
               {related.map((item, i) => (
@@ -191,19 +191,19 @@ export default function NewsDetail() {
           {/* Suite CTA */}
           <div className="bg-primary p-8 text-white">
             <p className="font-label uppercase tracking-[0.25em] text-secondary text-xs mb-3">
-              The Collection
+              Bộ sưu tập
             </p>
             <h3 className="font-headline text-xl mb-3 leading-snug">
-              Experience the Unrivaled Comfort of Our Suites
+              Trải nghiệm Sự Thoải mái Tuyệt đỉnh trong Các Phòng của Chúng tôi
             </h3>
             <p className="text-white/50 text-sm font-body mb-6">
-              Discover a sanctuary designed for those who seek the extraordinary in every detail.
+              Khám phá một khu bảo tồn được thiết kế dành cho những ai tìm kiếm sự phi thường trong từng chi tiết.
             </p>
             <Link
               to="/collections"
               className="inline-flex items-center gap-2 font-label uppercase tracking-widest text-xs text-secondary border-b border-secondary/30 hover:border-secondary transition-all pb-0.5"
             >
-              View Collections
+              Xem Bộ sưu tập
               <span className="material-symbols-outlined text-base">arrow_forward</span>
             </Link>
           </div>
@@ -215,7 +215,7 @@ export default function NewsDetail() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="font-headline italic text-xl text-white">GOAT HOTEL</div>
           <div className="flex gap-8">
-            {['Privacy Policy', 'Terms of Service', 'Press Inquiries', 'Sustainability'].map(link => (
+            {['Chính sách Bảo mật', 'Điều khoản Dịch vụ', 'Báo chí', 'Bền vững'].map(link => (
               <a key={link} href="#" className="font-label uppercase tracking-widest text-[10px] text-white/40 hover:text-white transition-colors">
                 {link}
               </a>

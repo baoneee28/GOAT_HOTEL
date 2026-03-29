@@ -5,19 +5,19 @@ import axios from 'axios';
 const STATUS_STYLES = {
   pending: {
     badge: 'border border-secondary/60 text-secondary bg-secondary/5',
-    label: 'Pending',
+    label: 'Chờ xử lý',
   },
   confirmed: {
     badge: 'bg-emerald-900/40 text-emerald-400 border border-emerald-500/30',
-    label: 'Confirmed',
+    label: 'Đã xác nhận',
   },
   completed: {
     badge: 'bg-slate-800 text-slate-300 border border-slate-700',
-    label: 'Completed',
+    label: 'Đã hoàn thành',
   },
   cancelled: {
     badge: 'bg-red-950/40 text-red-400 border border-red-800/30 line-through',
-    label: 'Cancelled',
+    label: 'Đã hủy',
   },
 };
 
@@ -92,10 +92,10 @@ export default function History() {
         {/* Page Header */}
         <header className="mb-16 border-b border-slate-800 pb-12 space-y-4">
           <h1 className="font-headline text-5xl md:text-6xl font-light tracking-tight text-white italic">
-            Residency <span className="text-secondary not-italic">History</span>
+            Lịch sử <span className="text-secondary not-italic">Đặt phòng</span>
           </h1>
           <p className="text-slate-500 font-body text-sm max-w-lg">
-            A complete record of your stays and reservations at The Sovereign.
+            Toàn bộ hồ sơ lưu trú và đặt phòng của bạn tại GOAT HOTEL.
           </p>
         </header>
 
@@ -111,7 +111,7 @@ export default function History() {
                   : 'border-slate-800 text-slate-500 hover:border-secondary/40 hover:text-secondary'
               }`}
             >
-              {f === 'all' ? 'All Stays' : f}
+              {f === 'all' ? 'Tất cả' : STATUS_STYLES[f]?.label || f}
             </button>
           ))}
         </div>
@@ -124,9 +124,9 @@ export default function History() {
         ) : bookings.length === 0 ? (
           <div className="glass-card p-20 rounded-lg text-center space-y-4">
             <span className="material-symbols-outlined text-5xl text-slate-700">hotel</span>
-            <p className="font-headline text-xl text-slate-500 italic">No reservations found.</p>
+            <p className="font-headline text-xl text-slate-500 italic">Không tìm thấy đặt phòng nào.</p>
             <Link to="/collections" className="inline-block mt-4 font-label text-xs uppercase tracking-widest text-secondary border-b border-secondary/40 pb-0.5">
-              Browse Rooms
+              Xem phòng
             </Link>
           </div>
         ) : (
@@ -164,25 +164,25 @@ export default function History() {
                           </span>
                         </div>
                         <h3 className="font-headline text-2xl text-white italic">
-                          {detail?.room?.roomType?.name || 'Standard Suite'}
+                          {detail?.room?.roomType?.name || 'Phòng Tiêu chuẩn'}
                         </h3>
                         <p className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
-                          Room {detail?.room?.roomNumber || 'N/A'}
+                          Phòng {detail?.room?.roomNumber || 'N/A'}
                         </p>
                       </div>
 
                       <div className="flex flex-wrap gap-8 md:gap-12">
                         <div className="space-y-1">
-                          <p className="font-label text-[0.6rem] uppercase tracking-widest text-slate-600 font-bold">Check-In</p>
+                          <p className="font-label text-[0.6rem] uppercase tracking-widest text-slate-600 font-bold">Nhận phòng</p>
                           <p className="font-headline text-base text-white">{formatDate(detail?.checkIn)}</p>
                         </div>
                         <div className="space-y-1">
-                          <p className="font-label text-[0.6rem] uppercase tracking-widest text-slate-600 font-bold">Check-Out</p>
+                          <p className="font-label text-[0.6rem] uppercase tracking-widest text-slate-600 font-bold">Trả phòng</p>
                           <p className="font-headline text-base text-white">{formatDate(detail?.checkOut)}</p>
                         </div>
                         <div className="space-y-1">
-                          <p className="font-label text-[0.6rem] uppercase tracking-widest text-slate-600 font-bold">Total</p>
-                          <p className="font-headline text-xl text-secondary">${booking.totalPrice?.toFixed(2) || '0.00'}</p>
+                          <p className="font-label text-[0.6rem] uppercase tracking-widest text-slate-600 font-bold">Tổng cộng</p>
+                          <p className="font-headline text-xl text-secondary">{(booking.totalPrice || 0).toLocaleString('vi-VN')}đ</p>
                         </div>
                       </div>
 
@@ -205,7 +205,7 @@ export default function History() {
               disabled={page === 1}
               className="px-5 py-2 border border-slate-800 text-slate-500 font-label text-[0.65rem] uppercase tracking-widest hover:border-secondary hover:text-secondary transition-all disabled:opacity-30"
             >
-              Prev
+              Trước
             </button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(pg => (
               <button
@@ -223,7 +223,7 @@ export default function History() {
               disabled={page === totalPages}
               className="px-5 py-2 border border-slate-800 text-slate-500 font-label text-[0.65rem] uppercase tracking-widest hover:border-secondary hover:text-secondary transition-all disabled:opacity-30"
             >
-              Next
+              Tiếp
             </button>
           </div>
         )}

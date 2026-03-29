@@ -82,7 +82,7 @@ export default function NewsPage() {
 
   const handleSubscribe = (e) => {
     e.preventDefault();
-    if (window.Swal) window.Swal.fire({ icon: 'success', title: 'Subscribed!', text: 'Thank you for joining our narrative.', timer: 2000, showConfirmButton: false });
+    if (window.Swal) window.Swal.fire({ icon: 'success', title: 'Đã đăng ký!', text: 'Cảm ơn bạn đã quan tâm.', timer: 2000, showConfirmButton: false });
     setEmail('');
   };
 
@@ -119,7 +119,7 @@ export default function NewsPage() {
               to={`/news/${FEATURED.id}`}
               className="font-label uppercase tracking-widest text-xs text-white border-b border-secondary pb-1 hover:text-secondary transition-colors"
             >
-              READ JOURNAL →
+              ĐỌC BÀI VIẾT →
             </Link>
             <span className="font-label text-xs text-white/40 uppercase tracking-wider">{FEATURED.date}</span>
           </div>
@@ -134,10 +134,10 @@ export default function NewsPage() {
           <div className="flex items-center justify-between mb-14">
             <div>
               <p className="font-label uppercase tracking-[0.25em] text-secondary text-xs mb-3">
-                Latest Journals
+                Bài viết Mới nhất
               </p>
               <h2 className="font-headline text-on-surface text-3xl md:text-4xl tracking-tight">
-                The Narrative
+                Câu chuyện của Chúng tôi
               </h2>
             </div>
           </div>
@@ -181,19 +181,19 @@ export default function NewsPage() {
       <section className="bg-primary py-20 md:py-28">
         <div className="max-w-xl mx-auto px-8 text-center">
           <p className="font-label uppercase tracking-[0.25em] text-secondary text-xs mb-4">
-            Stay Connected
+            Luôn Kết nối
           </p>
           <h2 className="font-headline text-white text-3xl md:text-4xl mb-4 tracking-tight">
-            Invitations to your Inbox
+            Nhận thông báo qua Email
           </h2>
           <p className="text-white/50 text-sm font-body mb-10">
-            By subscribing, you agree to our Privacy Policy and Terms of Narrative.
+            Bằng cách đăng ký, bạn đồng ý với Chính sách Bảo mật và Điều khoản Dịch vụ của chúng tôi.
           </p>
 
           <form onSubmit={handleSubscribe} className="flex gap-0">
             <input
               type="email"
-              placeholder="Your email address"
+              placeholder="Địa chỉ email của bạn"
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
@@ -203,7 +203,7 @@ export default function NewsPage() {
               type="submit"
               className="font-label uppercase tracking-widest text-xs text-secondary border-b border-secondary py-3 px-6 hover:text-white hover:border-white transition-all ml-4"
             >
-              SUBSCRIBE
+              ĐĂNG KÝ
             </button>
           </form>
         </div>

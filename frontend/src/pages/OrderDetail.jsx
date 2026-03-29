@@ -25,10 +25,10 @@ const calcNights = (hours) => {
 
 // Status step definitions
 const STATUS_STEPS = [
-  { key: 'pending',   label: 'Pending',   icon: 'check' },
-  { key: 'confirmed', label: 'Confirmed', icon: 'check_circle' },
-  { key: 'completed', label: 'Completed', icon: 'auto_awesome' },
-  { key: 'cancelled', label: 'Cancelled', icon: 'cancel' },
+  { key: 'pending',   label: 'Chờ xử lý',   icon: 'check' },
+  { key: 'confirmed', label: 'Đã xác nhận', icon: 'check_circle' },
+  { key: 'completed', label: 'Đã hoàn thành', icon: 'auto_awesome' },
+  { key: 'cancelled', label: 'Đã hủy', icon: 'cancel' },
 ];
 
 const STATUS_ORDER = { pending: 0, confirmed: 1, completed: 2, cancelled: 3 };
@@ -48,8 +48,8 @@ export default function OrderDetail() {
   if (!booking) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-6">
-        <p className="text-slate-400 font-label tracking-widest uppercase text-sm">No booking data found.</p>
-        <Link to="/history" className="text-secondary font-label text-xs uppercase tracking-widest border-b border-secondary/40 pb-0.5">← Back to History</Link>
+        <p className="text-slate-400 font-label tracking-widest uppercase text-sm">Không tìm thấy dữ liệu đặt phòng.</p>
+        <Link to="/history" className="text-secondary font-label text-xs uppercase tracking-widest border-b border-secondary/40 pb-0.5">← Quay lại Lịch sử</Link>
       </div>
     );
   }
@@ -106,17 +106,17 @@ export default function OrderDetail() {
         {/* Back Button */}
         <Link to="/history" className="inline-flex items-center gap-2 text-slate-500 hover:text-secondary transition-colors font-label text-xs uppercase tracking-widest mb-12">
           <span className="material-symbols-outlined text-sm">arrow_back</span>
-          Back to History
+          Quay lại Lịch sử
         </Link>
 
         {/* Header */}
         <header className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-8 border-b border-slate-800 pb-12">
           <div className="space-y-4">
             <span className="inline-block text-secondary font-label text-[0.7rem] tracking-[0.4em] uppercase font-bold px-3 py-1 border border-secondary/20 bg-secondary/5">
-              Reservation Overview
+              Tổng quan Đặt phòng
             </span>
             <h1 className="font-headline text-5xl md:text-6xl font-light tracking-tight text-white italic">
-              Order <span className="text-secondary not-italic">#{String(booking.id).padStart(5, '0')}</span>
+              Đơn <span className="text-secondary not-italic">#{String(booking.id).padStart(5, '0')}</span>
             </h1>
           </div>
 
@@ -137,7 +137,7 @@ export default function OrderDetail() {
                             <span className="material-symbols-outlined text-lg">{step.icon}</span>
                           </div>
                           <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                            <span className="font-label text-[0.55rem] tracking-[0.3em] uppercase font-bold text-secondary bg-secondary/10 px-2 py-0.5 rounded-full border border-secondary/20">Current</span>
+                            <span className="font-label text-[0.55rem] tracking-[0.3em] uppercase font-bold text-secondary bg-secondary/10 px-2 py-0.5 rounded-full border border-secondary/20">Hiện tại</span>
                           </div>
                         </div>
                       ) : (
@@ -171,22 +171,22 @@ export default function OrderDetail() {
             <section className="glass-card p-10 rounded-lg">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-10">
                 <div className="space-y-2">
-                  <p className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-slate-500 font-bold">Check-In</p>
+                  <p className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-slate-500 font-bold">Nhận phòng</p>
                   <p className="font-headline text-xl text-white">{formatDate(detail?.checkIn)}</p>
-                  <p className="font-body text-[0.7rem] text-slate-500 uppercase tracking-tighter italic">After 3:00 PM</p>
+                  <p className="font-body text-[0.7rem] text-slate-500 uppercase tracking-tighter italic">Sau 15:00</p>
                 </div>
                 <div className="space-y-2">
-                  <p className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-slate-500 font-bold">Check-Out</p>
+                  <p className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-slate-500 font-bold">Trả phòng</p>
                   <p className="font-headline text-xl text-white">{formatDate(detail?.checkOut)}</p>
-                  <p className="font-body text-[0.7rem] text-slate-500 uppercase tracking-tighter italic">Before 11:00 AM</p>
+                  <p className="font-body text-[0.7rem] text-slate-500 uppercase tracking-tighter italic">Trước 11:00</p>
                 </div>
                 <div className="space-y-2">
-                  <p className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-slate-500 font-bold">Duration</p>
-                  <p className="font-headline text-xl text-secondary">{nights} Night{nights !== 1 ? 's' : ''}</p>
+                  <p className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-slate-500 font-bold">Thời gian</p>
+                  <p className="font-headline text-xl text-secondary">{nights} Đêm</p>
                 </div>
                 <div className="space-y-2">
-                  <p className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-slate-500 font-bold">Guests</p>
-                  <p className="font-headline text-xl text-white">2 Adults</p>
+                  <p className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-slate-500 font-bold">Khách</p>
+                  <p className="font-headline text-xl text-white">2 Khách</p>
                 </div>
               </div>
             </section>
@@ -209,32 +209,32 @@ export default function OrderDetail() {
                   <div className="md:w-2/3 p-10 space-y-6">
                     <div>
                       <h2 className="font-headline text-3xl text-white mb-2 italic">
-                        Room {detail.room?.roomNumber || 'N/A'}
+                        Phòng {detail.room?.roomNumber || 'N/A'}
                       </h2>
                       <p className="font-label text-[0.7rem] text-secondary tracking-[0.3em] uppercase font-bold">
-                        {detail.room?.roomType?.name || 'Standard Suite'}
+                        {detail.room?.roomType?.name || 'Phòng Tiêu chuẩn'}
                       </p>
                     </div>
                     <p className="font-body text-slate-400 leading-relaxed text-sm">
-                      {detail.room?.roomType?.description || 'Experience the pinnacle of opulence with hand-selected artisanal furnishings and bespoke concierge service available at all hours.'}
+                      {detail.room?.roomType?.description || 'Trải nghiệm đỉnh cao của sự sang trọng với nội thất thủ công được tuyển chọn kỹ lưỡng và dịch vụ hỗ trợ đặc quyền 24/7.'}
                     </p>
                     <div className="flex flex-wrap gap-8 pt-4 border-t border-slate-800">
                       <div className="flex items-center gap-3">
                         <span className="material-symbols-outlined text-secondary text-sm">bed</span>
                         <span className="text-[0.65rem] uppercase tracking-widest text-slate-300">
-                          {detail.room?.roomType?.name || 'King Bed'}
+                          {detail.room?.roomType?.name || 'Giường King'}
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="material-symbols-outlined text-secondary text-sm">payments</span>
                         <span className="text-[0.65rem] uppercase tracking-widest text-slate-300">
-                          ${pricePerNight.toFixed(2)} / night
+                          {pricePerNight.toLocaleString('vi-VN')}đ / đêm
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="material-symbols-outlined text-secondary text-sm">hotel</span>
                         <span className="text-[0.65rem] uppercase tracking-widest text-slate-300">
-                          {detail.room?.status || 'Booked'}
+                          {detail.room?.status || 'Đã đặt'}
                         </span>
                       </div>
                     </div>
@@ -246,29 +246,29 @@ export default function OrderDetail() {
             {/* Financial Summary */}
             <section className="glass-card rounded-lg overflow-hidden">
               <div className="p-8 border-b border-slate-800 bg-slate-900/40">
-                <h3 className="font-headline text-2xl text-white italic">Financial Summary</h3>
+                <h3 className="font-headline text-2xl text-white italic">Tóm tắt Tài chính</h3>
               </div>
               <div className="p-10 space-y-6">
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-400 font-light tracking-wide">
-                    Nightly Rate ({nights} night{nights !== 1 ? 's' : ''} × ${pricePerNight.toFixed(2)})
+                    Tiền phòng ({nights} đêm × {pricePerNight.toLocaleString('vi-VN')}đ)
                   </span>
-                  <span className="font-headline text-white">${baseTotal.toFixed(2)}</span>
+                  <span className="font-headline text-white">{baseTotal.toLocaleString('vi-VN')}đ</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-400 font-light tracking-wide">Resort &amp; Experience Fees (8%)</span>
-                  <span className="font-headline text-white">${fees}</span>
+                  <span className="text-slate-400 font-light tracking-wide">Phí Dịch vụ (8%)</span>
+                  <span className="font-headline text-white">{Math.round(fees).toLocaleString('vi-VN')}đ</span>
                 </div>
                 <div className="flex justify-between items-center text-sm pb-6 border-b border-slate-800/50">
-                  <span className="text-slate-400 font-light tracking-wide">Taxes &amp; Surcharges (14%)</span>
-                  <span className="font-headline text-white">${taxes}</span>
+                  <span className="text-slate-400 font-light tracking-wide">Thuế Phí (14%)</span>
+                  <span className="font-headline text-white">{Math.round(taxes).toLocaleString('vi-VN')}đ</span>
                 </div>
                 <div className="flex justify-between items-end pt-4">
                   <div className="space-y-1">
-                    <span className="block font-label text-[0.7rem] uppercase tracking-[0.3em] font-bold text-secondary">Total Amount</span>
-                    <span className="block text-[0.65rem] text-slate-500 italic">Order #{String(booking.id).padStart(5, '0')}</span>
+                    <span className="block font-label text-[0.7rem] uppercase tracking-[0.3em] font-bold text-secondary">Tổng cộng</span>
+                    <span className="block text-[0.65rem] text-slate-500 italic">Đơn #{String(booking.id).padStart(5, '0')}</span>
                   </div>
-                  <span className="font-headline text-4xl text-white gold-shimmer">${grandTotal}</span>
+                  <span className="font-headline text-4xl text-white gold-shimmer">{Math.round(Number(grandTotal)).toLocaleString('vi-VN')}đ</span>
                 </div>
               </div>
             </section>
@@ -280,18 +280,18 @@ export default function OrderDetail() {
 
             {/* Booking Info Card */}
             <section className="glass-card p-8 rounded-lg">
-              <h3 className="font-label text-[0.7rem] uppercase tracking-[0.3em] text-secondary mb-8 font-bold">Booking Info</h3>
+              <h3 className="font-label text-[0.7rem] uppercase tracking-[0.3em] text-secondary mb-8 font-bold">Thông tin Đặt phòng</h3>
               <div className="space-y-4">
                 <div className="flex justify-between items-center bg-slate-950/50 border border-slate-800 p-4 rounded-lg">
                   <div>
-                    <p className="font-headline text-sm text-white">Guest</p>
+                    <p className="font-headline text-sm text-white">Khách</p>
                     <p className="text-[0.65rem] text-slate-500 uppercase tracking-widest mt-1">{booking.user?.fullName || booking.user?.email || 'N/A'}</p>
                   </div>
                   <span className="material-symbols-outlined text-secondary text-lg">person</span>
                 </div>
                 <div className="flex justify-between items-center bg-slate-950/50 border border-slate-800 p-4 rounded-lg">
                   <div>
-                    <p className="font-headline text-sm text-white">Status</p>
+                    <p className="font-headline text-sm text-white">Trạng thái</p>
                     <p className="text-[0.65rem] text-slate-500 uppercase tracking-widest mt-1 capitalize">{booking.status}</p>
                   </div>
                   <span className="material-symbols-outlined text-secondary text-lg">info</span>
@@ -302,16 +302,14 @@ export default function OrderDetail() {
             {/* Actions */}
             <section className="space-y-4">
               <button className="w-full py-5 bg-secondary text-slate-950 font-label text-[0.75rem] uppercase tracking-[0.3em] font-bold hover:bg-white transition-all duration-500 shadow-2xl shadow-secondary/10 group flex items-center justify-center gap-3">
-                <span>Download Invoice</span>
+                <span>Tải Hóa đơn</span>
                 <span className="material-symbols-outlined text-sm group-hover:translate-y-1 transition-transform">download</span>
               </button>
-
               {currentStatus === 'pending' && (
                 <button className="w-full py-5 border border-slate-700 text-white font-label text-[0.75rem] uppercase tracking-[0.3em] font-bold hover:bg-slate-800/50 hover:border-secondary transition-all duration-300">
-                  Modify Reservation
+                  Thay đổi Đặt phòng
                 </button>
               )}
-
               {(currentStatus === 'pending' || currentStatus === 'confirmed') && (
                 <div className="pt-6 text-center">
                   <button
@@ -319,7 +317,7 @@ export default function OrderDetail() {
                     disabled={cancelling}
                     className="text-[0.65rem] uppercase tracking-[0.4em] text-slate-600 hover:text-red-400 transition-colors border-b border-transparent hover:border-red-400/30 pb-1 disabled:opacity-40"
                   >
-                    {cancelling ? 'Cancelling...' : 'Cancel Booking'}
+                    {cancelling ? 'Đang hủy...' : 'Hủy Đặt phòng'}
                   </button>
                 </div>
               )}
@@ -331,12 +329,12 @@ export default function OrderDetail() {
                 <span className="material-symbols-outlined text-[12rem] text-secondary">concierge</span>
               </div>
               <div className="relative z-10 space-y-6">
-                <h4 className="font-headline text-2xl text-white italic">At Your Service</h4>
+                <h4 className="font-headline text-2xl text-white italic">Luôn Sẵn sàng Phục vụ</h4>
                 <p className="font-body text-xs text-slate-400 leading-relaxed uppercase tracking-widest">
-                  Your dedicated digital concierge is available 24/7 to personalize your arrival or arrange exclusive transportation.
+                  Dịch vụ hỗ trợ trực tuyến của chúng tôi làm việc 24/7 để mang đến những dịch vụ cá nhân hóa cho chuyến đi của bạn.
                 </p>
                 <button className="flex items-center gap-3 text-secondary font-label text-[0.75rem] uppercase tracking-[0.3em] font-bold group/btn">
-                  <span className="border-b border-secondary/30 pb-1 group-hover/btn:border-secondary transition-all">Message Concierge</span>
+                  <span className="border-b border-secondary/30 pb-1 group-hover/btn:border-secondary transition-all">Nhắn tin Hỗ trợ</span>
                   <span className="material-symbols-outlined text-sm group-hover/btn:translate-x-1 transition-transform">arrow_forward</span>
                 </button>
               </div>

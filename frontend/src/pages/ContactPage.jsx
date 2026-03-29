@@ -3,17 +3,17 @@ import React, { useState } from 'react';
 const CONTACT_INFO = [
   {
     icon: 'location_on',
-    label: 'Location',
-    value: '127 Azure Gilt Way,\nThe Sovereignty District, NY 10012',
+    label: 'Địa chỉ',
+    value: '127 Azure Gilt Way,\nQuận Sovereignty, NY 10012',
   },
   {
     icon: 'call',
-    label: 'Reservations',
+    label: 'Đặt phòng',
     value: '+1 (800) 555-GOAT',
   },
   {
     icon: 'mail',
-    label: 'General Inquiries',
+    label: 'Hỗ trợ chung',
     value: 'concierge@goathotel.com',
   },
 ];
@@ -27,8 +27,8 @@ export default function ContactPage() {
     if (window.Swal) {
       window.Swal.fire({
         icon: 'success',
-        title: 'Message Received',
-        text: 'Our concierge team will reach out within 24 hours.',
+        title: 'Đã nhận được tin nhắn',
+        text: 'Đội ngũ của chúng tôi sẽ liên hệ với bạn trong vòng 24 giờ.',
         timer: 2500,
         showConfirmButton: false,
       });
@@ -75,10 +75,10 @@ export default function ContactPage() {
         </div>
         <div className="relative z-10 text-center px-4">
           <p className="font-label text-secondary text-xs tracking-[0.4em] uppercase mb-4">
-            Inquiry &amp; Connection
+            Liên hệ &amp; Kết nối
           </p>
           <h1 className="font-headline text-5xl md:text-7xl text-white tracking-tight">
-            Contact Us
+            Liên hệ với Chúng tôi
           </h1>
         </div>
       </section>
@@ -90,9 +90,9 @@ export default function ContactPage() {
           {/* Contact Form Card */}
           <div className="lg:col-span-7 bg-surface-container-lowest p-10 md:p-16 shadow-[0_24px_48px_-12px_rgba(0,6,20,0.08)]">
             <div className="mb-12">
-              <h2 className="font-headline text-3xl mb-4">Send an Inquiry</h2>
+              <h2 className="font-headline text-3xl mb-4">Gửi yêu cầu</h2>
               <p className="text-on-surface-variant max-w-md">
-                Our concierge team is available 24/7 to assist with your requirements and reservations.
+                Đội ngũ hỗ trợ của chúng tôi luôn sẵn sàng 24/7 để giúp đỡ bạn với các yêu cầu và đặt phòng.
               </p>
             </div>
             <form className="space-y-10" onSubmit={handleSubmit}>
@@ -100,19 +100,19 @@ export default function ContactPage() {
                 <div className="floating-label-group">
                   <input
                     id="firstName" name="firstName" type="text" placeholder=" " required
-                    value={form.firstName} onChange={e => setForm({...form, firstName: e.target.value})}
+                    value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })}
                   />
                   <label htmlFor="firstName" className="font-label text-sm uppercase tracking-wider">
-                    First Name
+                    Tên
                   </label>
                 </div>
                 <div className="floating-label-group">
                   <input
                     id="lastName" name="lastName" type="text" placeholder=" " required
-                    value={form.lastName} onChange={e => setForm({...form, lastName: e.target.value})}
+                    value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })}
                   />
                   <label htmlFor="lastName" className="font-label text-sm uppercase tracking-wider">
-                    Last Name
+                    Họ
                   </label>
                 </div>
               </div>
@@ -120,10 +120,10 @@ export default function ContactPage() {
               <div className="floating-label-group">
                 <input
                   id="email" name="email" type="email" placeholder=" " required
-                  value={form.email} onChange={e => setForm({...form, email: e.target.value})}
+                  value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
                 />
                 <label htmlFor="email" className="font-label text-sm uppercase tracking-wider">
-                  Email Address
+                  Địa chỉ Email
                 </label>
               </div>
 
@@ -131,10 +131,10 @@ export default function ContactPage() {
                 <textarea
                   id="message" name="message" rows={4} placeholder=" " required
                   className="resize-none"
-                  value={form.message} onChange={e => setForm({...form, message: e.target.value})}
+                  value={form.message} onChange={e => setForm({ ...form, message: e.target.value })}
                 />
                 <label htmlFor="message" className="font-label text-sm uppercase tracking-wider">
-                  Your Message
+                  Tin nhắn của bạn
                 </label>
               </div>
 
@@ -143,11 +143,11 @@ export default function ContactPage() {
                   type="submit"
                   className="bg-primary text-on-primary px-12 py-4 font-label text-xs tracking-[0.3em] uppercase hover:bg-primary/90 transition-all active:scale-95"
                 >
-                  Send Message
+                  GỬI TIN NHẮN
                 </button>
                 {sent && (
                   <p className="mt-4 font-label text-xs text-secondary uppercase tracking-widest">
-                    ✓ Message delivered. We'll be in touch.
+                    ✓ Đã gửi tin nhắn. Chúng tôi sẽ sớm liên hệ.
                   </p>
                 )}
               </div>
@@ -159,7 +159,7 @@ export default function ContactPage() {
             {/* Dark Info Card */}
             <div className="bg-primary p-12 text-white shadow-xl">
               <h3 className="font-headline text-2xl mb-8 border-b border-white/10 pb-6">
-                Direct Channels
+                Kênh Trực tiếp
               </h3>
               <div className="space-y-8">
                 {CONTACT_INFO.map(({ icon, label, value }) => (
@@ -210,11 +210,11 @@ export default function ContactPage() {
           {/* Award logos */}
           <div className="flex gap-12 grayscale opacity-50">
             <img className="h-12 object-contain" alt="Forbes Travel Guide Five Star"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBoal-NI6tlTjYlJ5-JmttDLudqeEWHZKUkBkx-bkuiB_SWTYo2aiSqrbjDXQKU_sQ6kS446amybdYTmH1lLhzhcFBgCR5lpNLv6y6xfVeJz5zVjc_8JGLLc0ckalTU4we4tvmUFDm-StdprTMVt725GB7jigPBffc9HgZ_YdM2ay2Zt0ahv-Jnu4aqDdrdzLC3jtvQbvxxIIJqeOTImed7OHbqLpNHe1Dgqz-lzh6LkzuGpEl9ubEabSZNZNJ13ACDnxrMAfTiqdc"/>
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBoal-NI6tlTjYlJ5-JmttDLudqeEWHZKUkBkx-bkuiB_SWTYo2aiSqrbjDXQKU_sQ6kS446amybdYTmH1lLhzhcFBgCR5lpNLv6y6xfVeJz5zVjc_8JGLLc0ckalTU4we4tvmUFDm-StdprTMVt725GB7jigPBffc9HgZ_YdM2ay2Zt0ahv-Jnu4aqDdrdzLC3jtvQbvxxIIJqeOTImed7OHbqLpNHe1Dgqz-lzh6LkzuGpEl9ubEabSZNZNJ13ACDnxrMAfTiqdc" />
             <img className="h-12 object-contain" alt="Michelin Guide"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCzGsO17NaKn5eKfL1HU7MIjO0YXwpyGs2fu-w2VWmHVqx9i48isdbDc4asy7YRkEHluweE0RRH4ope5nR1mO2H8zXWGWP-oYhLw9nky79OGCychaO6JrIHmh3D-Cf51aTBFIYAX-IMBIWTmvciYzEPTmTuNSD3bbqyS906XpUa5H6SSFW_CBJcYDyfgJOgvbDW5whDgcRjS6HRaSN6kM0bpgDZX_N1igRfGhcGRxdZgXiDExro1eOGehcvBwCxqvjJAc6bh_e0gSA"/>
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCzGsO17NaKn5eKfL1HU7MIjO0YXwpyGs2fu-w2VWmHVqx9i48isdbDc4asy7YRkEHluweE0RRH4ope5nR1mO2H8zXWGWP-oYhLw9nky79OGCychaO6JrIHmh3D-Cf51aTBFIYAX-IMBIWTmvciYzEPTmTuNSD3bbqyS906XpUa5H6SSFW_CBJcYDyfgJOgvbDW5whDgcRjS6HRaSN6kM0bpgDZX_N1igRfGhcGRxdZgXiDExro1eOGehcvBwCxqvjJAc6bh_e0gSA" />
             <img className="h-12 object-contain" alt="Condé Nast Traveler"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDlR7BluVPQIyBPs6We0zUwu31VK2Td8Ql9Sq1_LMXEmkEj3rR-qC5ZCAzIiIQcB_ItRENSd8qJWmDYBBr2YTWELZDs9zd9B5dsDCtqsifblvY3LOZu2vtYndoEQTz8ilfccAUuukPUWoFGBlAossdWEom61BOH0OWE0Wr40Qr0HxLwjpRM5wa21JG7SivCuECBLXn2aN5MQdYa1QBj4TtCdYbRnT_uhLIMQyO4Z2TcaG4gD8LPBtfDz6HFOLzRZWNhiu-7HtYDb68"/>
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDlR7BluVPQIyBPs6We0zUwu31VK2Td8Ql9Sq1_LMXEmkEj3rR-qC5ZCAzIiIQcB_ItRENSd8qJWmDYBBr2YTWELZDs9zd9B5dsDCtqsifblvY3LOZu2vtYndoEQTz8ilfccAUuukPUWoFGBlAossdWEom61BOH0OWE0Wr40Qr0HxLwjpRM5wa21JG7SivCuECBLXn2aN5MQdYa1QBj4TtCdYbRnT_uhLIMQyO4Z2TcaG4gD8LPBtfDz6HFOLzRZWNhiu-7HtYDb68" />
           </div>
           {/* Social links */}
           <div className="flex gap-8">
@@ -233,10 +233,10 @@ export default function ContactPage() {
           <div className="font-headline italic text-xl text-white">GOAT HOTEL</div>
           <div className="flex gap-8">
             {[
-              { label: 'Privacy Policy', active: false },
-              { label: 'Terms of Service', active: false },
-              { label: 'Contact Us', active: true },
-              { label: 'Careers', active: false },
+              { label: 'Chính sách Bảo mật', active: false },
+              { label: 'Điều khoản Dịch vụ', active: false },
+              { label: 'Liên hệ', active: true },
+              { label: 'Tuyển dụng', active: false },
             ].map(({ label, active }) => (
               <a
                 key={label}
@@ -248,7 +248,7 @@ export default function ContactPage() {
             ))}
           </div>
           <p className="font-label uppercase tracking-widest text-[10px] text-slate-500">
-            © 2024 GOAT HOTEL. ALL RIGHTS RESERVED.
+            © 2024 GOAT HOTEL. TẤT CẢ QUYỀN ĐƯỢC BẢO LƯU.
           </p>
         </div>
       </footer>

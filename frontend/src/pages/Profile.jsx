@@ -43,7 +43,7 @@ export default function Profile() {
       if (res.data?.success) {
         setUser(res.data.user);
         setIsEditing(false);
-        if (window.Swal) window.Swal.fire({ icon: 'success', title: 'Updated', showConfirmButton: false, timer: 1500 });
+        if (window.Swal) window.Swal.fire({ icon: 'success', title: 'Đã cập nhật', showConfirmButton: false, timer: 1500 });
       }
     } catch (err) {
       console.error('Profile update error:', err);
@@ -83,9 +83,9 @@ export default function Profile() {
           />
         </div>
         <div className="relative z-10 max-w-6xl mx-auto">
-          <p className="text-secondary font-label text-[0.75rem] uppercase tracking-[0.3em] mb-4">GUEST EXCLUSIVITY</p>
+          <p className="text-secondary font-label text-[0.75rem] uppercase tracking-[0.3em] mb-4">ĐẶC QUYỀN KHÁCH HÀNG</p>
           <h1 className="font-headline text-5xl md:text-[3.5rem] text-white leading-tight -tracking-[0.02em] mb-6">
-            Your Sanctuary Profile
+            Hồ sơ Của bạn
           </h1>
           <div className="h-1 w-24 bg-secondary"></div>
         </div>
@@ -101,12 +101,12 @@ export default function Profile() {
             {/* Personal Info */}
             <div className="space-y-8">
               <div className="flex items-center justify-between border-b border-outline-variant/20 pb-4">
-                <h2 className="font-headline text-2xl text-primary">Personal Details</h2>
+                <h2 className="font-headline text-2xl text-primary">Thông tin Cá nhân</h2>
                 <button
                   onClick={() => setIsEditing(!isEditing)}
                   className="font-label text-[0.7rem] uppercase tracking-widest text-secondary border-b border-secondary/40 pb-0.5 hover:text-primary transition-colors"
                 >
-                  {isEditing ? 'Cancel' : 'Edit'}
+                  {isEditing ? 'Hủy' : 'Chỉnh sửa'}
                 </button>
               </div>
               <form onSubmit={handleSubmit} className="space-y-10 pt-4">
@@ -116,7 +116,7 @@ export default function Profile() {
                     id="fullName" name="fullName" placeholder=" " type="text"
                     value={formData.fullName} onChange={handleChange} disabled={!isEditing} required
                   />
-                  <label className="absolute left-0 top-2 text-outline pointer-events-none transition-all duration-300 font-label uppercase text-[0.7rem] tracking-widest" htmlFor="fullName">Full Name</label>
+                  <label className="absolute left-0 top-2 text-outline pointer-events-none transition-all duration-300 font-label uppercase text-[0.7rem] tracking-widest" htmlFor="fullName">Họ và tên</label>
                 </div>
                 <div className="relative">
                   <input
@@ -124,7 +124,7 @@ export default function Profile() {
                     id="email" name="email" placeholder=" " type="email"
                     value={formData.email} disabled
                   />
-                  <label className="absolute left-0 top-2 text-outline pointer-events-none transition-all duration-300 font-label uppercase text-[0.7rem] tracking-widest" htmlFor="email">Email Address</label>
+                  <label className="absolute left-0 top-2 text-outline pointer-events-none transition-all duration-300 font-label uppercase text-[0.7rem] tracking-widest" htmlFor="email">Địa chỉ Email</label>
                 </div>
                 <div className="relative">
                   <input
@@ -132,15 +132,15 @@ export default function Profile() {
                     id="phone" name="phone" placeholder=" " type="tel"
                     value={formData.phone} onChange={handleChange} disabled={!isEditing}
                   />
-                  <label className="absolute left-0 top-2 text-outline pointer-events-none transition-all duration-300 font-label uppercase text-[0.7rem] tracking-widest" htmlFor="phone">Phone Number</label>
+                  <label className="absolute left-0 top-2 text-outline pointer-events-none transition-all duration-300 font-label uppercase text-[0.7rem] tracking-widest" htmlFor="phone">Số điện thoại</label>
                 </div>
                 {isEditing ? (
                   <button type="submit" className="bg-primary text-on-primary px-8 py-4 rounded-sm font-label text-[0.75rem] uppercase tracking-widest hover:bg-secondary transition-all">
-                    Save Changes
+                    Lưu thay đổi
                   </button>
                 ) : (
                   <button type="button" onClick={() => setIsEditing(true)} className="bg-primary text-on-primary px-8 py-4 rounded-sm font-label text-[0.75rem] uppercase tracking-widest hover:bg-secondary transition-all">
-                    Update Profile
+                    Cập nhật Hồ sơ
                   </button>
                 )}
               </form>
@@ -148,15 +148,15 @@ export default function Profile() {
 
             {/* Security */}
             <div className="glass-card p-8 rounded-sm">
-              <h2 className="font-headline text-2xl text-primary mb-8">Security &amp; Access</h2>
+              <h2 className="font-headline text-2xl text-primary mb-8">Bảo mật &amp; Truy cập</h2>
               <div className="space-y-6">
-                <p className="text-sm text-outline font-body">Ensure your sanctuary remains private by updating your security credentials regularly.</p>
+                <p className="text-sm text-outline font-body">Đảm bảo tài khoản của bạn luôn được bảo mật bằng cách cập nhật thông tin thường xuyên.</p>
                 <div className="flex items-center justify-between group cursor-pointer border-b border-outline-variant/20 pb-4">
-                  <span className="font-label text-[0.75rem] uppercase tracking-widest text-on-surface group-hover:text-secondary transition-colors">Change Password</span>
+                  <span className="font-label text-[0.75rem] uppercase tracking-widest text-on-surface group-hover:text-secondary transition-colors">Đổi mật khẩu</span>
                   <span className="material-symbols-outlined text-secondary text-lg">chevron_right</span>
                 </div>
                 <div className="flex items-center justify-between group cursor-pointer">
-                  <span className="font-label text-[0.75rem] uppercase tracking-widest text-on-surface group-hover:text-secondary transition-colors">Two-Factor Auth</span>
+                  <span className="font-label text-[0.75rem] uppercase tracking-widest text-on-surface group-hover:text-secondary transition-colors">Xác thực hai yếu tố</span>
                   <div className="w-10 h-5 bg-surface-container-high rounded-full relative">
                     <div className="absolute left-1 top-1 w-3 h-3 bg-white rounded-full"></div>
                   </div>
@@ -171,8 +171,8 @@ export default function Profile() {
             {/* Booking History */}
             <div className="space-y-8">
               <div className="flex justify-between items-end border-b border-outline-variant/20 pb-4">
-                <h2 className="font-headline text-3xl text-primary leading-none">Your Residency History</h2>
-                <Link to="/history" className="font-label text-[0.7rem] uppercase tracking-widest text-secondary border-b border-secondary/30 pb-1">View All Stays</Link>
+                <h2 className="font-headline text-3xl text-primary leading-none">Lịch sử Đặt phòng của bạn</h2>
+                <Link to="/history" className="font-label text-[0.7rem] uppercase tracking-widest text-secondary border-b border-secondary/30 pb-1">Xem tất cả</Link>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="group">
@@ -185,11 +185,11 @@ export default function Profile() {
                   </div>
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-secondary">Upcoming Residency</span>
+                      <span className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-secondary">Kỳ nghỉ sắp tới</span>
                       <h3 className="font-headline text-xl text-primary mt-1">Imperial Grand Suite</h3>
-                      <p className="text-sm text-outline font-body mt-1">Oct 14 — Oct 21, 2024</p>
+                      <p className="text-sm text-outline font-body mt-1">14 Th10 — 21 Th10, 2024</p>
                     </div>
-                    <span className="px-3 py-1 bg-secondary/10 text-secondary font-label text-[0.6rem] uppercase tracking-widest">Confirmed</span>
+                    <span className="px-3 py-1 bg-secondary/10 text-secondary font-label text-[0.6rem] uppercase tracking-widest">Đã xác nhận</span>
                   </div>
                 </div>
                 <div className="group">
@@ -202,11 +202,11 @@ export default function Profile() {
                   </div>
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-outline">Past Stay</span>
+                      <span className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-outline">Kỳ nghỉ trước</span>
                       <h3 className="font-headline text-xl text-primary mt-1">Azure Horizon Deluxe</h3>
-                      <p className="text-sm text-outline font-body mt-1">Aug 02 — Aug 09, 2024</p>
+                      <p className="text-sm text-outline font-body mt-1">02 Th08 — 09 Th08, 2024</p>
                     </div>
-                    <span className="px-3 py-1 bg-surface-container-high text-on-surface-variant font-label text-[0.6rem] uppercase tracking-widest">Completed</span>
+                    <span className="px-3 py-1 bg-surface-container-high text-on-surface-variant font-label text-[0.6rem] uppercase tracking-widest">Đã hoàn thành</span>
                   </div>
                 </div>
               </div>
@@ -214,25 +214,25 @@ export default function Profile() {
 
             {/* Preferences Bento Grid */}
             <div className="space-y-8">
-              <h2 className="font-headline text-3xl text-primary border-b border-outline-variant/20 pb-4">Personalized Preferences</h2>
+              <h2 className="font-headline text-3xl text-primary border-b border-outline-variant/20 pb-4">Sở thích Cá nhân</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-surface-container-low p-8 rounded-sm space-y-4">
                   <span className="material-symbols-outlined text-secondary text-3xl">bed</span>
-                  <h4 className="font-headline text-lg">Rest</h4>
-                  <p className="font-label text-[0.7rem] uppercase tracking-widest text-outline">Pillow Menu</p>
-                  <p className="text-on-surface font-body text-sm">Hungarian Goose Down, extra firm.</p>
+                  <h4 className="font-headline text-lg">Nghỉ ngơi</h4>
+                  <p className="font-label text-[0.7rem] uppercase tracking-widest text-outline">Thực đơn Gối</p>
+                  <p className="text-on-surface font-body text-sm">Lông ngỗng Hungary, cực kỳ êm ái.</p>
                 </div>
                 <div className="bg-surface-container-low p-8 rounded-sm space-y-4">
                   <span className="material-symbols-outlined text-secondary text-3xl">restaurant</span>
-                  <h4 className="font-headline text-lg">Cuisine</h4>
-                  <p className="font-label text-[0.7rem] uppercase tracking-widest text-outline">Dietary Needs</p>
-                  <p className="text-on-surface font-body text-sm">Plant-based, Gluten-free focus.</p>
+                  <h4 className="font-headline text-lg">Ẩm thực</h4>
+                  <p className="font-label text-[0.7rem] uppercase tracking-widest text-outline">Nhu cầu Ăn uống</p>
+                  <p className="text-on-surface font-body text-sm">Hỗ trợ ăn chay, không Gluten.</p>
                 </div>
                 <div className="bg-surface-container-low p-8 rounded-sm space-y-4">
                   <span className="material-symbols-outlined text-secondary text-3xl">thermostat</span>
-                  <h4 className="font-headline text-lg">Climate</h4>
-                  <p className="font-label text-[0.7rem] uppercase tracking-widest text-outline">Ambient Temp</p>
-                  <p className="text-on-surface font-body text-sm">Maintained at precisely 21°C.</p>
+                  <h4 className="font-headline text-lg">Nhiệt độ</h4>
+                  <p className="font-label text-[0.7rem] uppercase tracking-widest text-outline">Nhiệt độ phòng</p>
+                  <p className="text-on-surface font-body text-sm">Duy trì chính xác ở mức 21°C.</p>
                 </div>
               </div>
             </div>

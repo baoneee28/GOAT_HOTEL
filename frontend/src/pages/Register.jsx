@@ -93,7 +93,7 @@ export default function Register() {
           <div className="absolute inset-0 bg-primary/10 mix-blend-multiply"></div>
           <div className="absolute bottom-20 left-12 max-w-sm z-10">
             <p className="font-headline text-white text-4xl font-extrabold tracking-[-0.04em] leading-tight">
-              A SANCTUARY <br/>OF REFINED <br/>SIMPLICITY.
+              MỘT THÁNH ĐỊA <br/>CỦA SỰ TINH TẾ <br/>VÀ ĐƠN GIẢN.
             </p>
             <div className="h-px w-12 bg-white/50 mt-6"></div>
           </div>
@@ -103,43 +103,43 @@ export default function Register() {
         <section className="flex-1 flex items-center justify-center px-8 pt-32 pb-20 md:pt-20">
           <div className="w-full max-w-md">
             <header className="mb-16">
-              <span className="text-secondary font-label text-[10px] tracking-[0.2em] uppercase block mb-4">Membership</span>
-              <h1 className="font-headline text-5xl font-extrabold tracking-[-0.04em] text-primary mb-2">Create Account</h1>
-              <p className="text-on-surface-variant font-body font-light text-lg">Join the collective of global curators.</p>
+              <span className="text-secondary font-label text-[10px] tracking-[0.2em] uppercase block mb-4">Thành viên</span>
+              <h1 className="font-headline text-5xl font-extrabold tracking-[-0.04em] text-primary mb-2">Tạo Tài Khoản</h1>
+              <p className="text-on-surface-variant font-body font-light text-lg">Gia nhập cộng đồng thượng lưu toàn cầu.</p>
             </header>
 
             <form className="space-y-2" onSubmit={handleRegister}>
               <div className="floating-label-group">
                 <input id="fullname" name="fullname" placeholder=" " required type="text"
                   value={formData.fullname} onChange={e => setFormData({...formData, fullname: e.target.value})} />
-                <label htmlFor="fullname">Full Name</label>
+                <label htmlFor="fullname">Họ và Tên</label>
               </div>
               <div className="floating-label-group">
                 <input id="email" name="email" placeholder=" " required type="email"
                   value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-                <label htmlFor="email">Email Address</label>
+                <label htmlFor="email">Địa chỉ Email</label>
               </div>
               <div className="floating-label-group">
                 <input id="phone" name="phone" placeholder=" " required type="tel"
                   value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                <label htmlFor="phone">Phone Number</label>
+                <label htmlFor="phone">Số điện thoại</label>
               </div>
               <div className="floating-label-group">
                 <input id="password" name="password" placeholder=" " required type="password"
                   value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
-                <label htmlFor="password">Password</label>
+                <label htmlFor="password">Mật khẩu</label>
               </div>
               <div className="floating-label-group">
                 <input id="confirm_password" name="confirm_password" placeholder=" " required type="password"
                   value={formData.confirm_password} onChange={e => setFormData({...formData, confirm_password: e.target.value})} />
-                <label htmlFor="confirm_password">Confirm Password</label>
+                <label htmlFor="confirm_password">Xác nhận Mật khẩu</label>
               </div>
 
               {/* Terms Checkbox */}
               <div className="flex items-start gap-3 py-4 mb-8">
                 <input className="mt-1 rounded-sm border-outline-variant text-primary focus:ring-0 focus:ring-offset-0 transition-colors cursor-pointer" id="terms" type="checkbox" required />
                 <label className="text-xs text-on-surface-variant font-light leading-relaxed" htmlFor="terms">
-                  I agree to the <Link className="text-primary font-medium hover:underline" to="#">Terms of Service</Link> and <Link className="text-primary font-medium hover:underline" to="#">Privacy Policy</Link>.
+                  Tôi đồng ý với <Link className="text-primary font-medium hover:underline" to="#">Điều khoản Dịch vụ</Link> và <Link className="text-primary font-medium hover:underline" to="#">Chính sách Bảo mật</Link>.
                 </label>
               </div>
 
@@ -149,7 +149,7 @@ export default function Register() {
 
               <div className="pt-8 text-center">
                 <p className="text-sm text-on-surface-variant font-light">
-                  Already a member?
+                  Đã có tài khoản?
                   <Link className="text-secondary font-semibold ml-2 hover:underline transition-all" to="/login">Đăng nhập</Link>
                 </p>
               </div>
@@ -164,7 +164,7 @@ export default function Register() {
                   <img className="w-8 h-8 rounded-full border-2 border-surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBwH7BQQYIdbqMKpqgxQyEuTgpJLar8YOU9IqoTQfSvAv8hBIDwdFyebdmaYct3WpUUf6E6UFe0ut5tR98WDwjIkp81SI5gUcA4v-alkNXXXSatklGoOp9vICEXCCxmOTc5iFgXRhVY6tZNTPgxACnIkuqdnS67yaTXuvMXUETzqOpF0P1PyVDI2saSyvrdzXmkuDuI_hR1xCfgp_nGOcoCTjymNIYsWlqHTwnFlOsI6Dw5FTyzLhS7pX5m7yid3ez6Dg9K_ek4UGuM" alt="guest 3" />
                 </div>
                 <p className="text-[10px] text-on-surface-variant uppercase tracking-widest font-medium">
-                  Joined by 2k+ curated guests
+                  Hơn 2000+ khách hàng tinh hoa
                 </p>
               </div>
             </div>
@@ -178,9 +178,9 @@ export default function Register() {
           © 2024 GOAT HOTEL. ALL RIGHTS RESERVED.
         </div>
         <div className="flex gap-8">
-          <Link className="text-[10px] tracking-widest uppercase text-stone-400 hover:text-stone-600 transition-colors" to="#">Privacy</Link>
-          <Link className="text-[10px] tracking-widest uppercase text-stone-400 hover:text-stone-600 transition-colors" to="#">Terms</Link>
-          <Link className="text-[10px] tracking-widest uppercase text-stone-400 hover:text-stone-600 transition-colors" to="#">Concierge</Link>
+          <Link className="text-[10px] tracking-widest uppercase text-stone-400 hover:text-stone-600 transition-colors" to="#">Bảo mật</Link>
+          <Link className="text-[10px] tracking-widest uppercase text-stone-400 hover:text-stone-600 transition-colors" to="#">Điều khoản</Link>
+          <Link className="text-[10px] tracking-widest uppercase text-stone-400 hover:text-stone-600 transition-colors" to="#">Hỗ trợ</Link>
         </div>
       </footer>
     </div>

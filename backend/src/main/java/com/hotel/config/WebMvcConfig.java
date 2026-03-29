@@ -48,6 +48,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
         // Hàm này rất quan trọng: Cấu hình để website có thể đọc được ảnh người dùng upload
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations("file:../frontend/static/uploads/");
+
+        // Phục vụ ảnh từ backend (classpath)
+        registry.addResourceHandler("/images/**")
+                .addResourceLocations("classpath:/static/images/");
     }
 
     @Override

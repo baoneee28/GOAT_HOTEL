@@ -65,10 +65,10 @@ export default function BookingConfirmation() {
 
             {/* Heading */}
             <h1 className="font-headline text-4xl md:text-5xl mb-4 tracking-tight text-center">
-              Confirm Your Stay
+              Xác nhận Đặt phòng
             </h1>
             <p className="font-label text-amber-500 uppercase tracking-[0.3em] text-[10px] mb-12">
-              The Sovereign Guest Experience
+              Trải nghiệm Đặc quyền
             </p>
 
             {/* Detail rows */}
@@ -77,7 +77,7 @@ export default function BookingConfirmation() {
               <div className="flex justify-between items-center border-b border-white/10 pb-4">
                 <div className="flex items-center space-x-4">
                   <span className="material-symbols-outlined text-white/50">calendar_today</span>
-                  <span className="text-white/60 text-xs uppercase tracking-widest font-bold">Check-In</span>
+                  <span className="text-white/60 text-xs uppercase tracking-widest font-bold">Ngày nhận phòng</span>
                 </div>
                 <span className="font-headline text-lg">{fmtDate(booking.checkIn)}</span>
               </div>
@@ -85,7 +85,7 @@ export default function BookingConfirmation() {
               <div className="flex justify-between items-center border-b border-white/10 pb-4">
                 <div className="flex items-center space-x-4">
                   <span className="material-symbols-outlined text-white/50">calendar_month</span>
-                  <span className="text-white/60 text-xs uppercase tracking-widest font-bold">Check-Out</span>
+                  <span className="text-white/60 text-xs uppercase tracking-widest font-bold">Ngày trả phòng</span>
                 </div>
                 <span className="font-headline text-lg">{fmtDate(booking.checkOut)}</span>
               </div>
@@ -93,7 +93,7 @@ export default function BookingConfirmation() {
               <div className="flex justify-between items-center border-b border-white/10 pb-4">
                 <div className="flex items-center space-x-4">
                   <span className="material-symbols-outlined text-white/50">king_bed</span>
-                  <span className="text-white/60 text-xs uppercase tracking-widest font-bold">Room Type</span>
+                  <span className="text-white/60 text-xs uppercase tracking-widest font-bold">Loại phòng</span>
                 </div>
                 <span className="font-headline text-lg">{booking.room}</span>
               </div>
@@ -101,11 +101,11 @@ export default function BookingConfirmation() {
               <div className="flex justify-between items-center pt-2">
                 <div className="flex items-center space-x-4">
                   <span className="material-symbols-outlined text-white/50">payments</span>
-                  <span className="text-white/60 text-xs uppercase tracking-widest font-bold">Price</span>
+                  <span className="text-white/60 text-xs uppercase tracking-widest font-bold">Giá phòng</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-amber-500 font-headline text-3xl">${booking.pricePerNight}</span>
-                  <span className="text-white/40 text-xs uppercase tracking-widest ml-1">/ Night</span>
+                  <span className="text-amber-500 font-headline text-3xl">{booking.pricePerNight?.toLocaleString('vi-VN')}đ</span>
+                  <span className="text-white/40 text-xs uppercase tracking-widest ml-1">/ Đêm</span>
                 </div>
               </div>
             </div>
@@ -115,14 +115,14 @@ export default function BookingConfirmation() {
               className="glow-button w-full bg-amber-600 hover:bg-amber-500 text-white font-bold tracking-[0.2em] py-5 rounded-full transition-all duration-300 transform hover:-translate-y-1 active:scale-95 text-xs"
               onClick={() => {/* integrate confirm booking API here */}}
             >
-              BOOK NOW
+              ĐẶT NGAY
             </button>
 
             <button
               className="mt-8 text-white/40 hover:text-white text-[10px] tracking-widest uppercase transition-colors duration-300 underline underline-offset-8"
               onClick={() => navigate(-1)}
             >
-              MODIFY SELECTION
+              THAY ĐỔI LỰA CHỌN
             </button>
           </div>
         </div>
@@ -134,11 +134,11 @@ export default function BookingConfirmation() {
           <div className="mb-8 md:mb-0">
             <span className="font-headline italic text-amber-600 text-xl">GOAT HOTEL</span>
             <p className="text-slate-500 font-body text-[10px] tracking-widest uppercase mt-2">
-              © 2024 GOAT HOTEL. THE SOVEREIGN GUEST EXPERIENCE.
+              © 2024 GOAT HOTEL. TRẢI NGHIỆM ĐẶC QUYỀN.
             </p>
           </div>
           <div className="flex space-x-8">
-            {['PRIVACY', 'TERMS', 'CAREERS', 'PRESS'].map(l => (
+            {['BẢO MẬT', 'ĐIỀU KHOẢN', 'TUYỂN DỤNG', 'BÁO CHÍ'].map(l => (
               <a
                 key={l}
                 href="#"

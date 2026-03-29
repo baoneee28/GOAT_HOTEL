@@ -79,6 +79,10 @@ public class BookingService {
 
     @Transactional
     public String bookRoom(User user, Integer roomId, LocalDateTime checkIn, LocalDateTime checkOut) {
+        // Không cho phép đặt phòng với ngày nhận trong quá khứ
+        if (checkIn.isBefore(LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0))) {
+            return "Ngày nhận phòng không thể ở trong quá khứ!";
+        }
         if (!checkOut.isAfter(checkIn)) {
             return "Thời gian ra phải lớn hơn thời gian vào!";
         }

@@ -12,7 +12,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -39,16 +41,23 @@ public class HomeController {
 
         response.put("featured_rooms", featuredRoomTypeRepository.findAllByOrderByDisplayOrderAsc());
         response.put("featured_news", featuredNewsRepository.findAllByOrderByDisplayOrderAsc());
-        
+
+        // Trả về danh sách URL của ảnh slider từ backend
+        List<String> sliderImages = Arrays.asList(
+                "http://localhost:8080/images/Featured_news/news_featured_1.jpg",
+                "http://localhost:8080/images/Featured_news/news_featured_2.jpg",
+                "http://localhost:8080/images/Featured_news/news_featured_3.jpg");
+        response.put("slider_images", sliderImages);
+
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/book")
     public ResponseEntity<Map<String, Object>> bookRoom(@RequestParam("room_id") Integer room_id,
-                           @RequestParam("check_in") @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm") LocalDateTime check_in, 
-                           @RequestParam("check_out") @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm") LocalDateTime check_out,
-                           HttpSession session) {
-        
+            @RequestParam("check_in") @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm") LocalDateTime check_in,
+            @RequestParam("check_out") @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm") LocalDateTime check_out,
+            HttpSession session) {
+
         Map<String, Object> response = new HashMap<>();
 
         if (session.getAttribute("user") == null) {

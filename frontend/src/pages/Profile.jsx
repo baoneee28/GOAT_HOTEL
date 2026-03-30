@@ -1,7 +1,58 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE, { imageUrl } from '../config';
+
+function formatDate(value) {
+  if (!value) return 'Chưa cập nhật';
+  if (Array.isArray(value)) {
+    const [year, month, day] = value;
+    return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+  }
+  if (typeof value === 'string') {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleDateString('vi-VN');
+  }
+  return new Date(value).toLocaleDateString('vi-VN');
+}
+
+function formatCurrency(value) {
+  return Number(value || 0).toLocaleString('vi-VN');
+}
+
+function getStatusMeta(status) {
+  switch ((status || '').toLowerCase()) {
+    case 'confirmed':
+      return {
+        label: 'Đã xác nhận',
+        summary: 'Kỳ nghỉ sắp tới',
+        className: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+      };
+    case 'completed':
+      return {
+        label: 'Đã hoàn thành',
+        summary: 'Đã lưu trú',
+        className: 'bg-slate-100 text-slate-700 border border-slate-200',
+      };
+    case 'cancelled':
+      return {
+        label: 'Đã hủy',
+        summary: 'Đã hủy',
+        className: 'bg-rose-50 text-rose-700 border border-rose-200',
+      };
+    default:
+      return {
+        label: 'Chờ xử lý',
+        summary: 'Đang chờ khách sạn xác nhận',
+        className: 'bg-amber-50 text-amber-700 border border-amber-200',
+      };
+  }
+}
+
+function getBookingCode(id) {
+  return `GH-${String(id || 0).padStart(5, '0')}`;
+}
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -33,9 +84,8 @@ export default function Profile() {
     };
     fetchProfile();
 
-    // Fetch recent bookings
     axios.get(`${API_BASE}/api/bookings/history?page=1`, { withCredentials: true })
-      .then(res => setRecentBookings((res.data?.bookings || []).slice(0, 2)))
+      .then(res => setRecentBookings((res.data?.bookings || []).slice(0, 3)))
       .catch(() => {});
   }, [currentUserId]);
 
@@ -62,6 +112,27 @@ export default function Profile() {
     return imageUrl(url, '/images/default_avatar.png');
   };
 
+  const nextStay = useMemo(
+    () => recentBookings.find((booking) => ['pending', 'confirmed'].includes((booking.status || '').toLowerCase())),
+    [recentBookings],
+  );
+
+  const stats = useMemo(() => {
+    const completedCount = recentBookings.filter((booking) => (booking.status || '').toLowerCase() === 'completed').length;
+    const pendingCount = recentBookings.filter((booking) => ['pending', 'confirmed'].includes((booking.status || '').toLowerCase())).length;
+    const totalSpent = recentBookings
+      .filter((booking) => (booking.status || '').toLowerCase() === 'completed')
+      .reduce((sum, booking) => sum + Number(booking.totalPrice || 0), 0);
+
+    return { completedCount, pendingCount, totalSpent };
+  }, [recentBookings]);
+
+  const memberTier = useMemo(() => {
+    if (stats.completedCount >= 5) return 'Signature Member';
+    if (stats.completedCount >= 2) return 'Preferred Guest';
+    return 'Classic Member';
+  }, [stats.completedCount]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
@@ -71,197 +142,339 @@ export default function Profile() {
   }
 
   return (
-    <div className="bg-surface font-body text-on-surface min-h-screen">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f7f2ea_0%,#f7f4ef_28%,#fbfaf8_100%)] font-body text-on-surface">
       <style>{`
-        .hero-gradient { background: linear-gradient(135deg, rgba(0, 6, 20, 0.76) 0%, rgba(0, 31, 65, 0.58) 100%); }
-        .glass-card { background: rgba(255,255,255,0.7); backdrop-filter: blur(20px); border: 1px solid rgba(196,198,207,0.2); }
-        input:focus + label, input:not(:placeholder-shown) + label {
-          transform: translateY(-1.5rem) scale(0.85); color: #775a19;
+        .profile-hero-shell {
+          background:
+            linear-gradient(180deg, rgba(5, 15, 30, 0.48) 0%, rgba(5, 15, 30, 0.66) 100%),
+            linear-gradient(90deg, rgba(5, 15, 30, 0.78) 0%, rgba(5, 15, 30, 0.42) 48%, rgba(5, 15, 30, 0.64) 100%);
+        }
+        .profile-premium-card {
+          background: rgba(255, 251, 246, 0.9);
+          backdrop-filter: blur(16px);
+          border: 1px solid rgba(120, 90, 25, 0.12);
+          box-shadow: 0 30px 70px -42px rgba(15, 23, 42, 0.35);
+        }
+        .profile-panel {
+          background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(255,250,245,0.96) 100%);
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          box-shadow: 0 20px 55px -38px rgba(15, 23, 42, 0.24);
+        }
+        .profile-input {
+          width: 100%;
+          border-radius: 18px;
+          border: 1px solid rgba(15, 23, 42, 0.12);
+          background: rgba(255,255,255,0.9);
+          padding: 0.95rem 1rem;
+          color: #0f172a;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+        .profile-input:focus {
+          outline: none;
+          border-color: rgba(119, 90, 25, 0.6);
+          box-shadow: 0 0 0 4px rgba(119, 90, 25, 0.08);
+          background: #fff;
+        }
+        .profile-input:disabled {
+          background: rgba(248, 244, 238, 0.85);
+          color: rgba(15, 23, 42, 0.68);
+          cursor: not-allowed;
         }
       `}</style>
 
-      {/* Hero Section */}
-      <section className="hero-gradient relative py-32 px-12 overflow-hidden">
-        <div className="absolute inset-0 opacity-55">
-          <img
-            alt="Sovereign ambiance"
-            className="w-full h-full object-cover"
-            src={imageUrl('/images/home/profile_hero.jpg')}
-          />
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0">
+          <img src={imageUrl('/images/home/profile_hero.jpg')} alt="GOAT HOTEL member ambiance" className="h-full w-full object-cover" />
         </div>
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/70 via-primary/35 to-transparent"></div>
-        <div className="relative z-10 max-w-6xl mx-auto">
-          <p className="text-secondary font-label text-[0.75rem] uppercase tracking-[0.3em] mb-4">ĐẶC QUYỀN KHÁCH HÀNG</p>
-          <h1 className="font-headline text-5xl md:text-[3.5rem] text-white leading-tight -tracking-[0.02em] mb-6">
-            Hồ sơ Của bạn
-          </h1>
-          <div className="h-1 w-24 bg-secondary"></div>
+        <div className="profile-hero-shell relative">
+          <div className="mx-auto max-w-7xl px-6 pb-24 pt-32 sm:px-8 lg:px-10 lg:pb-28">
+            <div className="max-w-3xl">
+              <p className="font-label text-[0.72rem] uppercase tracking-[0.34em] text-secondary/90">GOAT HOTEL Privilege</p>
+              <h1 className="mt-4 max-w-2xl font-headline text-4xl leading-tight text-white sm:text-5xl lg:text-[3.6rem]">Hồ sơ của bạn</h1>
+              <p className="mt-5 max-w-2xl text-sm leading-7 text-white/78 sm:text-base">
+                Quản lý thông tin tài khoản, theo dõi những kỳ lưu trú gần đây và duy trì trải nghiệm thành viên
+                được cá nhân hóa theo chuẩn nghỉ dưỡng cao cấp của GOAT HOTEL.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Main Content Grid */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-
-          {/* Left Column: Personal & Security */}
-          <div className="lg:col-span-4 space-y-16">
-
-            {/* Personal Info */}
-            <div className="space-y-8">
-              <div className="flex flex-col items-center text-center gap-4 pb-2">
-                <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-[0_18px_40px_-18px_rgba(0,0,0,0.35)] bg-surface-container-high">
-                  <img
-                    src={getAvatarUrl(user?.image)}
-                    alt={user?.fullName || 'Avatar người dùng'}
-                    className="w-full h-full object-cover"
-                  />
+      <main className="relative z-10 mx-auto -mt-14 max-w-7xl px-6 pb-20 sm:px-8 lg:px-10">
+        <section className="profile-premium-card rounded-[32px] p-6 sm:p-8 lg:p-10">
+          <div className="grid gap-8 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.9fr)] xl:items-stretch">
+            <div className="rounded-[28px] bg-[linear-gradient(135deg,rgba(8,19,37,0.96)_0%,rgba(15,31,56,0.92)_56%,rgba(32,47,71,0.88)_100%)] p-6 text-white sm:p-8">
+              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-5">
+                  <div className="h-24 w-24 overflow-hidden rounded-[28px] border border-white/15 bg-white/10 shadow-[0_18px_42px_-28px_rgba(0,0,0,0.7)] sm:h-28 sm:w-28">
+                    <img src={getAvatarUrl(user?.image)} alt={user?.fullName || 'Avatar thành viên'} className="h-full w-full object-cover" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="inline-flex items-center rounded-full border border-secondary/25 bg-secondary/10 px-3 py-1 font-label text-[0.6rem] uppercase tracking-[0.28em] text-secondary">
+                      {memberTier}
+                    </div>
+                    <h2 className="mt-4 font-headline text-3xl leading-tight text-white sm:text-[2.2rem]">{user?.fullName || 'Khách hàng GOAT HOTEL'}</h2>
+                    <p className="mt-2 text-sm text-white/68">{user?.email || 'Thành viên đặc quyền'}</p>
+                    <p className="mt-1 text-sm text-white/58">{user?.phone || 'Chưa cập nhật số điện thoại'}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-headline text-xl text-primary">{user?.fullName || 'Khách hàng GOAT HOTEL'}</p>
-                  <p className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-on-surface-variant mt-1">
-                    {user?.email || 'Thành viên'}
+
+                <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="rounded-full border border-white/70 bg-white px-5 py-3 font-label text-[0.68rem] uppercase tracking-[0.24em] text-primary transition-all hover:bg-[#f7f0e4] hover:border-[#f7f0e4]"
+                  >
+                    Chỉnh sửa hồ sơ
+                  </button>
+                  <button type="button" onClick={() => navigate('/history')} className="rounded-full bg-secondary px-5 py-3 font-label text-[0.68rem] uppercase tracking-[0.24em] text-primary transition-all hover:brightness-105">
+                    Quản lý lưu trú
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-8 grid gap-4 sm:grid-cols-3">
+                <div className="rounded-[22px] border border-white/10 bg-white/6 p-4">
+                  <p className="font-label text-[0.62rem] uppercase tracking-[0.24em] text-white/52">Đơn hoàn tất</p>
+                  <p className="mt-3 font-headline text-3xl text-white">{stats.completedCount}</p>
+                </div>
+                <div className="rounded-[22px] border border-white/10 bg-white/6 p-4">
+                  <p className="font-label text-[0.62rem] uppercase tracking-[0.24em] text-white/52">Lưu trú sắp tới</p>
+                  <p className="mt-3 font-headline text-3xl text-white">{stats.pendingCount}</p>
+                </div>
+                <div className="rounded-[22px] border border-white/10 bg-white/6 p-4">
+                  <p className="font-label text-[0.62rem] uppercase tracking-[0.24em] text-white/52">Chi tiêu gần đây</p>
+                  <p className="mt-3 font-headline text-3xl text-white">{formatCurrency(stats.totalSpent)}đ</p>
+                </div>
+              </div>
+            </div>
+
+            <aside className="profile-panel flex h-full flex-col justify-between rounded-[28px] p-6 sm:p-7">
+              <div>
+                <p className="font-label text-[0.65rem] uppercase tracking-[0.28em] text-secondary">Tóm tắt thành viên</p>
+                <h3 className="mt-4 font-headline text-2xl text-primary">Trải nghiệm được cá nhân hóa</h3>
+                <p className="mt-3 text-sm leading-7 text-on-surface-variant">
+                  Hồ sơ của bạn được dùng để đồng bộ thông tin lưu trú, lịch sử đặt phòng và các tương tác dịch vụ
+                  trong toàn bộ hệ sinh thái GOAT HOTEL.
+                </p>
+              </div>
+
+              <div className="mt-8 space-y-4">
+                <div className="rounded-[22px] border border-outline-variant/15 bg-white/75 p-4">
+                  <p className="font-label text-[0.62rem] uppercase tracking-[0.24em] text-on-surface-variant">Lần lưu trú gần nhất</p>
+                  <p className="mt-2 font-headline text-xl text-primary">{nextStay?.details?.[0]?.room?.roomType?.typeName || 'Chưa có kỳ lưu trú sắp tới'}</p>
+                  <p className="mt-2 text-sm text-on-surface-variant">
+                    {nextStay ? `${formatDate(nextStay.details?.[0]?.checkIn)} — ${formatDate(nextStay.details?.[0]?.checkOut)}` : 'Khám phá bộ sưu tập phòng để lên kế hoạch cho kỳ nghỉ tiếp theo.'}
                   </p>
                 </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button type="button" onClick={() => setIsEditing(true)} className="rounded-full border border-primary/12 bg-primary px-5 py-3 font-label text-[0.68rem] uppercase tracking-[0.22em] text-on-primary transition-all hover:brightness-105">
+                    Chỉnh sửa
+                  </button>
+                  <button type="button" onClick={() => navigate('/history')} className="rounded-full border border-outline-variant/25 bg-transparent px-5 py-3 font-label text-[0.68rem] uppercase tracking-[0.22em] text-primary transition-all hover:border-secondary/40 hover:text-secondary">
+                    Xem lịch sử
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center justify-between border-b border-outline-variant/20 pb-4">
-                <h2 className="font-headline text-2xl text-primary">Thông tin Cá nhân</h2>
-                <button
-                  onClick={() => setIsEditing(!isEditing)}
-                  className="font-label text-[0.7rem] uppercase tracking-widest text-secondary border-b border-secondary/40 pb-0.5 hover:text-primary transition-colors"
-                >
-                  {isEditing ? 'Hủy' : 'Chỉnh sửa'}
+            </aside>
+          </div>
+        </section>
+
+        <section className="mt-10 grid gap-8 xl:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.65fr)]">
+          <div className="space-y-8">
+            <section className="profile-panel rounded-[30px] p-6 sm:p-8">
+              <div className="flex flex-col gap-4 border-b border-outline-variant/15 pb-6 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="font-label text-[0.64rem] uppercase tracking-[0.28em] text-secondary">Tài khoản thành viên</p>
+                  <h2 className="mt-3 font-headline text-[2rem] leading-tight text-primary">Thông tin cá nhân</h2>
+                </div>
+                <button onClick={() => setIsEditing((prev) => !prev)} className="rounded-full border border-outline-variant/20 bg-white px-5 py-3 font-label text-[0.66rem] uppercase tracking-[0.22em] text-primary transition-all hover:border-secondary/40 hover:text-secondary">
+                  {isEditing ? 'Hủy chỉnh sửa' : 'Chỉnh sửa hồ sơ'}
                 </button>
               </div>
-              <form onSubmit={handleSubmit} className="space-y-10 pt-4">
-                <div className="relative">
-                  <input
-                    className="peer w-full bg-transparent border-b border-outline-variant/30 focus:border-secondary transition-colors py-2 outline-none text-on-surface disabled:opacity-60"
-                    id="fullName" name="fullName" placeholder=" " type="text"
-                    value={formData.fullName} onChange={handleChange} disabled={!isEditing} required
-                  />
-                  <label className="absolute left-0 top-2 text-outline pointer-events-none transition-all duration-300 font-label uppercase text-[0.7rem] tracking-widest" htmlFor="fullName">Họ và tên</label>
-                </div>
-                <div className="relative">
-                  <input
-                    className="peer w-full bg-transparent border-b border-outline-variant/30 py-2 outline-none text-on-surface opacity-60 cursor-not-allowed"
-                    id="email" name="email" placeholder=" " type="email"
-                    value={formData.email} disabled
-                  />
-                  <label className="absolute left-0 top-2 text-outline pointer-events-none transition-all duration-300 font-label uppercase text-[0.7rem] tracking-widest" htmlFor="email">Địa chỉ Email</label>
-                </div>
-                <div className="relative">
-                  <input
-                    className="peer w-full bg-transparent border-b border-outline-variant/30 focus:border-secondary transition-colors py-2 outline-none text-on-surface disabled:opacity-60"
-                    id="phone" name="phone" placeholder=" " type="tel"
-                    value={formData.phone} onChange={handleChange} disabled={!isEditing}
-                  />
-                  <label className="absolute left-0 top-2 text-outline pointer-events-none transition-all duration-300 font-label uppercase text-[0.7rem] tracking-widest" htmlFor="phone">Số điện thoại</label>
-                </div>
-                {isEditing ? (
-                  <button type="submit" className="bg-primary text-on-primary px-8 py-4 rounded-sm font-label text-[0.75rem] uppercase tracking-widest hover:bg-secondary transition-all">
-                    Lưu thay đổi
-                  </button>
-                ) : (
-                  <button type="button" onClick={() => setIsEditing(true)} className="bg-primary text-on-primary px-8 py-4 rounded-sm font-label text-[0.75rem] uppercase tracking-widest hover:bg-secondary transition-all">
-                    Cập nhật Hồ sơ
-                  </button>
-                )}
-              </form>
-            </div>
 
-            {/* Security */}
-            <div className="glass-card p-8 rounded-sm">
-              <h2 className="font-headline text-2xl text-primary mb-8">Bảo mật &amp; Truy cập</h2>
-              <div className="space-y-6">
-                <p className="text-sm text-outline font-body">Đảm bảo tài khoản của bạn luôn được bảo mật bằng cách cập nhật thông tin thường xuyên.</p>
-                <div className="flex items-center justify-between group cursor-pointer border-b border-outline-variant/20 pb-4">
-                  <span className="font-label text-[0.75rem] uppercase tracking-widest text-on-surface group-hover:text-secondary transition-colors">Đổi mật khẩu</span>
-                  <span className="material-symbols-outlined text-secondary text-lg">chevron_right</span>
+              <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+                <div>
+                  <label className="mb-2 block font-label text-[0.64rem] uppercase tracking-[0.24em] text-on-surface-variant" htmlFor="fullName">Họ và tên</label>
+                  <input id="fullName" name="fullName" type="text" value={formData.fullName} onChange={handleChange} disabled={!isEditing} required className="profile-input" />
                 </div>
-                <div className="flex items-center justify-between group cursor-pointer">
-                  <span className="font-label text-[0.75rem] uppercase tracking-widest text-on-surface group-hover:text-secondary transition-colors">Xác thực hai yếu tố</span>
-                  <div className="w-10 h-5 bg-surface-container-high rounded-full relative">
-                    <div className="absolute left-1 top-1 w-3 h-3 bg-white rounded-full"></div>
+
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block font-label text-[0.64rem] uppercase tracking-[0.24em] text-on-surface-variant" htmlFor="email">Địa chỉ email</label>
+                    <input id="email" name="email" type="email" value={formData.email} disabled className="profile-input" />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block font-label text-[0.64rem] uppercase tracking-[0.24em] text-on-surface-variant" htmlFor="phone">Số điện thoại</label>
+                    <input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleChange} disabled={!isEditing} className="profile-input" />
                   </div>
                 </div>
+
+                <div className="grid gap-4 rounded-[24px] border border-outline-variant/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.9)_0%,rgba(248,243,236,0.95)_100%)] p-5 sm:grid-cols-2">
+                  <div>
+                    <p className="font-label text-[0.62rem] uppercase tracking-[0.24em] text-on-surface-variant">Loại thành viên</p>
+                    <p className="mt-2 font-headline text-xl text-primary">{memberTier}</p>
+                  </div>
+                  <div>
+                    <p className="font-label text-[0.62rem] uppercase tracking-[0.24em] text-on-surface-variant">Mã khách hàng</p>
+                    <p className="mt-2 font-headline text-xl text-primary">MEM-{String(user?.id || 0).padStart(4, '0')}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3 pt-2">
+                  {isEditing ? (
+                    <button type="submit" className="rounded-full bg-primary px-6 py-3 font-label text-[0.68rem] uppercase tracking-[0.24em] text-on-primary transition-all hover:brightness-105">
+                      Lưu thay đổi
+                    </button>
+                  ) : (
+                    <button type="button" onClick={() => setIsEditing(true)} className="rounded-full bg-primary px-6 py-3 font-label text-[0.68rem] uppercase tracking-[0.24em] text-on-primary transition-all hover:brightness-105">
+                      Cập nhật hồ sơ
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.Swal) window.Swal.fire('Sắp ra mắt', 'Tính năng đổi mật khẩu sẽ được bổ sung ở phiên bản tiếp theo.', 'info');
+                    }}
+                    className="rounded-full border border-outline-variant/25 bg-white px-6 py-3 font-label text-[0.68rem] uppercase tracking-[0.24em] text-primary transition-all hover:border-secondary/40 hover:text-secondary"
+                  >
+                    Đổi mật khẩu
+                  </button>
+                </div>
+              </form>
+            </section>
+
+            <section className="profile-panel rounded-[30px] p-6 sm:p-8">
+              <p className="font-label text-[0.64rem] uppercase tracking-[0.28em] text-secondary">Dịch vụ ưu tiên</p>
+              <h3 className="mt-3 font-headline text-[1.9rem] text-primary">Quyền lợi thành viên</h3>
+              <div className="mt-6 grid gap-4">
+                {[
+                  ['Nghỉ dưỡng tinh chỉnh', 'Yêu cầu gối, nhiệt độ phòng và nhịp lưu trú phù hợp cho từng kỳ nghỉ.'],
+                  ['Hỗ trợ đặt phòng nhanh', 'Ưu tiên truy xuất lịch sử và tiếp tục quy trình đặt phòng chỉ trong vài thao tác.'],
+                  ['Liên hệ dịch vụ', 'Đội ngũ GOAT HOTEL sẵn sàng xác nhận các yêu cầu phát sinh cho lưu trú sắp tới.'],
+                ].map(([title, desc]) => (
+                  <div key={title} className="rounded-[22px] border border-outline-variant/12 bg-white/75 p-5">
+                    <p className="font-headline text-xl text-primary">{title}</p>
+                    <p className="mt-2 text-sm leading-7 text-on-surface-variant">{desc}</p>
+                  </div>
+                ))}
               </div>
-            </div>
+            </section>
           </div>
 
-          {/* Right Column: History & Preferences */}
-          <div className="lg:col-span-8 space-y-16">
-
-            {/* Booking History */}
-            <div className="space-y-8">
-              <div className="flex justify-between items-end border-b border-outline-variant/20 pb-4">
-                <h2 className="font-headline text-3xl text-primary leading-none">Lịch sử Đặt phòng của bạn</h2>
-                <Link to="/history" className="font-label text-[0.7rem] uppercase tracking-widest text-secondary border-b border-secondary/30 pb-1">Xem tất cả</Link>
+          <section className="profile-panel rounded-[30px] p-6 sm:p-8">
+            <div className="flex flex-col gap-4 border-b border-outline-variant/15 pb-6 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="font-label text-[0.64rem] uppercase tracking-[0.28em] text-secondary">Reservation Ledger</p>
+                <h2 className="mt-3 font-headline text-[2rem] leading-tight text-primary">Lịch sử đặt phòng</h2>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">
+                  Theo dõi các kỳ lưu trú gần đây với trạng thái, chi phí và mốc thời gian rõ ràng trong một bố cục
+                  phù hợp cho trải nghiệm thành viên cao cấp.
+                </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {recentBookings.length > 0 ? recentBookings.map((booking) => {
-                  const detail = booking.details?.[0];
-                  const status = booking.status?.toLowerCase() || 'pending';
-                  const statusLabel = status === 'pending' ? 'Chờ xử lý' : status === 'confirmed' ? 'Đã xác nhận' : status === 'completed' ? 'Đã hoàn thành' : 'Đã hủy';
-                  return (
-                    <div key={booking.id} className="group cursor-pointer" onClick={() => navigate(`/booking/${booking.id}`, { state: { booking } })}>
-                      <div className="aspect-[16/10] mb-4 overflow-hidden rounded-sm">
-                        <img
-                          alt={detail?.room?.roomType?.typeName || 'Phòng'}
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                          src={imageUrl(detail?.room?.image)}
-                        />
-                      </div>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <span className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-secondary">
-                            {status === 'confirmed' ? 'Kỳ nghỉ sắp tới' : status === 'completed' ? 'Kỳ nghỉ trước' : statusLabel}
-                          </span>
-                          <h3 className="font-headline text-xl text-primary mt-1">{detail?.room?.roomType?.typeName || 'Phòng Tiêu chuẩn'}</h3>
-                          <p className="text-sm text-outline font-body mt-1">Phòng {detail?.room?.roomNumber || 'N/A'}</p>
+              <Link
+                to="/history"
+                className="inline-flex min-w-[170px] items-center justify-center gap-2 rounded-full border border-outline-variant/20 bg-white px-5 py-3 font-label text-[0.68rem] uppercase tracking-[0.22em] text-primary whitespace-nowrap transition-all hover:border-secondary/40 hover:text-secondary"
+              >
+                Xem tất cả
+                <span className="material-symbols-outlined text-base">arrow_forward</span>
+              </Link>
+            </div>
+
+            <div className="mt-8 space-y-5">
+              {recentBookings.length > 0 ? recentBookings.map((booking) => {
+                const detail = booking.details?.[0];
+                const statusMeta = getStatusMeta(booking.status);
+                const roomTypeName = detail?.room?.roomType?.typeName || 'Phòng tiêu chuẩn';
+                const roomNumber = detail?.room?.roomNumber || 'N/A';
+                const imageSrc = imageUrl(detail?.room?.image);
+
+                return (
+                  <article key={booking.id} className="group overflow-hidden rounded-[28px] border border-outline-variant/12 bg-white/80 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_-40px_rgba(15,23,42,0.45)]">
+                    <div className="grid gap-0 lg:grid-cols-[230px_minmax(0,1fr)]">
+                      <div className="relative min-h-[210px] overflow-hidden bg-surface-container-low">
+                        <img src={imageSrc} alt={roomTypeName} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-primary/75 to-transparent p-5">
+                          <p className="font-label text-[0.6rem] uppercase tracking-[0.24em] text-white/75">Booking code</p>
+                          <p className="mt-2 font-headline text-2xl text-white">{getBookingCode(booking.id)}</p>
                         </div>
-                        <span className={`px-3 py-1 font-label text-[0.6rem] uppercase tracking-widest ${status === 'confirmed' ? 'bg-secondary/10 text-secondary' : 'bg-surface-container-high text-on-surface-variant'}`}>
-                          {statusLabel}
-                        </span>
+                      </div>
+
+                      <div className="flex flex-col justify-between p-6 sm:p-7">
+                        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                          <div>
+                            <div className="inline-flex items-center gap-2 rounded-full bg-secondary/10 px-3 py-1 font-label text-[0.58rem] uppercase tracking-[0.24em] text-secondary">
+                              {statusMeta.summary}
+                            </div>
+                            <h3 className="mt-4 font-headline text-3xl leading-tight text-primary">{roomTypeName}</h3>
+                            <p className="mt-2 text-sm text-on-surface-variant">Phòng {roomNumber}</p>
+                          </div>
+
+                          <span className={`inline-flex rounded-full px-4 py-2 font-label text-[0.62rem] uppercase tracking-[0.22em] ${statusMeta.className}`}>
+                            {statusMeta.label}
+                          </span>
+                        </div>
+
+                        <div className="mt-7 grid grid-cols-2 gap-4 rounded-[24px] border border-outline-variant/10 bg-[linear-gradient(180deg,rgba(248,244,238,0.82)_0%,rgba(255,255,255,0.94)_100%)] p-5 2xl:grid-cols-4">
+                          <div>
+                            <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Nhận phòng</p>
+                            <p className="mt-2 font-headline text-lg leading-tight text-primary xl:text-xl">{formatDate(detail?.checkIn)}</p>
+                          </div>
+                          <div>
+                            <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Trả phòng</p>
+                            <p className="mt-2 font-headline text-lg leading-tight text-primary xl:text-xl">{formatDate(detail?.checkOut)}</p>
+                          </div>
+                          <div>
+                            <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Ngày đặt</p>
+                            <p className="mt-2 font-headline text-lg leading-tight text-primary xl:text-xl">{formatDate(booking.createdAt || detail?.checkIn)}</p>
+                          </div>
+                          <div>
+                            <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Tổng giá trị</p>
+                            <p className="mt-2 font-headline text-lg leading-tight text-primary xl:text-xl">{formatCurrency(booking.totalPrice)}đ</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+                          <p className="text-sm leading-7 text-on-surface-variant">
+                            {detail?.totalHours
+                              ? `Thời lượng lưu trú dự kiến ${detail.totalHours} giờ.`
+                              : 'Thông tin lưu trú đã được lưu trong hồ sơ thành viên của bạn.'}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/booking/${booking.id}`, { state: { booking } })}
+                            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 font-label text-[0.66rem] uppercase tracking-[0.22em] text-on-primary transition-all hover:brightness-105"
+                          >
+                            Xem chi tiết
+                            <span className="material-symbols-outlined text-base">north_east</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  );
-                }) : (
-                  <div className="md:col-span-2 text-center py-8">
-                    <p className="text-on-surface-variant font-body text-sm italic">Chưa có lịch sử đặt phòng nào.</p>
-                    <Link to="/collections" className="text-secondary font-label text-xs uppercase tracking-widest mt-2 inline-block">Đặt phòng ngay</Link>
+                  </article>
+                );
+              }) : (
+                <div className="rounded-[30px] border border-dashed border-outline-variant/25 bg-[linear-gradient(180deg,rgba(255,255,255,0.82)_0%,rgba(248,243,236,0.9)_100%)] px-6 py-14 text-center sm:px-10">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-secondary/10 text-secondary">
+                    <span className="material-symbols-outlined text-3xl">hotel</span>
                   </div>
-                )}
-              </div>
+                  <h3 className="mt-6 font-headline text-3xl text-primary">Chưa có kỳ lưu trú nào</h3>
+                  <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-on-surface-variant">
+                    Hồ sơ thành viên của bạn vẫn đang chờ những hành trình đầu tiên. Khám phá bộ sưu tập phòng để bắt
+                    đầu một trải nghiệm lưu trú được chăm chút theo phong cách GOAT HOTEL.
+                  </p>
+                  <Link to="/collections" className="mt-8 inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-label text-[0.68rem] uppercase tracking-[0.24em] text-on-primary transition-all hover:brightness-105">
+                    Đặt phòng ngay
+                    <span className="material-symbols-outlined text-base">arrow_forward</span>
+                  </Link>
+                </div>
+              )}
             </div>
-
-            {/* Preferences Bento Grid */}
-            <div className="space-y-8">
-              <h2 className="font-headline text-3xl text-primary border-b border-outline-variant/20 pb-4">Sở thích Cá nhân</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-surface-container-low p-8 rounded-sm space-y-4">
-                  <span className="material-symbols-outlined text-secondary text-3xl">bed</span>
-                  <h4 className="font-headline text-lg">Nghỉ ngơi</h4>
-                  <p className="font-label text-[0.7rem] uppercase tracking-widest text-outline">Thực đơn Gối</p>
-                  <p className="text-on-surface font-body text-sm">Lông ngỗng Hungary, cực kỳ êm ái.</p>
-                </div>
-                <div className="bg-surface-container-low p-8 rounded-sm space-y-4">
-                  <span className="material-symbols-outlined text-secondary text-3xl">restaurant</span>
-                  <h4 className="font-headline text-lg">Ẩm thực</h4>
-                  <p className="font-label text-[0.7rem] uppercase tracking-widest text-outline">Nhu cầu Ăn uống</p>
-                  <p className="text-on-surface font-body text-sm">Hỗ trợ ăn chay, không Gluten.</p>
-                </div>
-                <div className="bg-surface-container-low p-8 rounded-sm space-y-4">
-                  <span className="material-symbols-outlined text-secondary text-3xl">thermostat</span>
-                  <h4 className="font-headline text-lg">Nhiệt độ</h4>
-                  <p className="font-label text-[0.7rem] uppercase tracking-widest text-outline">Nhiệt độ phòng</p>
-                  <p className="text-on-surface font-body text-sm">Duy trì chính xác ở mức 21°C.</p>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
+          </section>
+        </section>
+      </main>
     </div>
   );
 }

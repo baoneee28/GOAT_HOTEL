@@ -1,29 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE, { imageUrl } from '../config';
 
+const FILTERS = ['all', 'pending', 'confirmed', 'completed', 'cancelled'];
+
 const STATUS_STYLES = {
   pending: {
-    badge: 'border border-secondary/60 text-secondary bg-secondary/5',
+    badge: 'border border-amber-400/25 bg-amber-500/10 text-amber-200',
+    pill: 'border border-amber-400/25 bg-amber-500/8 text-amber-200',
     label: 'Chờ xử lý',
+    summary: 'Đang chờ khách sạn xác nhận',
   },
   confirmed: {
-    badge: 'bg-emerald-900/40 text-emerald-400 border border-emerald-500/30',
+    badge: 'border border-emerald-400/25 bg-emerald-500/10 text-emerald-200',
+    pill: 'border border-emerald-400/25 bg-emerald-500/8 text-emerald-200',
     label: 'Đã xác nhận',
+    summary: 'Kỳ nghỉ sắp tới',
   },
   completed: {
-    badge: 'bg-slate-800 text-slate-300 border border-slate-700',
+    badge: 'border border-slate-300/14 bg-white/8 text-white/82',
+    pill: 'border border-slate-300/14 bg-white/6 text-white/78',
     label: 'Đã hoàn thành',
+    summary: 'Đã lưu trú',
   },
   cancelled: {
-    badge: 'bg-red-950/40 text-red-400 border border-red-800/30 line-through',
+    badge: 'border border-rose-400/22 bg-rose-500/10 text-rose-200',
+    pill: 'border border-rose-400/22 bg-rose-500/8 text-rose-200',
     label: 'Đã hủy',
+    summary: 'Đơn lưu trú đã hủy',
   },
 };
 
-const formatDate = (dateValue) => {
-  if (!dateValue) return 'N/A';
+function formatDate(dateValue) {
+  if (!dateValue) return 'Chưa cập nhật';
   let d;
   if (Array.isArray(dateValue)) {
     const [year, month, day, hour = 0, minute = 0, second = 0] = dateValue;
@@ -31,15 +41,21 @@ const formatDate = (dateValue) => {
   } else {
     d = new Date(dateValue);
   }
-  if (isNaN(d)) return 'Invalid Date';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-};
+  if (Number.isNaN(d.getTime())) return 'Chưa cập nhật';
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
 
-const getRoomImage = (url) => {
+function formatCurrency(value) {
+  return Number(value || 0).toLocaleString('vi-VN');
+}
+
+function getBookingCode(id) {
+  return `GH-${String(id || 0).padStart(5, '0')}`;
+}
+
+function getRoomImage(url) {
   return imageUrl(url);
-};
-
-const FILTERS = ['all', 'pending', 'confirmed', 'completed', 'cancelled'];
+}
 
 export default function History() {
   const navigate = useNavigate();
@@ -72,8 +88,17 @@ export default function History() {
     fetchHistory(activeFilter, page);
   }, [activeFilter, page, currentUserId]);
 
-  const handleFilterChange = (f) => {
-    setActiveFilter(f);
+  const filterCounts = useMemo(() => {
+    const counts = { all: bookings.length, pending: 0, confirmed: 0, completed: 0, cancelled: 0 };
+    bookings.forEach((booking) => {
+      const status = (booking.status || 'pending').toLowerCase();
+      if (counts[status] !== undefined) counts[status] += 1;
+    });
+    return counts;
+  }, [bookings]);
+
+  const handleFilterChange = (filter) => {
+    setActiveFilter(filter);
     setPage(1);
   };
 
@@ -82,146 +107,257 @@ export default function History() {
   };
 
   return (
-    <div className="min-h-screen font-body text-slate-200" style={{ background: 'radial-gradient(circle at top left, #0f172a, #020617)' }}>
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f5efe5_0%,#fbf8f3_34%,#f9f5ee_100%)] font-body text-slate-200">
       <style>{`
-        .glass-card { background: rgba(15,23,42,0.6); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.08); }
-        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; vertical-align: middle; }
+        .history-shell {
+          background:
+            linear-gradient(180deg, rgba(5, 15, 30, 0.46) 0%, rgba(5, 15, 30, 0.68) 100%),
+            linear-gradient(90deg, rgba(5, 15, 30, 0.78) 0%, rgba(5, 15, 30, 0.4) 48%, rgba(5, 15, 30, 0.66) 100%);
+        }
+        .history-panel {
+          background: linear-gradient(180deg, rgba(255,252,247,0.94) 0%, rgba(250,246,239,0.98) 100%);
+          border: 1px solid rgba(120, 90, 25, 0.14);
+          box-shadow: 0 28px 70px -46px rgba(40, 28, 12, 0.28);
+          backdrop-filter: blur(20px);
+        }
+        .history-filter-rail {
+          background: linear-gradient(180deg, rgba(255,251,246,0.95) 0%, rgba(248,243,235,0.98) 100%);
+          border: 1px solid rgba(120, 90, 25, 0.14);
+          box-shadow: 0 24px 60px -42px rgba(40, 28, 12, 0.22);
+          backdrop-filter: blur(18px);
+        }
+        .material-symbols-outlined {
+          font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+          vertical-align: middle;
+        }
       `}</style>
 
-      <main className="pt-8 pb-24 px-6 md:px-12 max-w-7xl mx-auto">
-        {/* Page Header */}
-        <header className="mb-16 border-b border-slate-800 pb-12 space-y-4">
-          <h1 className="font-headline text-5xl md:text-6xl font-light tracking-tight text-white italic">
-            Lịch sử <span className="text-secondary not-italic">Đặt phòng</span>
-          </h1>
-          <p className="text-slate-500 font-body text-sm max-w-lg">
-            Toàn bộ hồ sơ lưu trú và đặt phòng của bạn tại GOAT HOTEL.
-          </p>
-        </header>
-
-        {/* Filter Tabs */}
-        <div className="flex flex-wrap gap-3 mb-12">
-          {FILTERS.map((f) => (
-            <button
-              key={f}
-              onClick={() => handleFilterChange(f)}
-              className={`px-5 py-2 font-label text-[0.65rem] uppercase tracking-[0.3em] font-bold border transition-all duration-300 ${
-                activeFilter === f
-                  ? 'bg-secondary text-slate-950 border-secondary'
-                  : 'border-slate-800 text-slate-500 hover:border-secondary/40 hover:text-secondary'
-              }`}
-            >
-              {f === 'all' ? 'Tất cả' : STATUS_STYLES[f]?.label || f}
-            </button>
-          ))}
+      <section className="history-shell relative overflow-hidden">
+        <div className="absolute inset-0">
+          <img
+            src={imageUrl('/images/home/history_hero.webp')}
+            alt="GOAT HOTEL reservations"
+            className="h-full w-full object-cover"
+          />
         </div>
+        <div className="relative mx-auto max-w-7xl px-6 pb-24 pt-28 sm:px-8 lg:px-10 lg:pb-28 lg:pt-32">
+          <div className="max-w-3xl pt-12 sm:pt-16 lg:pt-24">
+            <p className="font-label text-[0.72rem] uppercase tracking-[0.34em] text-secondary/90">
+              Reservation Archive
+            </p>
+            <h1 className="mt-8 font-headline text-4xl leading-tight text-white sm:text-5xl lg:text-[3.8rem]">
+              Lịch sử Đặt phòng
+            </h1>
+            <p className="mt-5 max-w-2xl text-sm leading-7 text-white/78 sm:text-base">
+              Kho lưu trú cá nhân của bạn tại GOAT HOTEL, nơi mọi lần đặt phòng được lưu lại với trạng thái,
+              thời gian và giá trị rõ ràng trong một trải nghiệm sang trọng, dễ theo dõi.
+            </p>
+          </div>
+        </div>
+      </section>
 
-        {/* Booking List */}
-        {loading ? (
-          <div className="flex justify-center py-24">
-            <div className="w-8 h-8 rounded-full border-2 border-secondary border-t-transparent animate-spin"></div>
+      <main className="relative z-10 mx-auto mt-12 max-w-7xl px-6 pb-24 sm:px-8 lg:mt-16 lg:px-10">
+        <section className="history-filter-rail rounded-[30px] p-5 sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="font-label text-[0.64rem] uppercase tracking-[0.28em] text-secondary">Bộ lọc lưu trú</p>
+              <p className="mt-2 text-sm leading-7 text-on-surface-variant">
+                Chọn trạng thái để tập trung vào những kỳ lưu trú bạn cần xem lại nhanh nhất.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              {FILTERS.map((filter) => {
+                const isActive = activeFilter === filter;
+                const label = filter === 'all' ? 'Tất cả' : STATUS_STYLES[filter]?.label || filter;
+                return (
+                  <button
+                    key={filter}
+                    onClick={() => handleFilterChange(filter)}
+                    className={`inline-flex items-center gap-2 rounded-full px-4 py-3 font-label text-[0.64rem] uppercase tracking-[0.22em] transition-all ${
+                      isActive
+                        ? 'bg-secondary text-slate-950 shadow-[0_14px_30px_-18px_rgba(212,175,55,0.8)]'
+                        : 'border border-outline-variant/20 bg-white/70 text-primary/72 hover:border-secondary/35 hover:text-secondary'
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <span className={`inline-flex min-w-6 justify-center rounded-full px-2 py-0.5 text-[0.58rem] tracking-normal ${isActive ? 'bg-slate-950/12 text-slate-950' : 'bg-primary/6 text-primary/58'}`}>
+                      {filterCounts[filter] || 0}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        ) : bookings.length === 0 ? (
-          <div className="glass-card p-20 rounded-lg text-center space-y-4">
-            <span className="material-symbols-outlined text-5xl text-slate-700">hotel</span>
-            <p className="font-headline text-xl text-slate-500 italic">Không tìm thấy đặt phòng nào.</p>
-            <Link to="/collections" className="inline-block mt-4 font-label text-xs uppercase tracking-widest text-secondary border-b border-secondary/40 pb-0.5">
-              Xem phòng
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {bookings.map((booking) => {
-              const detail = booking.details?.[0];
-              const status = booking.status?.toLowerCase() || 'pending';
-              const style = STATUS_STYLES[status] || STATUS_STYLES.pending;
-              return (
-                <div
-                  key={booking.id}
-                  onClick={() => goToDetail(booking)}
-                  className="glass-card rounded-lg overflow-hidden cursor-pointer group hover:border-secondary/30 transition-all duration-500"
-                >
-                  <div className="flex flex-col md:flex-row">
-                    {/* Room Image */}
-                    <div className="md:w-1/5 relative overflow-hidden">
-                      <img
-                        alt={`Room ${detail?.room?.roomNumber}`}
-                        src={getRoomImage(detail?.room?.image)}
-                        className="w-full h-full object-cover min-h-[180px] transition-transform duration-700 group-hover:scale-110"
-                      />
-                      <div className="absolute inset-0 bg-slate-950/30 group-hover:bg-slate-950/10 transition-colors duration-500"></div>
+        </section>
+
+        <section className="mt-8">
+          {loading ? (
+            <div className="history-panel rounded-[30px] px-6 py-24 text-center text-primary sm:px-10">
+              <div className="mx-auto h-10 w-10 rounded-full border-2 border-secondary border-t-transparent animate-spin"></div>
+              <p className="mt-6 font-label text-[0.68rem] uppercase tracking-[0.28em] text-primary/42">Đang tải lịch sử lưu trú</p>
+            </div>
+          ) : bookings.length === 0 ? (
+            <div className="history-panel rounded-[32px] px-6 py-20 text-center sm:px-10">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-outline-variant/18 bg-white/75 text-secondary">
+                <span className="material-symbols-outlined text-3xl">hotel</span>
+              </div>
+              <h2 className="mt-6 font-headline text-3xl text-primary">Chưa có lưu trú phù hợp</h2>
+              <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-on-surface-variant">
+                Không tìm thấy đơn đặt phòng ở trạng thái bạn đang chọn. Hãy khám phá bộ sưu tập phòng để bắt đầu
+                một hành trình lưu trú mới cùng GOAT HOTEL.
+              </p>
+              <Link
+                to="/collections"
+                className="mt-8 inline-flex items-center gap-2 rounded-full bg-secondary px-6 py-3 font-label text-[0.68rem] uppercase tracking-[0.24em] text-slate-950 transition-all hover:brightness-105"
+              >
+                Đặt phòng ngay
+                <span className="material-symbols-outlined text-base">arrow_forward</span>
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {bookings.map((booking) => {
+                const detail = booking.details?.[0];
+                const status = booking.status?.toLowerCase() || 'pending';
+                const statusMeta = STATUS_STYLES[status] || STATUS_STYLES.pending;
+                const roomTypeName = detail?.room?.roomType?.typeName || 'Phòng tiêu chuẩn';
+                const roomNumber = detail?.room?.roomNumber || 'N/A';
+
+                return (
+                  <article
+                    key={booking.id}
+                    className="history-panel group overflow-hidden rounded-[32px] text-primary transition-all duration-500 hover:-translate-y-1 hover:border-secondary/25 hover:shadow-[0_34px_90px_-48px_rgba(40,28,12,0.32)]"
+                  >
+                    <div className="grid lg:grid-cols-[280px_minmax(0,1fr)]">
+                      <div className="relative min-h-[260px] overflow-hidden">
+                        <img
+                          alt={`Phòng ${roomNumber}`}
+                          src={getRoomImage(detail?.room?.image)}
+                          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/20 to-transparent"></div>
+
+                        <div className="absolute inset-x-0 bottom-0 p-6">
+                          <p className="font-label text-[0.62rem] uppercase tracking-[0.26em] text-white/58">Booking code</p>
+                          <p className="mt-3 font-headline text-4xl text-white">{getBookingCode(booking.id)}</p>
+                        </div>
+                      </div>
+
+                      <div className="p-6 sm:p-8 lg:p-9">
+                        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-3">
+                              <span className={`rounded-full px-4 py-2 font-label text-[0.62rem] uppercase tracking-[0.24em] ${statusMeta.badge}`}>
+                                {statusMeta.label}
+                              </span>
+                              <span className="rounded-full border border-outline-variant/16 bg-white/65 px-3 py-2 font-label text-[0.58rem] uppercase tracking-[0.24em] text-primary/45">
+                                Phòng {roomNumber}
+                              </span>
+                            </div>
+                            <h3 className="mt-5 font-headline text-3xl leading-tight text-primary sm:text-[2.4rem]">
+                              {roomTypeName}
+                            </h3>
+                            <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">
+                              {statusMeta.summary}
+                            </p>
+                          </div>
+
+                          <div className="rounded-[24px] border border-outline-variant/12 bg-white/65 px-5 py-4 text-left xl:min-w-[220px] xl:text-right">
+                            <p className="font-label text-[0.58rem] uppercase tracking-[0.24em] text-primary/42">Tổng thanh toán</p>
+                            <p className="mt-3 font-headline text-3xl text-secondary">{formatCurrency(booking.totalPrice)}đ</p>
+                            <p className="mt-2 text-xs uppercase tracking-[0.22em] text-primary/32">Đã lưu vào hồ sơ</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-8 grid gap-4 rounded-[28px] border border-outline-variant/12 bg-white/62 p-5 sm:grid-cols-2 2xl:grid-cols-4">
+                          <div>
+                            <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-primary/42">Nhận phòng</p>
+                            <p className="mt-3 font-headline text-xl text-primary">{formatDate(detail?.checkIn)}</p>
+                          </div>
+                          <div>
+                            <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-primary/42">Trả phòng</p>
+                            <p className="mt-3 font-headline text-xl text-primary">{formatDate(detail?.checkOut)}</p>
+                          </div>
+                          <div>
+                            <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-primary/42">Ngày đặt</p>
+                            <p className="mt-3 font-headline text-xl text-primary">{formatDate(booking.createdAt || detail?.checkIn)}</p>
+                          </div>
+                          <div>
+                            <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-primary/42">Trạng thái</p>
+                            <div className={`mt-3 inline-flex rounded-full px-4 py-2 font-label text-[0.62rem] uppercase tracking-[0.22em] ${statusMeta.pill}`}>
+                              {statusMeta.label}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-7 flex flex-col gap-4 border-t border-outline-variant/12 pt-6 md:flex-row md:items-center md:justify-between">
+                          <p className="text-sm leading-7 text-on-surface-variant">
+                            {detail?.totalHours
+                              ? `Thời lượng lưu trú dự kiến ${detail.totalHours} giờ, đồng bộ trong hồ sơ đặt phòng của bạn.`
+                              : 'Mọi chi tiết lưu trú đã được GOAT HOTEL lưu lại cho trải nghiệm thành viên liền mạch.'}
+                          </p>
+
+                          <div className="flex flex-wrap gap-3">
+                            {status === 'completed' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate('/collections');
+                                }}
+                                className="inline-flex items-center gap-2 rounded-full border border-outline-variant/18 bg-white/70 px-5 py-3 font-label text-[0.64rem] uppercase tracking-[0.22em] text-primary/80 transition-all hover:border-secondary/30 hover:text-secondary"
+                              >
+                                Đặt lại
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => goToDetail(booking)}
+                              className="inline-flex items-center gap-2 rounded-full bg-secondary px-5 py-3 font-label text-[0.64rem] uppercase tracking-[0.22em] text-slate-950 transition-all hover:brightness-105"
+                            >
+                              Xem chi tiết
+                              <span className="material-symbols-outlined text-base">north_east</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
-                    {/* Info */}
-                    <div className="flex-1 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <span className={`px-3 py-1 font-label text-[0.6rem] uppercase tracking-widest font-bold rounded-sm ${style.badge}`}>
-                            {style.label}
-                          </span>
-                          <span className="font-label text-[0.6rem] text-slate-600 uppercase tracking-widest">
-                            #{String(booking.id).padStart(5, '0')}
-                          </span>
-                        </div>
-                        <h3 className="font-headline text-2xl text-white italic">
-                          {detail?.room?.roomType?.typeName || 'Phòng Tiêu chuẩn'}
-                        </h3>
-                        <p className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
-                          Phòng {detail?.room?.roomNumber || 'N/A'}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap gap-8 md:gap-12">
-                        <div className="space-y-1">
-                          <p className="font-label text-[0.6rem] uppercase tracking-widest text-slate-600 font-bold">Nhận phòng</p>
-                          <p className="font-headline text-base text-white">{formatDate(detail?.checkIn)}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="font-label text-[0.6rem] uppercase tracking-widest text-slate-600 font-bold">Trả phòng</p>
-                          <p className="font-headline text-base text-white">{formatDate(detail?.checkOut)}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="font-label text-[0.6rem] uppercase tracking-widest text-slate-600 font-bold">Tổng cộng</p>
-                          <p className="font-headline text-xl text-secondary">{(booking.totalPrice || 0).toLocaleString('vi-VN')}đ</p>
-                        </div>
-                      </div>
-
-                      <div className="hidden md:flex items-center">
-                        <span className="material-symbols-outlined text-slate-700 group-hover:text-secondary group-hover:translate-x-1 transition-all duration-300">arrow_forward_ios</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex justify-center gap-3 mt-12">
+          <div className="mt-12 flex flex-wrap items-center justify-center gap-3">
             <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-5 py-2 border border-slate-800 text-slate-500 font-label text-[0.65rem] uppercase tracking-widest hover:border-secondary hover:text-secondary transition-all disabled:opacity-30"
+              className="rounded-full border border-outline-variant/18 bg-white/70 px-5 py-3 font-label text-[0.64rem] uppercase tracking-[0.22em] text-primary/62 transition-all hover:border-secondary/30 hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30"
             >
               Trước
             </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(pg => (
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
               <button
                 key={pg}
                 onClick={() => setPage(pg)}
-                className={`w-10 h-10 font-label text-[0.65rem] uppercase tracking-widest border transition-all ${
-                  pg === page ? 'bg-secondary text-slate-950 border-secondary' : 'border-slate-800 text-slate-500 hover:border-secondary/40'
+                className={`h-11 min-w-11 rounded-full px-4 font-label text-[0.64rem] uppercase tracking-[0.2em] transition-all ${
+                  pg === page
+                    ? 'bg-secondary text-slate-950'
+                    : 'border border-outline-variant/18 bg-white/70 text-primary/62 hover:border-secondary/30 hover:text-secondary'
                 }`}
               >
                 {pg}
               </button>
             ))}
+
             <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="px-5 py-2 border border-slate-800 text-slate-500 font-label text-[0.65rem] uppercase tracking-widest hover:border-secondary hover:text-secondary transition-all disabled:opacity-30"
+              className="rounded-full border border-outline-variant/18 bg-white/70 px-5 py-3 font-label text-[0.64rem] uppercase tracking-[0.22em] text-primary/62 transition-all hover:border-secondary/30 hover:text-secondary disabled:cursor-not-allowed disabled:opacity-30"
             >
               Tiếp
             </button>

@@ -13,6 +13,27 @@ const getRoomAmenities = (room) => {
   return ['WiFi miễn phí', 'TV màn hình phẳng', 'Điều hòa', 'Phòng tắm riêng'];
 };
 
+const getAmenityIcon = (label) => {
+  if (!label) return null;
+  const l = label.toLowerCase();
+  
+  // Các icon cơ bản đã có
+  if (l.includes('wifi') || l.includes('mạng') || l.includes('internet')) return '/icons/wifi.png';
+  if (l.includes('ban công') || l.includes('balcony')) return '/icons/balcony.png';
+  if (l.includes('hồ bơi') || l.includes('bơi') || l.includes('bồn tắm') || l.includes('jacuzzi')) return '/icons/jacuzzi.png';
+  if (l.includes('spa') || l.includes('tình yêu') || l.includes('couple') || l.includes('massage') || l.includes('cặp đôi')) return '/icons/heart.png';
+  
+  // Icon mới upload
+  if (l.includes('máy lạnh') || l.includes('điều hòa') || l.includes('air filter') || l.includes('air conditioner')) return '/icons/air-conditioner.png';
+  if (l.includes('máy sấy') || l.includes('hairdryer')) return '/icons/hairdryer.png';
+  if (l.includes('bàn ủi') || l.includes('iron') || l.includes('giặt')) return '/icons/ironing.png';
+  if (l.includes('tủ lạnh') || l.includes('mini') || l.includes('fridge')) return '/icons/mini.png';
+  if (l.includes('két sắt') || l.includes('safe') || l.includes('bảo mật')) return '/icons/safe.png';
+  if (l.includes('tv') || l.includes('tivi') || l.includes('màn hình phẳng') || l.includes('truyền hình')) return '/icons/tv.png';
+  
+  return null;
+};
+
 const formatDate = (dateString) => {
   if (!dateString) return '';
   const parts = dateString.split('-');
@@ -227,17 +248,24 @@ export default function RoomDetail() {
               Tiện ích Độc quyền
             </p>
             <div className="grid grid-cols-2 gap-y-4 gap-x-6">
-              {roomAmenities.map((label) => (
-                <div key={label} className="flex items-center gap-3">
-                  <span
-                    className="material-symbols-outlined text-secondary text-xl flex-shrink-0"
-                    style={{ fontVariationSettings: "'FILL' 0, 'wght' 300" }}
-                  >
-                    check_circle
-                  </span>
-                  <span className="font-body text-sm text-on-surface">{label}</span>
-                </div>
-              ))}
+              {roomAmenities.map((label) => {
+                const customIcon = getAmenityIcon(label);
+                return (
+                  <div key={label} className="flex items-center gap-3">
+                    {customIcon ? (
+                      <img src={imageUrl(customIcon)} alt={label} className="w-5 h-5 object-contain flex-shrink-0" />
+                    ) : (
+                      <span
+                        className="material-symbols-outlined text-secondary text-xl flex-shrink-0"
+                        style={{ fontVariationSettings: "'FILL' 0, 'wght' 300" }}
+                      >
+                        check_circle
+                      </span>
+                    )}
+                    <span className="font-body text-sm text-on-surface">{label}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

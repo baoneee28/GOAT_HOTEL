@@ -68,7 +68,7 @@ export default function NewsPage() {
             {articles.map((article) => (
               <Link
                 key={article.id}
-                to={`/news/${article.slug || article.id}`}
+                to={`/news/${article.id}`}
                 className="group flex flex-col bg-surface rounded-xl overflow-hidden shadow-lg border border-outline-variant/10 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-300 hover:-translate-y-1 active:scale-95 cursor-pointer relative z-20"
               >
                 {/* Ảnh bài viết tỉ lệ 16:9 */}

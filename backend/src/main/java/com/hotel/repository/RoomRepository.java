@@ -15,6 +15,8 @@ public interface RoomRepository extends JpaRepository<Room, Integer> {
 
     List<Room> findByRoomTypeIdOrderByRoomNumberAsc(Integer typeId);
 
+    List<Room> findByRoomTypeIdAndStatusOrderByRoomNumberAsc(Integer typeId, String status);
+
 
     List<Room> findByStatus(String status);
 

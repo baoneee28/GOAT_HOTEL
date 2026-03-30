@@ -22,7 +22,7 @@ public class DescriptionController {
                 String content = new String(Files.readAllBytes(path), "UTF-8");
                 response.put("content", content);
             } else {
-                response.put("content", "Welcome to GOAT HOTEL. A premier destination for luxury and relaxation.");
+                response.put("content", "GOAT HOTEL là một khách sạn hiện đại, mang phong cách thiết kế sang trọng và ấm cúng, phù hợp cho cả khách du lịch và công tác. Với vị trí thuận lợi, khách sạn giúp du khách dễ dàng di chuyển đến các điểm tham quan nổi bật trong khu vực. Hệ thống phòng nghỉ được trang bị đầy đủ tiện nghi, đảm bảo mang lại sự thoải mái tối đa cho khách hàng. Bên cạnh đó, dịch vụ chuyên nghiệp và thân thiện tại GOAT HOTEL luôn tạo ấn tượng tốt và sự hài lòng cho mọi du khách.");
             }
         } catch (Exception e) {
             response.put("content", "Error loading description.");

@@ -27,10 +27,16 @@ public class RoomApiController {
         return roomRepository.findById(id).orElse(null);
     }
 
-    // Lấy danh sách phòng lọc theo Loại phòng (Standard, VIP)
+    // Lấy danh sách phòng lọc theo Loại phòng — mặc định chỉ trả phòng "available"
+    // Admin / internal: gọi ?status=all để lấy tất cả
     @GetMapping("/type/{typeId}")
-    public List<Room> getRoomsByType(@PathVariable("typeId") Integer typeId) {
-        return roomRepository.findByRoomTypeIdOrderByRoomNumberAsc(typeId);
+    public List<Room> getRoomsByType(
+            @PathVariable("typeId") Integer typeId,
+            @RequestParam(defaultValue = "available") String status) {
+        if ("all".equalsIgnoreCase(status)) {
+            return roomRepository.findByRoomTypeIdOrderByRoomNumberAsc(typeId);
+        }
+        return roomRepository.findByRoomTypeIdAndStatusOrderByRoomNumberAsc(typeId, status);
     }
 
     // ==========================================

@@ -5,7 +5,7 @@ import API_BASE, { imageUrl } from '../config';
 import HeroHeader from '../components/HeroHeader';
 
 export default function NewsDetail() {
-  const { id } = useParams(); // URL path /news/:id (hiện đang dùng truyền slug)
+  const { id } = useParams(); // URL path /news/:id
   const navigate = useNavigate();
   const [news, setNews] = useState(null);
   const [related, setRelated] = useState([]);
@@ -21,7 +21,7 @@ export default function NewsDetail() {
       })
       .then(res => {
         if (res) {
-          setRelated((res.data || []).filter(n => String(n.id) !== String(id) && n.slug !== id).slice(0, 3));
+          setRelated((res.data || []).filter(n => String(n.id) !== String(id)).slice(0, 3));
         }
       })
       .catch(() => navigate('/news'));
@@ -118,7 +118,7 @@ export default function NewsDetail() {
               {related.map((item) => (
                 <Link
                   key={item.id}
-                  to={`/news/${item.slug || item.id}`}
+                  to={`/news/${item.id}`}
                   className="group flex flex-col gap-4 cursor-pointer"
                 >
                   <div className="w-full aspect-video overflow-hidden rounded-md bg-surface-container-high relative">

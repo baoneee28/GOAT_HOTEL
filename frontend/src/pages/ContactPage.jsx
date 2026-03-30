@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
+import HeroHeader from '../components/HeroHeader';
 
 const CONTACT_INFO = [
   {
     icon: 'location_on',
     label: 'Địa chỉ',
-    value: '127 Azure Gilt Way,\nQuận Sovereignty, NY 10012',
+    value: '01 Võ Văn Ngân, Phường Linh Chiểu,\nTP. Thủ Đức, Hồ Chí Minh',
   },
   {
     icon: 'call',
     label: 'Đặt phòng',
-    value: '+1 (800) 555-GOAT',
+    value: '+84 (0) 28 1234 5678',
   },
   {
     icon: 'mail',
     label: 'Hỗ trợ chung',
-    value: 'concierge@goathotel.com',
+    value: 'goathotel@gmail.com',
   },
 ];
 
@@ -45,50 +46,41 @@ export default function ContactPage() {
         .floating-label-group input:not(:placeholder-shown) ~ label,
         .floating-label-group textarea:focus ~ label,
         .floating-label-group textarea:not(:placeholder-shown) ~ label {
-          top: -0.5rem; font-size: 0.75rem; color: #775a19; opacity: 1;
+          top: -0.65rem; font-size: 0.7rem; color: #775a19; opacity: 1;
+          background: #e8e4dc; padding: 0 6px; left: 10px;
         }
         .floating-label-group label {
-          position: absolute; left: 0; top: 1rem;
+          position: absolute; left: 16px; top: 1.1rem;
           transition: all 0.2s ease; pointer-events: none; color: #74777f;
         }
         .floating-label-group input, .floating-label-group textarea {
-          border: none; border-bottom: 1px solid rgba(196,198,207,0.4);
-          background: transparent; padding-top: 1.5rem; padding-bottom: 0.5rem; width: 100%;
+          border: 1px solid rgba(196,198,207,0.5);
+          border-radius: 12px;
+          background: transparent; padding: 1rem 1rem 0.6rem 1rem; width: 100%;
         }
         .floating-label-group input:focus, .floating-label-group textarea:focus {
-          outline: none; border-bottom: 1px solid #775a19;
+          outline: none; border-color: #775a19;
         }
       `}</style>
 
-      {/* ── HERO ─────────────────────────────────────────────────────── */}
-      <section className="relative h-[409px] flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-primary z-0">
-          <div
-            className="absolute inset-0 opacity-40"
-            style={{
-              backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuBRF6Dya7NFHm87LEYMeGkx0lFpd6GTO-_34xZ2mM0_zhTfT-UZNXb3obmVMOv65VMwQ0pSPBJizF-qX1PZrqbzQfm-oLI_nWmEWAR0TMp-KC7VcflUIO61rBRbVo1DDozc6vIu63UkVoa8Gd3nQQgA06C6ml4vtFQc7OagJJB8aIACu-oN_J4WlPlU0RPC9gBGku4TCxA0X1bbHEwEAO1stZbKky2mJbR60kUG53bbQf2Aju51IJpDagGYhsVTxYeJz6_d05hhpWs')`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/80 via-primary/40 to-surface"></div>
-        </div>
-        <div className="relative z-10 text-center px-4">
-          <p className="font-label text-secondary text-xs tracking-[0.4em] uppercase mb-4">
-            Liên hệ &amp; Kết nối
-          </p>
-          <h1 className="font-headline text-5xl md:text-7xl text-white tracking-tight">
-            Liên hệ với Chúng tôi
-          </h1>
-        </div>
-      </section>
+      {/* ── HERO ────────────────────────────────────────────────────── */}
+      <HeroHeader
+        image="https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=2000&auto=format&fit=crop"
+        altText="Liên hệ với GOAT HOTEL"
+      />
 
-      {/* ── MAIN CONTENT GRID ────────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-8 -mt-24 pb-24 relative z-20">
+      {/* ── TIÊU ĐỀ TRANG ────────────────────────────────────────── */}
+      <div className="bg-surface w-full pt-14 pb-6 text-center border-b border-outline-variant/10">
+        <p className="font-label uppercase tracking-[0.3em] text-secondary text-xs mb-3">Liên hệ &amp; Kết nối</p>
+        <h1 className="font-headline text-4xl md:text-5xl text-primary tracking-tight">Liên hệ với Chúng tôi</h1>
+      </div>
+
+      {/* ── MAIN CONTENT GRID ─────────────────────────────────────── */}
+      <section className="max-w-7xl mx-auto px-8 pt-16 pb-24 relative z-20">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
           {/* Contact Form Card */}
-          <div className="lg:col-span-7 bg-surface-container-lowest p-10 md:p-16 shadow-[0_24px_48px_-12px_rgba(0,6,20,0.08)]">
+          <div className="lg:col-span-7 bg-[#e8e4dc] p-10 md:p-16 border border-[#c5bba8] shadow-[0_8px_40px_-8px_rgba(0,0,0,0.1)] rounded-2xl">
             <div className="mb-12">
               <h2 className="font-headline text-3xl mb-4">Gửi yêu cầu</h2>
               <p className="text-on-surface-variant max-w-md">
@@ -102,7 +94,7 @@ export default function ContactPage() {
                     id="firstName" name="firstName" type="text" placeholder=" " required
                     value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })}
                   />
-                  <label htmlFor="firstName" className="font-label text-sm uppercase tracking-wider">
+                  <label htmlFor="firstName" className="font-label text-sm tracking-wide">
                     Tên
                   </label>
                 </div>
@@ -111,7 +103,7 @@ export default function ContactPage() {
                     id="lastName" name="lastName" type="text" placeholder=" " required
                     value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })}
                   />
-                  <label htmlFor="lastName" className="font-label text-sm uppercase tracking-wider">
+                  <label htmlFor="lastName" className="font-label text-sm tracking-wide">
                     Họ
                   </label>
                 </div>
@@ -122,7 +114,7 @@ export default function ContactPage() {
                   id="email" name="email" type="email" placeholder=" " required
                   value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
                 />
-                <label htmlFor="email" className="font-label text-sm uppercase tracking-wider">
+                <label htmlFor="email" className="font-label text-sm tracking-wide">
                   Địa chỉ Email
                 </label>
               </div>
@@ -133,7 +125,7 @@ export default function ContactPage() {
                   className="resize-none"
                   value={form.message} onChange={e => setForm({ ...form, message: e.target.value })}
                 />
-                <label htmlFor="message" className="font-label text-sm uppercase tracking-wider">
+                <label htmlFor="message" className="font-label text-sm tracking-wide">
                   Tin nhắn của bạn
                 </label>
               </div>
@@ -154,10 +146,9 @@ export default function ContactPage() {
             </form>
           </div>
 
-          {/* Info + Map Column */}
-          <div className="lg:col-span-5 space-y-8">
-            {/* Dark Info Card */}
-            <div className="bg-primary p-12 text-white shadow-xl">
+          {/* Info Column */}
+          <div className="lg:col-span-5">
+            <div className="bg-primary p-12 text-white shadow-xl rounded-2xl">
               <h3 className="font-headline text-2xl mb-8 border-b border-white/10 pb-6">
                 Kênh Trực tiếp
               </h3>
@@ -182,76 +173,12 @@ export default function ContactPage() {
                 ))}
               </div>
             </div>
-
-            {/* Stylized Map */}
-            <div className="h-[350px] w-full relative group grayscale hover:grayscale-0 transition-all duration-700 overflow-hidden shadow-lg border border-outline-variant/20">
-              <img
-                alt="Stylized map"
-                className="absolute inset-0 w-full h-full object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBedII3uC_cPIh0ITDCbb8su-53DQTUaKiawVEDSUNxBaiBvSKxlSCLo8hB51RNco0HPkJ-yd6NMoQoSwnJWZYMD8d_reAOBqAjsEqhcvVl4qe9JgtLynWYGc81J2wSxXma78e0cmdrLMA2JsiHJIfq_IE2QwsZJKhUwbJoI8GjogEPfyfaqMdC08wyQKfUbkF5ZTnU29fDxloGv45mVFU6lzPhbKFwYt0QkOe6GS1iczKoGk9lYa-UphY8CdOwfEI2pTreGcxcptc"
-              />
-              <div className="absolute inset-0 bg-primary/20 group-hover:bg-transparent transition-colors"></div>
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                <span
-                  className="material-symbols-outlined text-secondary text-5xl animate-bounce"
-                  style={{ fontVariationSettings: "'FILL' 1" }}
-                >
-                  location_on
-                </span>
-              </div>
-            </div>
           </div>
+
         </div>
       </section>
 
-      {/* ── SOCIAL & AWARDS ──────────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-8 pb-24">
-        <div className="flex flex-col md:flex-row justify-between items-center py-12 border-t border-outline-variant/30 gap-12">
-          {/* Award logos */}
-          <div className="flex gap-12 grayscale opacity-50">
-            <img className="h-12 object-contain" alt="Forbes Travel Guide Five Star"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBoal-NI6tlTjYlJ5-JmttDLudqeEWHZKUkBkx-bkuiB_SWTYo2aiSqrbjDXQKU_sQ6kS446amybdYTmH1lLhzhcFBgCR5lpNLv6y6xfVeJz5zVjc_8JGLLc0ckalTU4we4tvmUFDm-StdprTMVt725GB7jigPBffc9HgZ_YdM2ay2Zt0ahv-Jnu4aqDdrdzLC3jtvQbvxxIIJqeOTImed7OHbqLpNHe1Dgqz-lzh6LkzuGpEl9ubEabSZNZNJ13ACDnxrMAfTiqdc" />
-            <img className="h-12 object-contain" alt="Michelin Guide"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCzGsO17NaKn5eKfL1HU7MIjO0YXwpyGs2fu-w2VWmHVqx9i48isdbDc4asy7YRkEHluweE0RRH4ope5nR1mO2H8zXWGWP-oYhLw9nky79OGCychaO6JrIHmh3D-Cf51aTBFIYAX-IMBIWTmvciYzEPTmTuNSD3bbqyS906XpUa5H6SSFW_CBJcYDyfgJOgvbDW5whDgcRjS6HRaSN6kM0bpgDZX_N1igRfGhcGRxdZgXiDExro1eOGehcvBwCxqvjJAc6bh_e0gSA" />
-            <img className="h-12 object-contain" alt="Condé Nast Traveler"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDlR7BluVPQIyBPs6We0zUwu31VK2Td8Ql9Sq1_LMXEmkEj3rR-qC5ZCAzIiIQcB_ItRENSd8qJWmDYBBr2YTWELZDs9zd9B5dsDCtqsifblvY3LOZu2vtYndoEQTz8ilfccAUuukPUWoFGBlAossdWEom61BOH0OWE0Wr40Qr0HxLwjpRM5wa21JG7SivCuECBLXn2aN5MQdYa1QBj4TtCdYbRnT_uhLIMQyO4Z2TcaG4gD8LPBtfDz6HFOLzRZWNhiu-7HtYDb68" />
-          </div>
-          {/* Social links */}
-          <div className="flex gap-8">
-            {['Instagram', 'LinkedIn', 'Facebook'].map(s => (
-              <a key={s} href="#" className="text-on-surface-variant hover:text-secondary transition-colors">
-                <span className="font-label text-xs tracking-widest uppercase">{s}</span>
-              </a>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── FOOTER ───────────────────────────────────────────────────── */}
-      <footer className="bg-slate-950 w-full py-12 px-8 border-t border-white/5">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="font-headline italic text-xl text-white">GOAT HOTEL</div>
-          <div className="flex gap-8">
-            {[
-              { label: 'Chính sách Bảo mật', active: false },
-              { label: 'Điều khoản Dịch vụ', active: false },
-              { label: 'Liên hệ', active: true },
-              { label: 'Tuyển dụng', active: false },
-            ].map(({ label, active }) => (
-              <a
-                key={label}
-                href="#"
-                className={`font-label uppercase tracking-widest text-[10px] transition-colors ${active ? 'text-secondary' : 'text-slate-400 hover:text-white'}`}
-              >
-                {label}
-              </a>
-            ))}
-          </div>
-          <p className="font-label uppercase tracking-widest text-[10px] text-slate-500">
-            © 2024 GOAT HOTEL. TẤT CẢ QUYỀN ĐƯỢC BẢO LƯU.
-          </p>
-        </div>
-      </footer>
+      {/* Footer được render bởi MainLayout — không cần thêm ở đây */}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import API_BASE from '../config';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -10,7 +11,7 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:8080/api/auth/login', { email, password }, { withCredentials: true });
+      const response = await axios.post(`${API_BASE}/api/auth/login`, { email, password }, { withCredentials: true });
       if (response.data.success) {
         if (window.Swal) window.Swal.fire({ icon: 'success', title: 'Thành công', text: response.data.message, timer: 1500, showConfirmButton: false });
         navigate('/');
@@ -47,7 +48,7 @@ export default function Login() {
           <img
             alt="Luxury hotel lobby"
             className="absolute inset-0 w-full h-full object-cover"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDz9rjWA-4lI0ot3meW_1JoCd3_WqJhY5nBbeYyheFFnkkS8VtFnhbS9vpCAT6pTWiRABg7K2oq2LGVMlehf9KzbURqWLsy5yEbhX3AD1sUTdDrHWts84m9NMn7-tc1hiXZoMVPziSoI3f9KEkkwQJSjE1MFqUxC8Izbz5qNAha7vG7cbqlLJX5k7xTEBF4e8qHbfvydb9HK8LkjhDJv8x_AiACTOjEMWL-krIA9qE77lovO5q48ce43Jlll5KuM6u49MRwMFSs1Bpy"
+            src={`${API_BASE}/images/home/hero_slider_2.jpg`}
           />
           <div className="absolute inset-0 bg-primary/10"></div>
           {/* Editorial Quote Overlay */}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
+import API_BASE from '../../config';
 import Chart from 'chart.js/auto';
 
 export default function Dashboard() {
@@ -19,12 +20,12 @@ export default function Dashboard() {
     }, 1000);
 
     // Fetch User
-    axios.get('http://localhost:8080/api/home/', { withCredentials: true }).then(res => {
+    axios.get(`${API_BASE}/api/home/`, { withCredentials: true }).then(res => {
       if (res.data.user_logged_in) setUser(res.data.user_logged_in);
     });
 
     // Fetch Stats
-    axios.get('http://localhost:8080/api/admin/dashboard/stats', { withCredentials: true })
+    axios.get(`${API_BASE}/api/admin/dashboard/stats`, { withCredentials: true })
       .then(res => setStats(res.data))
       .catch(err => console.error(err));
 

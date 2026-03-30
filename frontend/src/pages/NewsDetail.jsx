@@ -1,231 +1,171 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-
-const HERO_IMG = 'https://lh3.googleusercontent.com/aida-public/AB6AXuD8M-FaRoCO8wBYor7LaCaMvUdbWL9eJFdQhitFz_hFpNhqxUJgG5pgJ0_DH7OcDG5WXztdRva1kdtFooZZ5PpRlLCpJY8fpLhH7gY3zch59Z7NNFj__0qpgwy8ddNXY70Ej3IBUbFu-Om1PRnoYyYYv9FT2gJRda9MYu9VsJXcCwSK1yndY3etLlA2F8Ikw9qOJARK44RpziXj9C2FS6v2A74vm5JAoetNVOWNL2KPzv0UC5BY5SThqpEjpHtRxmCDqYt1BZquypQ';
-
-const STATIC = {
-  id: 1,
-  category: 'Signature Ritual',
-  title: 'The Art of Sunset Sabrage at the Azure Deck',
-  date: 'October 5, 2024',
-  image: HERO_IMG,
-  content: `As the sun dips below the horizon, painting the Amalfi Coast in hues of burnt orange and deep indigo, a timeless ritual begins. The tradition of sabrage is not merely about opening a bottle; it is a celebration of the evening's arrival.
-
-There is a specific vibration in the air at the Azure Deck during the twilight hour. It is a moment where time seems to expand, held in suspension by the rhythmic crashing of the Tyrrhenian Sea against the limestone cliffs below. Guests gather, not in a rush, but with the quiet anticipation of those who understand that luxury is found in the pauses between actions.
-
-Our head sommelier, Marcus Vane, approaches the pedestal with a heavy, silver-hilted saber. The bottle—a vintage Reserve Sovereign Brut—is chilled to precisely five degrees Celsius. This is essential, he explains. The pressure inside the bottle, combined with the cold glass, makes the crystalline structure brittle along the seam.
-
-The ritual has its roots in the Napoleonic era, where the cavalry would celebrate victories with whatever tools were at hand. At The Sovereign, we have refined this martial display into an art form. It marks the transition from the warmth of the sun to the intimacy of the stars, signaling that the night has officially begun.`,
-  pullQuote: '"Sabrage is the ultimate dialogue between elegance and force. It is the exclamation point at the end of a perfect day."',
-  pullQuoteAuthor: 'Marcus Vane, Head Sommelier',
-};
-
-const RELATED = [
-  { id: 2, category: 'Gastronomy', title: "Harvesting the Deep: A Chef's Guide to Local Waters", date: 'Sept 12, 2024', image: HERO_IMG },
-  { id: 3, category: 'Wellness', title: 'The Midnight Spa: Rejuvenation Under the Moon', date: 'Aug 29, 2024', image: HERO_IMG },
-  { id: 4, category: 'Design', title: 'Bespoke Suite Design: The Sovereign Philosophy', date: 'July 15, 2024', image: HERO_IMG },
-];
+import API_BASE, { imageUrl } from '../config';
+import HeroHeader from '../components/HeroHeader';
 
 export default function NewsDetail() {
-  const { id } = useParams();
+  const { id } = useParams(); // URL path /news/:id (hiện đang dùng truyền slug)
+  const navigate = useNavigate();
   const [news, setNews] = useState(null);
-  const [related, setRelated] = useState(RELATED);
+  const [related, setRelated] = useState([]);
 
   useEffect(() => {
-    setNews(null);
-    axios.get(`http://localhost:8080/api/news/${id}`, { withCredentials: true })
-      .then(res => setNews(res.data ?? STATIC))
-      .catch(() => setNews(STATIC));
-
-    axios.get('http://localhost:8080/api/news/latest', { withCredentials: true })
+    // Fetch tin tức từ backend API theo slug hoặc id
+    axios.get(`${API_BASE}/api/news/${id}`, { withCredentials: true })
       .then(res => {
-        if (res.data?.length > 0)
-          setRelated(res.data.filter(n => n.id !== parseInt(id)).slice(0, 3));
+        if (!res.data) { navigate('/news'); return; }
+        setNews(res.data);
+        // Fetch tin liên quan
+        return axios.get(`${API_BASE}/api/news`, { withCredentials: true });
       })
-      .catch(() => {});
-  }, [id]);
+      .then(res => {
+        if (res) {
+          setRelated((res.data || []).filter(n => String(n.id) !== String(id) && n.slug !== id).slice(0, 3));
+        }
+      })
+      .catch(() => navigate('/news'));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [id, navigate]);
 
   if (!news) return (
     <div className="min-h-screen flex items-center justify-center bg-surface">
-      <p className="font-label uppercase tracking-widest text-xs text-on-surface-variant animate-pulse">Đang tải...</p>
+      <p className="font-label uppercase tracking-widest text-xs text-on-surface-variant animate-pulse">Đang tải nội dung...</p>
     </div>
   );
 
-  const paragraphs = typeof news.content === 'string'
-    ? news.content.split('\n\n').filter(Boolean)
-    : [];
-
   return (
-    <div className="bg-surface text-on-surface font-body">
+    <div className="bg-surface text-on-surface font-body min-h-screen flex flex-col">
 
-      {/* ── HERO IMAGE ────────────────────────────────────────────── */}
-      <section className="relative w-full h-[55vh] md:h-[70vh] overflow-hidden">
-        <img
-          src={news.image ? `http://localhost:8080/uploads/${news.image}` : HERO_IMG}
-          alt={news.title}
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/30 to-transparent"></div>
+      {/* ── BẮT TAY COMPONENT HERO ĐỒNG NHẤT ──────────────────────── */}
+      <HeroHeader image={imageUrl(news.image || news.heroImage)} altText={news.title} />
 
-        {/* Overlay title */}
-        <div className="absolute bottom-0 left-0 right-0 max-w-4xl mx-auto px-8 md:px-16 pb-12">
-          <p className="font-label uppercase tracking-[0.3em] text-secondary text-xs mb-3">
-            {news.category ?? STATIC.category}
+      {/* ── TIÊU ĐỀ BÀI VIẾT (TÁCH KHỎI ẢNH ĐỂ KHÔNG ĐÈ NAVBAR) ───── */}
+      <div className="w-full bg-surface pt-12 pb-4 px-8 md:px-16 text-center">
+        <div className="max-w-4xl mx-auto">
+          <p className="font-label uppercase tracking-[0.3em] text-secondary text-xs mb-4">
+            {news.categoryName} <span className="text-on-surface-variant ml-2 opacity-60">• {news.publishDate}</span>
           </p>
-          <h1 className="font-headline text-white text-3xl md:text-5xl leading-tight tracking-tight">
+          <h1 className="font-headline text-primary text-4xl md:text-5xl lg:text-6xl leading-tight tracking-tight">
             {news.title}
           </h1>
         </div>
-      </section>
+      </div>
 
-      {/* ── BACK NAV ──────────────────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-8 md:px-16 py-6 border-b border-outline-variant/20">
-        <div className="flex items-center justify-between">
+      {/* ── THANH BREADCRUMB ──────────────────────────────────────── */}
+      <div className="max-w-7xl mx-auto px-8 md:px-16 py-6 border-b border-outline-variant/20 w-full mb-12">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <Link
             to="/news"
-            className="inline-flex items-center gap-2 font-label uppercase tracking-widest text-xs text-on-surface-variant hover:text-secondary transition-colors"
+            className="inline-flex items-center gap-2 font-label uppercase tracking-widest text-xs text-on-surface-variant hover:text-secondary transition-colors group cursor-pointer"
           >
-            <span className="material-symbols-outlined text-base">arrow_back</span>
-            Quay lại Tin tức
+            <span className="material-symbols-outlined text-base group-hover:-translate-x-1 transition-transform">arrow_back</span>
+            Trở lại Tạp chí
           </Link>
-          <span className="font-label text-xs text-on-surface-variant uppercase tracking-widest">
-            {news.date ?? STATIC.date}
+          <span className="font-label text-[10px] text-on-surface-variant uppercase tracking-widest hidden md:block">
+            {news.categoryName} | GOAT HOTEL Editorial
           </span>
         </div>
       </div>
 
-      {/* ── MAIN GRID ─────────────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-8 md:px-16 py-16 grid grid-cols-1 lg:grid-cols-3 gap-16">
+      {/* ── NỘI DUNG CHÍNH (MAIN GRID) ────────────────────────────── */}
+      <section className="max-w-7xl mx-auto px-8 md:px-16 pb-24 grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-20">
 
         {/* LEFT: Article Body ───────────────────────────────────── */}
-        <article className="lg:col-span-2 space-y-8">
-
-          {/* Summary / lead */}
-          {news.summary && (
-            <p className="text-on-surface text-lg md:text-xl font-light leading-relaxed border-l-2 border-secondary pl-6">
-              {news.summary}
+        <article className="space-y-10">
+          
+          {/* Summary / Lead Paragraph */}
+          {news.excerpt && (
+            <p className="text-on-surface text-xl md:text-2xl font-headline font-light leading-relaxed border-l-4 border-secondary pl-8">
+              {news.excerpt}
             </p>
           )}
 
-          {/* Body paragraphs or HTML */}
-          {news.content && typeof news.content === 'string' && news.content.includes('<') ? (
-            <div
-              className="prose prose-lg max-w-none text-on-surface-variant leading-relaxed space-y-6"
-              dangerouslySetInnerHTML={{ __html: news.content }}
-            />
-          ) : (
-            <div className="space-y-6">
-              {paragraphs.map((p, i) => (
-                <p key={i} className="text-on-surface-variant leading-relaxed text-base md:text-lg font-light">
-                  {p}
-                </p>
-              ))}
-            </div>
-          )}
+          {/* HTML Content Render */}
+          <div
+            className="text-on-surface-variant font-light text-[17px] md:text-xl leading-[1.85] [&>p]:mb-8"
+            dangerouslySetInnerHTML={{ __html: news.content }}
+          />
 
-          {/* Pull quote */}
-          {(news.pullQuote ?? STATIC.pullQuote) && (
-            <blockquote className="my-12 border-l-4 border-secondary pl-8 py-4">
-              <p className="font-headline text-xl md:text-2xl text-on-surface italic leading-snug">
-                {news.pullQuote ?? STATIC.pullQuote}
-              </p>
-              <footer className="mt-4 font-label text-xs uppercase tracking-widest text-secondary">
-                — {news.pullQuoteAuthor ?? STATIC.pullQuoteAuthor}
-              </footer>
-            </blockquote>
-          )}
-
-          {/* Tradition note */}
-          {!news.content?.includes('<') && (
-            <div className="bg-surface-container-low px-6 py-5 flex items-center gap-4">
-              <span className="material-symbols-outlined text-secondary text-xl flex-shrink-0"
-                style={{ fontVariationSettings: "'FILL' 0, 'wght' 300" }}>
-                schedule
-              </span>
-              <p className="font-label text-xs uppercase tracking-widest text-on-surface-variant">
-                Truyền thống được gìn giữ: Nghi thức buổi tối của The Sovereign diễn ra lúc 18:45 hàng ngày.
-              </p>
+          {/* Signature / Author */}
+          <div className="mt-16 pt-8 border-t border-outline-variant/30 flex items-center justify-between">
+            <div>
+              <p className="font-label uppercase tracking-widest text-xs text-secondary">Người viết</p>
+              <p className="font-headline text-lg mt-1">Ban Biên Tập GOAT Hotel</p>
             </div>
-          )}
+            <div className="flex gap-4">
+              {/* Share actions */}
+              <button className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center hover:bg-surface-container hover:text-secondary transition-colors">
+                <span className="material-symbols-outlined text-[18px]">share</span>
+              </button>
+            </div>
+          </div>
         </article>
 
         {/* RIGHT: Sidebar ───────────────────────────────────────── */}
-        <aside className="lg:col-span-1 space-y-10">
+        <aside className="space-y-16 lg:pt-0 pt-10 border-t lg:border-t-0 border-outline-variant/20">
 
-          {/* Related Articles */}
+          {/* Related Articles Widgets */}
           <div>
-            <p className="font-label uppercase tracking-[0.25em] text-secondary text-xs mb-6">
-              Bài viết Liên quan
-            </p>
-            <div className="space-y-6">
-              {related.map((item, i) => (
+            <div className="flex items-center gap-3 mb-8">
+              <span className="w-8 h-[1px] bg-secondary"></span>
+              <p className="font-label uppercase tracking-[0.25em] text-secondary text-[11px] font-bold">
+                Có thể bạn quan tâm
+              </p>
+            </div>
+            
+            <div className="space-y-8">
+              {related.map((item) => (
                 <Link
-                  key={item.id ?? i}
-                  to={`/news/${item.id}`}
-                  className="group flex gap-4 hover:bg-surface-container-low p-2 -mx-2 transition-colors"
+                  key={item.id}
+                  to={`/news/${item.slug || item.id}`}
+                  className="group flex flex-col gap-4 cursor-pointer"
                 >
-                  <div className="flex-shrink-0 w-20 h-16 overflow-hidden rounded-sm bg-surface-container-high">
+                  <div className="w-full aspect-video overflow-hidden rounded-md bg-surface-container-high relative">
                     <img
-                      src={item.image ? `http://localhost:8080/uploads/${item.image}` : HERO_IMG}
+                      src={imageUrl(item.image || item.thumbnail)}
                       alt={item.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                     />
+                    <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   </div>
-                  <div className="flex flex-col justify-center gap-1 min-w-0">
-                    <p className="font-label uppercase tracking-[0.15em] text-secondary text-[10px]">
-                      {item.category}
+                  <div className="flex flex-col gap-2">
+                    <p className="font-label uppercase tracking-[0.15em] text-secondary text-[9px]">
+                      {item.categoryName} <span className="opacity-50 ml-1">• {item.publishDate}</span>
                     </p>
-                    <h4 className="font-headline text-on-surface text-sm leading-snug group-hover:text-secondary transition-colors line-clamp-2">
+                    <h4 className="font-headline text-on-surface text-[15px] leading-snug group-hover:text-secondary transition-colors line-clamp-2">
                       {item.title}
                     </h4>
-                    <p className="font-label text-on-surface-variant text-[10px] uppercase tracking-wider">
-                      {item.date}
-                    </p>
                   </div>
                 </Link>
               ))}
             </div>
           </div>
 
-          {/* Suite CTA */}
-          <div className="bg-primary p-8 text-white">
-            <p className="font-label uppercase tracking-[0.25em] text-secondary text-xs mb-3">
-              Bộ sưu tập
+          {/* Banner Promo / Collection CTA */}
+          <div className="bg-primary/5 p-8 border border-primary/10 rounded-xl relative overflow-hidden group">
+            <div className="absolute -right-10 -top-10 w-32 h-32 bg-secondary/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+            <p className="font-label uppercase tracking-[0.25em] text-secondary text-[10px] mb-3 relative z-10">
+              Trải nghiệm thực tế
             </p>
-            <h3 className="font-headline text-xl mb-3 leading-snug">
-              Trải nghiệm Sự Thoải mái Tuyệt đỉnh trong Các Phòng của Chúng tôi
+            <h3 className="font-headline text-primary text-2xl mb-4 leading-snug relative z-10">
+              Biến cảm hứng thành kỳ nghỉ trong mơ
             </h3>
-            <p className="text-white/50 text-sm font-body mb-6">
-              Khám phá một khu bảo tồn được thiết kế dành cho những ai tìm kiếm sự phi thường trong từng chi tiết.
+            <p className="text-on-surface-variant text-sm font-light font-body mb-8 line-clamp-3 relative z-10">
+              Đừng chỉ đọc về sự xa hoa. Hãy để GOAT HOTEL trở thành điểm dừng chân vương giả tiếp theo của bạn.
             </p>
             <Link
               to="/collections"
-              className="inline-flex items-center gap-2 font-label uppercase tracking-widest text-xs text-secondary border-b border-secondary/30 hover:border-secondary transition-all pb-0.5"
+              className="inline-flex items-center justify-center w-full py-4 text-center font-label uppercase tracking-widest text-[11px] text-on-primary bg-primary rounded-sm hover:bg-secondary transition-all active:scale-95 shadow-md relative z-10"
             >
-              Xem Bộ sưu tập
-              <span className="material-symbols-outlined text-base">arrow_forward</span>
+              Đặt phòng ngay
             </Link>
           </div>
+
         </aside>
+
       </section>
 
-      {/* ── FOOTER ───────────────────────────────────────────────── */}
-      <footer className="bg-primary py-10 px-8 border-t border-white/5">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="font-headline italic text-xl text-white">GOAT HOTEL</div>
-          <div className="flex gap-8">
-            {['Chính sách Bảo mật', 'Điều khoản Dịch vụ', 'Báo chí', 'Bền vững'].map(link => (
-              <a key={link} href="#" className="font-label uppercase tracking-widest text-[10px] text-white/40 hover:text-white transition-colors">
-                {link}
-              </a>
-            ))}
-          </div>
-          <p className="font-label text-[10px] text-white/30 uppercase tracking-widest">
-            © 2024 GOAT HOTEL
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }

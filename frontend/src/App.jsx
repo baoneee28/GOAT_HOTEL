@@ -16,6 +16,7 @@ import NewsDetail from './pages/NewsDetail';
 import NewsPage from './pages/NewsPage';
 import ContactPage from './pages/ContactPage';
 import RoomDetail from './pages/RoomDetail';
+import AvailableRooms from './pages/AvailableRooms';
 import BookingConfirmation from './pages/BookingConfirmation';
 import AdminLayout from './pages/admin/AdminLayout';
 import Dashboard from './pages/admin/Dashboard';
@@ -43,6 +44,7 @@ function App() {
           <Route path="/news/:id" element={<NewsDetail />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/rooms/:id" element={<RoomDetail />} />
+          <Route path="/rooms/:id/available" element={<AvailableRooms />} />
           <Route path="/booking/confirmation" element={<BookingConfirmation />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/history" element={<History />} />

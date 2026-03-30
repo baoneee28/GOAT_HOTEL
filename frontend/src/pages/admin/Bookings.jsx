@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import API_BASE from '../../config';
 const Swal = window.Swal;
 
 export default function Bookings() {
@@ -21,15 +22,15 @@ export default function Bookings() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await axios.get(`http://localhost:8080/api/admin/bookings?status=${status}&page=${page}`, { withCredentials: true });
+      const res = await axios.get(`${API_BASE}/api/admin/bookings?status=${status}&page=${page}`, { withCredentials: true });
       setData(res.data);
     } catch (err) { console.error(err); }
   }, [status, page]);
 
   useEffect(() => {
     fetchData();
-    axios.get('http://localhost:8080/api/admin/users/all', { withCredentials: true }).then(r => setUsers(r.data));
-    axios.get('http://localhost:8080/api/rooms', { withCredentials: true }).then(r => setRooms(r.data));
+    axios.get(`${API_BASE}/api/admin/users/all`, { withCredentials: true }).then(r => setUsers(r.data));
+    axios.get(`${API_BASE}/api/rooms`, { withCredentials: true }).then(r => setRooms(r.data));
   }, [fetchData]);
 
   const handleDelete = (id) => {
@@ -39,7 +40,7 @@ export default function Bookings() {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const res = await axios.delete(`http://localhost:8080/api/admin/bookings/${id}`, { withCredentials: true });
+          const res = await axios.delete(`${API_BASE}/api/admin/bookings/${id}`, { withCredentials: true });
           if (res.data.success) {
             Swal.fire({ icon: 'success', title: 'Thành công', timer: 1500, showConfirmButton: false });
             fetchData();
@@ -95,7 +96,7 @@ export default function Bookings() {
 
   const submitCheckout = async (id, type) => {
     try {
-      const res = await axios.post(`http://localhost:8080/api/admin/bookings/${id}/checkout`, { checkoutType: type }, { withCredentials: true });
+      const res = await axios.post(`${API_BASE}/api/admin/bookings/${id}/checkout`, { checkoutType: type }, { withCredentials: true });
       if (res.data.success) {
         Swal.fire({ icon: 'success', title: 'Đã thanh toán', timer: 1500, showConfirmButton: false });
         fetchData();
@@ -110,7 +111,7 @@ export default function Bookings() {
     }).then(async (res) => {
       if (res.isConfirmed) {
         try {
-          const result = await axios.post(`http://localhost:8080/api/admin/bookings/${id}/approve`, {}, { withCredentials: true });
+          const result = await axios.post(`${API_BASE}/api/admin/bookings/${id}/approve`, {}, { withCredentials: true });
           if (result.data.success) {
             Swal.fire({ icon: 'success', title: 'Đã duyệt!', timer: 1500, showConfirmButton: false });
             fetchData();
@@ -141,7 +142,7 @@ export default function Bookings() {
   const handleSave = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post('http://localhost:8080/api/admin/bookings', formData, { withCredentials: true });
+      const res = await axios.post(`${API_BASE}/api/admin/bookings`, formData, { withCredentials: true });
       if (res.data.success) {
         Swal.fire({ icon: 'success', title: 'Lưu thành công', timer: 1500, showConfirmButton: false });
         setShowModal(false);

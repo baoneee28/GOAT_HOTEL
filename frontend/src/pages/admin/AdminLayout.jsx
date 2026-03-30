@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import API_BASE from '../../config';
 import AdminSidebar from '../../components/AdminSidebar';
 
 export default function AdminLayout() {
@@ -8,7 +9,7 @@ export default function AdminLayout() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    axios.get('http://localhost:8080/api/home/', { withCredentials: true })
+    axios.get(`${API_BASE}/api/home/`, { withCredentials: true })
       .then(res => {
         if (!res.data.user_logged_in || res.data.user_logged_in.role?.toLowerCase() !== 'admin') {
           navigate('/login');

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import API_BASE from '../../config';
 const Swal = window.Swal;
 
 export default function News() {
@@ -14,7 +15,7 @@ export default function News() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await axios.get(`http://localhost:8080/api/news/admin?q=${q}&page=${page}`, { withCredentials: true });
+      const res = await axios.get(`${API_BASE}/api/news/admin?q=${q}&page=${page}`, { withCredentials: true });
       setData(res.data);
     } catch (err) { console.error(err); }
   }, [q, page]);
@@ -30,7 +31,7 @@ export default function News() {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const res = await axios.delete(`http://localhost:8080/api/news/admin/${id}`, { withCredentials: true });
+          const res = await axios.delete(`${API_BASE}/api/news/admin/${id}`, { withCredentials: true });
           if (res.data.success) {
             Swal.fire({ icon: 'success', title: 'Thành công', timer: 1500, showConfirmButton: false });
             fetchData();
@@ -57,7 +58,7 @@ export default function News() {
   const handleSave = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post('http://localhost:8080/api/news/admin', formData, { withCredentials: true });
+      const res = await axios.post(`${API_BASE}/api/news/admin`, formData, { withCredentials: true });
       if (res.data.success) {
         Swal.fire({ icon: 'success', title: 'Thành công', timer: 1500, showConfirmButton: false });
         setShowModal(false);
@@ -105,7 +106,7 @@ export default function News() {
                       {data.newsList && data.newsList.length > 0 ? data.newsList.map(n => (
                           <tr key={n.id}>
                               <td className="ps-4 py-3">
-                                  <img src={n.image ? (n.image.startsWith('http') ? n.image : `http://localhost:8080/uploads/${n.image}`) : 'https://via.placeholder.com/80x50'} className="news-img" alt="News" />
+                                  <img src={n.image ? (n.image.startsWith('http') ? n.image : `${API_BASE}/uploads/${n.image}`) : 'https://via.placeholder.com/80x50'} className="news-img" alt="News" />
                               </td>
                               <td className="fw-bold py-3">{n.title}</td>
                               <td className="py-3">{new Date(n.createdAt).toLocaleDateString('vi-VN')}</td>

@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import API_BASE from '../../config';
 
 export default function RoomTypes() {
   const [data, setData] = useState({ roomTypes: [], totalPages: 1 });
@@ -15,14 +16,14 @@ export default function RoomTypes() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await axios.get(`http://localhost:8080/api/room-types/admin?q=${q}&page=${page}`, { withCredentials: true });
+      const res = await axios.get(`${API_BASE}/api/room-types/admin?q=${q}&page=${page}`, { withCredentials: true });
       setData(res.data);
     } catch (err) { console.error(err); }
   }, [q, page]);
 
   useEffect(() => { 
       fetchData(); 
-      axios.get('http://localhost:8080/api/admin/items/all', { withCredentials: true }).then(r => setAllItems(r.data));
+      axios.get(`${API_BASE}/api/admin/items/all`, { withCredentials: true }).then(r => setAllItems(r.data));
   }, [fetchData]);
 
   const handleDelete = (id) => {
@@ -32,7 +33,7 @@ export default function RoomTypes() {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const res = await axios.delete(`http://localhost:8080/api/room-types/admin/${id}`, { withCredentials: true });
+          const res = await axios.delete(`${API_BASE}/api/room-types/admin/${id}`, { withCredentials: true });
           if (res.data.success) {
             window.Swal.fire({ icon: 'success', title: 'Thành công', timer: 1500, showConfirmButton: false });
             fetchData();
@@ -67,7 +68,7 @@ export default function RoomTypes() {
           uploadData.append('file', file);
           uploadData.append('type', 'general');
 
-          const uploadRes = await axios.post('http://localhost:8080/api/upload', uploadData, {
+          const uploadRes = await axios.post(`${API_BASE}/api/upload`, uploadData, {
               headers: { 'Content-Type': 'multipart/form-data' },
               withCredentials: true
           });
@@ -86,7 +87,7 @@ export default function RoomTypes() {
           itemsIds: formData.itemsIds.join(',')
       };
 
-      const res = await axios.post('http://localhost:8080/api/room-types/admin', payload, { withCredentials: true });
+      const res = await axios.post(`${API_BASE}/api/room-types/admin`, payload, { withCredentials: true });
       if (res.data.success) {
           window.Swal.fire({ icon: 'success', title: 'Thành công', timer: 1500, showConfirmButton: false });
           setShowModal(false);
@@ -141,7 +142,7 @@ export default function RoomTypes() {
                       {data.roomTypes?.length > 0 ? data.roomTypes.map(t => (
                           <tr key={t.id}>
                               <td>
-                                  <img src={t.image ? `http://localhost:8080/uploads/${t.image}` : 'https://via.placeholder.com/60'} className="type-img" alt="type" />
+                                  <img src={t.image ? `${API_BASE}/uploads/${t.image}` : 'https://via.placeholder.com/60'} className="type-img" alt="type" />
                               </td>
                               <td>
                                   <div className="fw-bold">{t.typeName}</div>
@@ -222,7 +223,7 @@ export default function RoomTypes() {
                                               if(!item) return null;
                                               return (
                                                   <div key={item.id} className="item-brick">
-                                                      <img src={`http://localhost:8080${item.image}`} alt={item.name} /> {item.name}
+                                                      <img src={`${API_BASE}${item.image}`} alt={item.name} /> {item.name}
                                                       <span className="remove-btn" onClick={() => toggleItem(item.id)}>×</span>
                                                   </div>
                                               )
@@ -241,7 +242,7 @@ export default function RoomTypes() {
                                           <div key={item.id} className="col-md-4 col-sm-6 item-wrapper">
                                               <div className={`item-option d-flex align-items-center ${formData.itemsIds.includes(item.id) ? 'active' : ''}`} onClick={() => toggleItem(item.id)}>
                                                   <div className="check-mark">✔</div>
-                                                  <img src={`http://localhost:8080${item.image}`} className="rounded bg-light" alt={item.name} />
+                                                  <img src={`${API_BASE}${item.image}`} className="rounded bg-light" alt={item.name} />
                                                   <div className="ms-3 fw-bold small text-truncate">{item.name}</div>
                                               </div>
                                           </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import API_BASE from '../config';
 import Navbar from './Navbar';
 import Footer from './Footer';
 
@@ -9,7 +10,7 @@ export default function MainLayout() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    axios.get('http://localhost:8080/api/home/', { withCredentials: true })
+    axios.get(`${API_BASE}/api/home/`, { withCredentials: true })
       .then((res) => {
         if (res.data.user_logged_in) {
           setUser(res.data.user_logged_in);
@@ -20,7 +21,7 @@ export default function MainLayout() {
 
   const handleLogout = async () => {
     try {
-      await axios.post('http://localhost:8080/api/auth/logout', {}, { withCredentials: true });
+      await axios.post(`${API_BASE}/api/auth/logout`, {}, { withCredentials: true });
       setUser(null);
       navigate('/');
     } catch (error) {

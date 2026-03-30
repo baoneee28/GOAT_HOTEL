@@ -1,155 +1,364 @@
 import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-
-const BG_IMG =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuDLb8cYvQnJ540J-YvOcTj8Mdsnf5z6wQcyQV4H506T2b9uYsiEBRAp1BeJRSHrvU-gGoU07_VStl3nUgai7ezQlvXgpiZ2wQRJSEc1vRDTTGZE70ExkbRLTZ0F1_P2--0ISqQSHzL7aHNFgPF9_V5hU2qEcqAgj-lgXvjTqbyjxBBOAlgUML2sEGIsSkzrKa-gz1_TBbbnwBz6Z2AJSvMfB05M1dIVJAFjYA0OmfG0f-dgP10BfVwTfJcN7yTH6N3MhwxH_-gPAPc';
+import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
+import axios from 'axios';
+import API_BASE, { imageUrl } from '../config';
+import HeroHeader from '../components/HeroHeader';
 
 function fmtDate(d) {
   if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-US', {
-    month: 'long', day: 'numeric', year: 'numeric',
+  return new Date(d).toLocaleDateString('vi-VN', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
   });
 }
 
 export default function BookingConfirmation() {
   const { state } = useLocation();
   const navigate = useNavigate();
+  const { user: sessionUser } = useOutletContext() || {};
 
+  // Mock initial state if loaded without state
   const booking = {
-    checkIn: state?.checkIn ?? '2024-10-28',
-    checkOut: state?.checkOut ?? '2024-11-01',
-    room: state?.room ?? 'Imperial Grand Suite',
-    pricePerNight: state?.pricePerNight ?? 340,
+    physicalRoomNumber: state?.physicalRoomNumber ?? '101',
+    room: state?.room ?? 'Standard Room',
+    pricePerNight: state?.pricePerNight ?? 350000,
+    image: imageUrl(state?.image, '/images/rooms/standard-room.jpg')
+  };
+
+  const [formData, setFormData] = useState({
+    checkIn: state?.checkIn ?? new Date().toISOString().split('T')[0],
+    checkOut: state?.checkOut ?? new Date(Date.now() + 86400000).toISOString().split('T')[0],
+    guests: state?.guests ?? 2,
+    fullName: '',
+    phone: '',
+    email: '',
+    notes: ''
+  });
+
+  const nights = formData.checkIn && formData.checkOut
+    ? Math.max(0, Math.round((new Date(formData.checkOut) - new Date(formData.checkIn)) / 86400000))
+    : 0; 
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({...prev, [name]: value}));
+  };
+
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if(nights <= 0) {
+      if (window.Swal) window.Swal.fire('Lỗi', 'Ngày trả phòng phải sau ngày nhận phòng.', 'warning');
+      else alert('Ngày trả phòng phải sau ngày nhận phòng.');
+      return;
+    }
+    
+    // Nếu chưa đăng nhập thì không thể map userId cho backend
+    if (!sessionUser?.id) {
+       if (window.Swal) window.Swal.fire('Chú ý', 'Bạn cần đăng nhập để đặt phòng.', 'warning');
+       else alert('Bạn cần đăng nhập để đặt phòng.');
+       navigate('/login');
+       return;
+    }
+
+    if(!formData.fullName || !formData.phone || !formData.email) {
+      if (window.Swal) window.Swal.fire('Thiếu thông tin', 'Vui lòng điền đầy đủ các thông tin cá nhân bắt buộc', 'warning');
+      else alert('Vui lòng điền đầy đủ thông tin bắt buộc.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        userId: String(sessionUser.id),
+        roomId: String(state?.id || 1), // fallback nếu ko có
+        checkIn: formData.checkIn,
+        checkOut: formData.checkOut
+      };
+
+      const res = await axios.post(`${API_BASE}/api/bookings`, payload, { withCredentials: true });
+      
+      if (res.data?.success) {
+        if (window.Swal) {
+          window.Swal.fire('Thành công', 'Đã lưu yêu cầu đặt phòng!', 'success').then(() => navigate('/history'));
+        } else {
+          alert('Thanh toán thành công!');
+          navigate('/history');
+        }
+      } else {
+        if (window.Swal) window.Swal.fire('Lỗi', res.data?.message || 'Có lỗi khi đặt phòng.', 'error');
+        else alert(res.data?.message || 'Có lỗi khi đặt phòng.');
+      }
+    } catch (err) {
+      console.error(err);
+      if (window.Swal) window.Swal.fire('Lỗi', err.response?.data?.message || 'Không thể kết nối với máy chủ.', 'error');
+      else alert('Không thể kết nối với máy chủ.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="font-body text-on-surface">
-      <style>{`
-        .glass-card {
-          background: rgba(25, 28, 29, 0.6);
-          backdrop-filter: blur(40px);
-          -webkit-backdrop-filter: blur(40px);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .glow-button {
-          box-shadow: 0 0 20px rgba(119, 90, 25, 0.4);
-        }
-      `}</style>
+    <div className="bg-surface text-on-surface font-body min-h-screen flex flex-col">
+      
+      {/* ── HERO IMAGE ──────────────────────────────────────────────── */}
+      <HeroHeader image={booking.image} altText={booking.room} />
 
-      {/* ── HERO (full screen) ──────────────────────────────────── */}
-      <main className="relative min-h-screen flex items-center justify-center pt-24 pb-12 overflow-hidden">
-
-        {/* Background */}
-        <div className="absolute inset-0 z-0">
-          <img
-            alt="Luxury Suite"
-            className="w-full h-full object-cover"
-            src={BG_IMG}
-          />
-          <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary/60 to-transparent"></div>
+      {/* ── HEADER BREADCRUMB ────────────────────────────────────── */}
+      <div className="border-b border-outline-variant/20 bg-surface">
+        <div className="max-w-7xl mx-auto px-8 md:px-16 py-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-2 font-label uppercase tracking-widest text-xs text-on-surface-variant hover:text-secondary transition-colors"
+          >
+            <span className="material-symbols-outlined text-base">arrow_back</span>
+            QUAY LẠI
+          </button>
         </div>
+      </div>
 
-        {/* Glass card */}
-        <div className="relative z-10 w-full max-w-xl px-6">
-          <div className="glass-card p-10 md:p-16 rounded-sm text-white flex flex-col items-center">
+      {/* ── MAIN CONTENT GRID ────────────────────────────────────── */}
+      <section className="max-w-7xl mx-auto px-8 md:px-16 py-12 md:py-20 grid grid-cols-1 lg:grid-cols-3 gap-16 flex-grow">
+        
+        {/* LEFT: INFO & FORM ─────────────────────────────────────── */}
+        <div className="lg:col-span-2">
+          <div className="mb-12">
+            <h1 className="font-headline text-4xl md:text-5xl tracking-tight text-on-surface mb-2">
+              Xác nhận lưu trú 
+            </h1>
+            <p className="text-secondary font-headline text-2xl mb-4">
+              PHÒNG {booking.physicalRoomNumber}
+            </p>
+            <p className="text-on-surface-variant font-body text-base">
+              Vui lòng hoàn thiện lịch trình và thông tin liên hệ để nhận mã xác nhận đặt phòng.
+            </p>
+          </div>
 
-            {/* Icon */}
-            <div className="mb-8">
-              <span
-                className="material-symbols-outlined text-amber-500 text-5xl"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                verified
-              </span>
+          <form id="checkout-form" onSubmit={handleSubmit} className="space-y-12">
+            
+            {/* THÔNG TIN LƯU TRÚ (Dịch chuyển từ RoomDetail sang đây) */}
+            <div className="space-y-6">
+              <h2 className="font-label uppercase tracking-widest text-xs text-secondary border-b border-outline-variant/30 pb-2">
+                1. Thông tin lưu trú
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                  <label className="font-label uppercase tracking-widest text-[10px] text-on-surface-variant mb-2 block">
+                    Ngày nhận phòng <span className="text-error">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="checkIn"
+                    value={formData.checkIn}
+                    onChange={handleInputChange}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full border-0 border-b border-outline-variant/40 focus:border-secondary bg-transparent py-2 px-0 focus:ring-0 font-body text-base text-on-surface transition-colors focus:outline-none opacity-50 cursor-not-allowed"
+                    disabled
+                  />
+                </div>
+                <div>
+                  <label className="font-label uppercase tracking-widest text-[10px] text-on-surface-variant mb-2 block">
+                    Ngày trả phòng <span className="text-error">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="checkOut"
+                    value={formData.checkOut}
+                    onChange={handleInputChange}
+                    min={formData.checkIn || new Date().toISOString().split('T')[0]}
+                    className="w-full border-0 border-b border-outline-variant/40 focus:border-secondary bg-transparent py-2 px-0 focus:ring-0 font-body text-base text-on-surface transition-colors focus:outline-none opacity-50 cursor-not-allowed"
+                    disabled
+                  />
+                </div>
+                <div>
+                  <label className="font-label uppercase tracking-widest text-[10px] text-on-surface-variant mb-2 block">
+                    Số khách <span className="text-error">*</span>
+                  </label>
+                  <select
+                    name="guests"
+                    value={formData.guests}
+                    onChange={handleInputChange}
+                    className="w-full border-0 border-b border-outline-variant/40 focus:border-secondary bg-transparent py-2 px-0 focus:ring-0 font-body text-base text-on-surface transition-colors focus:outline-none opacity-50 cursor-not-allowed"
+                    disabled
+                  >
+                    {[1, 2, 3, 4].map(n => <option key={n} value={n} className="bg-surface text-on-surface">{n} Khách</option>)}
+                  </select>
+                </div>
+              </div>
             </div>
 
-            {/* Heading */}
-            <h1 className="font-headline text-4xl md:text-5xl mb-4 tracking-tight text-center">
-              Xác nhận Đặt phòng
-            </h1>
-            <p className="font-label text-amber-500 uppercase tracking-[0.3em] text-[10px] mb-12">
-              Trải nghiệm Đặc quyền
-            </p>
-
-            {/* Detail rows */}
-            <div className="w-full space-y-8 mb-12">
-
-              <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                <div className="flex items-center space-x-4">
-                  <span className="material-symbols-outlined text-white/50">calendar_today</span>
-                  <span className="text-white/60 text-xs uppercase tracking-widest font-bold">Ngày nhận phòng</span>
+            {/* THÔNG TIN KHÁCH */}
+            <div className="space-y-6">
+              <h2 className="font-label uppercase tracking-widest text-xs text-secondary border-b border-outline-variant/30 pb-2">
+                2. Thông tin cá nhân
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                  <label className="font-label uppercase tracking-widest text-[10px] text-on-surface-variant mb-2 block">
+                    Họ và tên <span className="text-error">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="fullName"
+                    value={formData.fullName}
+                    onChange={handleInputChange}
+                    placeholder="Nguyễn Văn A"
+                    className="w-full border-0 border-b border-outline-variant/40 focus:border-secondary bg-transparent py-2 px-0 focus:ring-0 font-body text-base text-on-surface transition-colors placeholder:text-outline-variant focus:outline-none"
+                    required
+                  />
                 </div>
-                <span className="font-headline text-lg">{fmtDate(booking.checkIn)}</span>
+                <div>
+                  <label className="font-label uppercase tracking-widest text-[10px] text-on-surface-variant mb-2 block">
+                    Số điện thoại <span className="text-error">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    placeholder="090 123 4567"
+                    className="w-full border-0 border-b border-outline-variant/40 focus:border-secondary bg-transparent py-2 px-0 focus:ring-0 font-body text-base text-on-surface transition-colors placeholder:text-outline-variant focus:outline-none"
+                    required
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="font-label uppercase tracking-widest text-[10px] text-on-surface-variant mb-2 block">
+                    Địa chỉ Email <span className="text-error">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="nguyen.a@email.com"
+                    className="w-full border-0 border-b border-outline-variant/40 focus:border-secondary bg-transparent py-2 px-0 focus:ring-0 font-body text-base text-on-surface transition-colors placeholder:text-outline-variant focus:outline-none"
+                    required
+                  />
+                </div>
               </div>
+            </div>
 
-              <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                <div className="flex items-center space-x-4">
-                  <span className="material-symbols-outlined text-white/50">calendar_month</span>
-                  <span className="text-white/60 text-xs uppercase tracking-widest font-bold">Ngày trả phòng</span>
-                </div>
-                <span className="font-headline text-lg">{fmtDate(booking.checkOut)}</span>
+            {/* YÊU CẦU ĐẶC BIỆT */}
+            <div className="space-y-6">
+              <h2 className="font-label uppercase tracking-widest text-xs text-secondary border-b border-outline-variant/30 pb-2">
+                3. Yêu cầu đặc biệt (Tùy chọn)
+              </h2>
+              <p className="font-body text-xs text-on-surface-variant">
+                Mọi yêu cầu của bạn sẽ được gửi trực tiếp tới khách sạn để chúng tôi chuẩn bị tốt nhất.
+              </p>
+              <div>
+                <textarea
+                  name="notes"
+                  value={formData.notes}
+                  onChange={handleInputChange}
+                  placeholder="Ví dụ: Cần xe đưa rước sân bay, chuẩn bị nôi em bé..."
+                  rows="3"
+                  className="w-full border border-outline-variant/40 focus:border-secondary bg-transparent p-4 focus:ring-0 font-body text-sm text-on-surface transition-colors placeholder:text-outline-variant rounded-sm resize-none focus:outline-none"
+                ></textarea>
               </div>
+            </div>
 
-              <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                <div className="flex items-center space-x-4">
-                  <span className="material-symbols-outlined text-white/50">king_bed</span>
-                  <span className="text-white/60 text-xs uppercase tracking-widest font-bold">Loại phòng</span>
-                </div>
-                <span className="font-headline text-lg">{booking.room}</span>
-              </div>
+            {/* CHÍNH SÁCH */}
+             <div className="space-y-4">
+              <h2 className="font-label uppercase tracking-widest text-xs text-secondary border-b border-outline-variant/30 pb-2">
+                Chính sách lưu trú
+              </h2>
+              <ul className="text-sm font-body text-on-surface-variant space-y-2 list-disc list-inside">
+                <li>Nhận phòng từ <strong>14:00</strong>. Cần xuất trình CMND/CCCD hoặc Hộ chiếu.</li>
+                <li>Trả phòng trước <strong>12:00</strong>. Việc trả muộn có thể phát sinh phụ phí.</li>
+                <li>Du lịch có trách nhiệm: Cấm hút thuốc tại phòng và không mang theo thú cưng.</li>
+              </ul>
+            </div>
 
-              <div className="flex justify-between items-center pt-2">
-                <div className="flex items-center space-x-4">
-                  <span className="material-symbols-outlined text-white/50">payments</span>
-                  <span className="text-white/60 text-xs uppercase tracking-widest font-bold">Giá phòng</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-amber-500 font-headline text-3xl">{booking.pricePerNight?.toLocaleString('vi-VN')}đ</span>
-                  <span className="text-white/40 text-xs uppercase tracking-widest ml-1">/ Đêm</span>
+          </form>
+        </div>
+
+        {/* RIGHT: BOOKING SUMMARY (STICKY) ───────────────────────── */}
+        <div className="lg:col-span-1">
+          <div className="sticky top-28 bg-secondary/5 rounded-sm p-8 border border-secondary/10 shadow-[0_24px_48px_-12px_rgba(0,0,0,0.05)]">
+            
+            <h3 className="font-headline text-2xl mb-6">Tóm tắt đặt phòng</h3>
+
+            {/* Room ID Badge */}
+            <div className="flex gap-4 mb-6 border-b border-outline-variant/20 pb-6">
+              <img src={booking.image} alt={booking.room} className="w-24 h-24 object-cover rounded-sm" />
+              <div>
+                <h4 className="font-headline text-3xl tracking-tight text-on-surface mb-1">PHÒNG {booking.physicalRoomNumber}</h4>
+                <p className="font-body text-sm text-on-surface-variant font-medium">{booking.room}</p>
+                <div className="flex items-center gap-2 font-body text-[10px] uppercase tracking-wider text-on-surface-variant mt-2 opacity-80 flex-wrap">
+                  <span>20m²</span><span>•</span>
+                  <span>Hướng vườn</span><span>•</span>
+                  <span>{formData.guests} Khách</span>
                 </div>
               </div>
+            </div>
+
+            {/* Schedule */}
+            <div className="space-y-4 mb-6 border-b border-outline-variant/20 pb-6">
+              <h4 className="font-label uppercase tracking-widest text-[10px] text-secondary">Thời gian lưu trú</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="font-body text-xs text-on-surface-variant mb-1">Nhận phòng</p>
+                  <p className="font-medium text-sm">14:00</p>
+                  <p className="font-headline text-base">{fmtDate(formData.checkIn)}</p>
+                </div>
+                <div className="border-l border-outline-variant/20 pl-4">
+                  <p className="font-body text-xs text-on-surface-variant mb-1">Trả phòng</p>
+                  <p className="font-medium text-sm">12:00</p>
+                  <p className="font-headline text-base">{fmtDate(formData.checkOut)}</p>
+                </div>
+              </div>
+              <p className="font-body text-sm text-on-surface-variant pt-2">
+                Tổng cộng: <span className="font-medium text-on-surface">{nights} đêm</span>
+              </p>
+            </div>
+
+            {/* Price Breakdown */}
+            <div className="space-y-3 mb-6">
+              <h4 className="font-label uppercase tracking-widest text-[10px] text-secondary mb-2">Chi tiết thanh toán</h4>
+              {nights > 0 ? (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-on-surface-variant">Giá phòng ({booking.pricePerNight.toLocaleString('vi-VN')}đ × {nights} đêm)</span>
+                    <span className="font-medium">{(booking.pricePerNight * nights).toLocaleString('vi-VN')}đ</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-on-surface-variant">Thuế & phí dịch vụ</span>
+                    <span className="font-medium">0đ</span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-sm text-error">Vui lòng chọn ngày hợp lệ</div>
+              )}
+            </div>
+
+            {/* Total */}
+            <div className="flex justify-between items-end font-headline text-xl lg:text-2xl pt-6 border-t border-outline-variant/20 mb-8">
+              <span>Tổng cộng</span>
+              <span className="text-secondary tracking-tight">
+                {nights > 0 ? (booking.pricePerNight * nights).toLocaleString('vi-VN') + 'đ' : '0đ'}
+              </span>
             </div>
 
             {/* CTA */}
             <button
-              className="glow-button w-full bg-amber-600 hover:bg-amber-500 text-white font-bold tracking-[0.2em] py-5 rounded-full transition-all duration-300 transform hover:-translate-y-1 active:scale-95 text-xs"
-              onClick={() => {/* integrate confirm booking API here */}}
+              type="submit"
+              form="checkout-form"
+              disabled={nights <= 0 || submitting}
+              className={`w-full font-label uppercase tracking-widest text-xs py-5 transition-all shadow-xl active:scale-95 ${(nights > 0 && !submitting) ? 'bg-primary text-on-primary hover:bg-primary-container shadow-primary/10' : 'bg-surface-variant text-on-surface-variant cursor-not-allowed opacity-70'}`}
             >
-              ĐẶT NGAY
+              {submitting ? 'ĐANG XỬ LÝ...' : 'THANH TOÁN NGAY'}
             </button>
-
-            <button
-              className="mt-8 text-white/40 hover:text-white text-[10px] tracking-widest uppercase transition-colors duration-300 underline underline-offset-8"
-              onClick={() => navigate(-1)}
-            >
-              THAY ĐỔI LỰA CHỌN
-            </button>
-          </div>
-        </div>
-      </main>
-
-      {/* ── FOOTER ───────────────────────────────────────────────── */}
-      <footer className="bg-slate-950 w-full border-t border-white/5">
-        <div className="flex flex-col md:flex-row justify-between items-center w-full py-16 px-12 max-w-screen-2xl mx-auto">
-          <div className="mb-8 md:mb-0">
-            <span className="font-headline italic text-amber-600 text-xl">GOAT HOTEL</span>
-            <p className="text-slate-500 font-body text-[10px] tracking-widest uppercase mt-2">
-              © 2024 GOAT HOTEL. TRẢI NGHIỆM ĐẶC QUYỀN.
+            <p className="text-center mt-4">
+              <span className="font-body text-[10px] text-on-surface-variant">
+                Bằng việc thanh toán, bạn đồng ý với Điều khoản của GOAT Hotel.
+              </span>
             </p>
-          </div>
-          <div className="flex space-x-8">
-            {['BẢO MẬT', 'ĐIỀU KHOẢN', 'TUYỂN DỤNG', 'BÁO CHÍ'].map(l => (
-              <a
-                key={l}
-                href="#"
-                className="text-slate-500 font-body text-[10px] tracking-widest uppercase hover:text-slate-100 transition-colors duration-300 opacity-80 hover:opacity-100"
-              >
-                {l}
-              </a>
-            ))}
+
           </div>
         </div>
-      </footer>
+      </section>
     </div>
   );
 }

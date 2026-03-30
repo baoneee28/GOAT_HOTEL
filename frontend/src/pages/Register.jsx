@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import API_BASE from '../config';
 
 export default function Register() {
   const [formData, setFormData] = useState({ fullname: '', email: '', phone: '', password: '', confirm_password: '' });
@@ -13,7 +14,7 @@ export default function Register() {
       return;
     }
     try {
-      const response = await axios.post('http://localhost:8080/api/auth/register', formData, { withCredentials: true });
+      const response = await axios.post(`${API_BASE}/api/auth/register`, formData, { withCredentials: true });
       if (response.data.success) {
         if (window.Swal) {
           window.Swal.fire({ icon: 'success', title: 'Thành công', text: response.data.message }).then(() => navigate('/login'));
@@ -88,7 +89,7 @@ export default function Register() {
           <img
             alt="Luxury Hotel Lobby"
             className="absolute inset-0 w-full h-full object-cover"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAp_YGgWWZANBmtdcbLCGXenLY_V6yUu-NPq1ov6fBTRNEPmCtBVg0SRWNDsh10vOy__kup40aD9gfvN2XhE_h3sjX9epbqVgu2HgiB_BBz_PjRqtd3QJmocEFyd-fkspEy8sJrKtH68S62KhOAnJPTUjhGSgQXboFLr16NAGZFIyBPWgWuoC6pVWve2TXtLV1RjyK3gkizHP2hEdJEjFJHkAeOlXMCYCNT0syHtDvMA9vyZSoXG5VyU2CcOfOTR8u06ra4sklTQpwN"
+            src={`${API_BASE}/images/home/hero_slider_3.jpg`}
           />
           <div className="absolute inset-0 bg-primary/10 mix-blend-multiply"></div>
           <div className="absolute bottom-20 left-12 max-w-sm z-10">
@@ -159,9 +160,9 @@ export default function Register() {
             <div className="mt-20 pt-10 border-t border-outline-variant/20">
               <div className="flex items-center gap-6">
                 <div className="flex -space-x-3">
-                  <img className="w-8 h-8 rounded-full border-2 border-surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD4AIQwBHcS2dqcvXn5WfZU0Qs8oUt5ArKwIoPpFnhqCJ5KC3L6cAHr8aWu2OSghgVwIO1A-SR-ioGYsq0_GodURYOgFL5b5FaNgoj0TR-NId3CN3x7-wvxI18xUfsZx-gbB-Xy8g-LKfIm8pWwOav-RxJhegclYWejAA7B6wKFRr7HetLxg87Sa-21DBKSHE6qwuHxCNGNIeyoNc994RaYodcq8LxwgSGJtFwYz3CdQIQzbwXoAhN9HGkovarAyGOr4WTFRg0h69Ak" alt="guest 1" />
-                  <img className="w-8 h-8 rounded-full border-2 border-surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYoi9MYma3cCzEH6pG1IAWDqBIQTO3gHOT2VhV25FzvlfD90CQ7NXwDFVHWF_6ipqPlI37jKOLs-WtCx9dg9NnSxNRRMmiI-HjotiYBN6T6KZ0nfkd-EvwrXzcXYdIJnc4bCBxLsjXdDz-znLTbaOEopbwDVQQJ5QPqTnIvP7e0qAdlN6o_4yidVEclo2n-xSj8pbQi6JMKhnGKlfpti43WEVYf5bpmC_9qmNicIBTaUV9acmeakXyxUKx9dNtepnEm1RKi9bUV8K5" alt="guest 2" />
-                  <img className="w-8 h-8 rounded-full border-2 border-surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBwH7BQQYIdbqMKpqgxQyEuTgpJLar8YOU9IqoTQfSvAv8hBIDwdFyebdmaYct3WpUUf6E6UFe0ut5tR98WDwjIkp81SI5gUcA4v-alkNXXXSatklGoOp9vICEXCCxmOTc5iFgXRhVY6tZNTPgxACnIkuqdnS67yaTXuvMXUETzqOpF0P1PyVDI2saSyvrdzXmkuDuI_hR1xCfgp_nGOcoCTjymNIYsWlqHTwnFlOsI6Dw5FTyzLhS7pX5m7yid3ez6Dg9K_ek4UGuM" alt="guest 3" />
+                  <img className="w-8 h-8 rounded-full border-2 border-surface" src={`${API_BASE}/images/Featured_news/news_featured_1.jpg`} alt="guest 1" />
+                  <img className="w-8 h-8 rounded-full border-2 border-surface" src={`${API_BASE}/images/Featured_news/news_featured_2.jpg`} alt="guest 2" />
+                  <img className="w-8 h-8 rounded-full border-2 border-surface" src={`${API_BASE}/images/Featured_news/news_featured_3.jpg`} alt="guest 3" />
                 </div>
                 <p className="text-[10px] text-on-surface-variant uppercase tracking-widest font-medium">
                   Hơn 2000+ khách hàng tinh hoa

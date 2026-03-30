@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import API_BASE from '../../config';
 
 export default function Rooms() {
   const [data, setData] = useState({ rooms: [], totalPages: 1, currentPage: 1 });
@@ -15,7 +16,7 @@ export default function Rooms() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await axios.get(`http://localhost:8080/api/rooms/admin?q=${q}&status=${status}&page=${page}`, { withCredentials: true });
+      const res = await axios.get(`${API_BASE}/api/rooms/admin?q=${q}&status=${status}&page=${page}`, { withCredentials: true });
       setData(res.data);
     } catch (err) {
       console.error(err);
@@ -24,7 +25,7 @@ export default function Rooms() {
 
   useEffect(() => {
     fetchData();
-    axios.get('http://localhost:8080/api/room-types', { withCredentials: true }).then(r => setTypes(r.data));
+    axios.get(`${API_BASE}/api/room-types`, { withCredentials: true }).then(r => setTypes(r.data));
   }, [fetchData]);
 
   const handleDelete = (id) => {
@@ -34,7 +35,7 @@ export default function Rooms() {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const res = await axios.delete(`http://localhost:8080/api/rooms/admin/${id}`, { withCredentials: true });
+          const res = await axios.delete(`${API_BASE}/api/rooms/admin/${id}`, { withCredentials: true });
           if (res.data.success) {
              window.Swal.fire({ icon: 'success', title: 'Thành công', timer: 1500, showConfirmButton: false });
              fetchData();
@@ -66,7 +67,7 @@ export default function Rooms() {
             typeId: formData.typeId,
             status: formData.status
         };
-        const res = await axios.post('http://localhost:8080/api/rooms/admin', payload, { withCredentials: true });
+        const res = await axios.post(`${API_BASE}/api/rooms/admin`, payload, { withCredentials: true });
         if (res.data.success) {
             window.Swal.fire({ icon: 'success', title: 'Thành công', timer: 1500, showConfirmButton: false });
             setShowModal(false);

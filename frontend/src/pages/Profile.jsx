@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import axios from 'axios';
+import API_BASE, { imageUrl } from '../config';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -12,11 +13,13 @@ export default function Profile() {
 
   const currentUserId = sessionUser?.id;
 
+  const [recentBookings, setRecentBookings] = useState([]);
+
   useEffect(() => {
-    if (!currentUserId) return; // Wait for session user to load
+    if (!currentUserId) return;
     const fetchProfile = async () => {
       try {
-        const res = await axios.get(`http://localhost:8080/api/profile/${currentUserId}`, { withCredentials: true });
+        const res = await axios.get(`${API_BASE}/api/profile/${currentUserId}`, { withCredentials: true });
         if (res.data?.success) {
           const u = res.data.user;
           setUser(u);
@@ -29,6 +32,11 @@ export default function Profile() {
       }
     };
     fetchProfile();
+
+    // Fetch recent bookings
+    axios.get(`${API_BASE}/api/bookings/history?userId=${currentUserId}&page=1`, { withCredentials: true })
+      .then(res => setRecentBookings((res.data?.bookings || []).slice(0, 2)))
+      .catch(() => {});
   }, [currentUserId]);
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -36,7 +44,7 @@ export default function Profile() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post(`http://localhost:8080/api/profile/${currentUserId}`, {
+      const res = await axios.post(`${API_BASE}/api/profile/${currentUserId}`, {
         fullName: formData.fullName,
         phone: formData.phone,
       }, { withCredentials: true });
@@ -51,8 +59,7 @@ export default function Profile() {
   };
 
   const getAvatarUrl = (url) => {
-    if (!url) return 'https://lh3.googleusercontent.com/aida-public/AB6AXuBupAx6rs2g2vSjz67aZ0D0tiQDRzDBfJgkudwD4c38Y1_Em9RSX2wyw97p3vln7gc28YLmT4TekXIvJLB91yKBrNQG0j2Y9JvbKXJ7sCYse5IdHrGnONnEP16tc1dW_hWmjk1-SmOoRw7uDZSyT2phBM9Lu9s9MsJ0-q_sgp2xWl3kR1TTvliEaCTqJCMShkhPr3_9hvLUlcryiRJ7iZNtScyYRpWF7STcq6yUDBBEdXjXbmBkI9X7moBVxDNr5UjI1aqTcX4MOMI';
-    return url.startsWith('http') ? url : `http://localhost:8080${url.startsWith('/') ? '' : '/'}${url}`;
+    return imageUrl(url, '/images/rooms/standard-room.jpg');
   };
 
   if (loading) {
@@ -175,40 +182,39 @@ export default function Profile() {
                 <Link to="/history" className="font-label text-[0.7rem] uppercase tracking-widest text-secondary border-b border-secondary/30 pb-1">Xem tất cả</Link>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="group">
-                  <div className="aspect-[16/10] mb-4 overflow-hidden rounded-sm">
-                    <img
-                      alt="Imperial Grand Suite"
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfp90yg3OkRye5eebeEZtq10QTRmiou6TQBzkhJVTNoGsNtHOzIi7csj2tBD_SdOrW9FnqF3Bz0ZjG5_fJ3ev-b3Xu3SGU1Xb6Ihhb0sds2y6GrDkD4WGjHtUI_CXHUBbycy1kzApt4V9R7cxxDffDgQTsWervJ0R_fyYTyWtFzzV176BeeC6ASUpMdapBKHmHSgLg1RPW-VjLj5MeFIuvouBJvo5v2rIYN9wsmR55zNXU2VBhJLxThuoJxZQ1xpey5B8biV7fCDg"
-                    />
-                  </div>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-secondary">Kỳ nghỉ sắp tới</span>
-                      <h3 className="font-headline text-xl text-primary mt-1">Imperial Grand Suite</h3>
-                      <p className="text-sm text-outline font-body mt-1">14 Th10 — 21 Th10, 2024</p>
+                {recentBookings.length > 0 ? recentBookings.map((booking) => {
+                  const detail = booking.details?.[0];
+                  const status = booking.status?.toLowerCase() || 'pending';
+                  const statusLabel = status === 'pending' ? 'Chờ xử lý' : status === 'confirmed' ? 'Đã xác nhận' : status === 'completed' ? 'Đã hoàn thành' : 'Đã hủy';
+                  return (
+                    <div key={booking.id} className="group cursor-pointer" onClick={() => navigate(`/booking/${booking.id}`, { state: { booking } })}>
+                      <div className="aspect-[16/10] mb-4 overflow-hidden rounded-sm">
+                        <img
+                          alt={detail?.room?.roomType?.typeName || 'Phòng'}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          src={imageUrl(detail?.room?.image)}
+                        />
+                      </div>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-secondary">
+                            {status === 'confirmed' ? 'Kỳ nghỉ sắp tới' : status === 'completed' ? 'Kỳ nghỉ trước' : statusLabel}
+                          </span>
+                          <h3 className="font-headline text-xl text-primary mt-1">{detail?.room?.roomType?.typeName || 'Phòng Tiêu chuẩn'}</h3>
+                          <p className="text-sm text-outline font-body mt-1">Phòng {detail?.room?.roomNumber || 'N/A'}</p>
+                        </div>
+                        <span className={`px-3 py-1 font-label text-[0.6rem] uppercase tracking-widest ${status === 'confirmed' ? 'bg-secondary/10 text-secondary' : 'bg-surface-container-high text-on-surface-variant'}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
                     </div>
-                    <span className="px-3 py-1 bg-secondary/10 text-secondary font-label text-[0.6rem] uppercase tracking-widest">Đã xác nhận</span>
+                  );
+                }) : (
+                  <div className="md:col-span-2 text-center py-8">
+                    <p className="text-on-surface-variant font-body text-sm italic">Chưa có lịch sử đặt phòng nào.</p>
+                    <Link to="/collections" className="text-secondary font-label text-xs uppercase tracking-widest mt-2 inline-block">Đặt phòng ngay</Link>
                   </div>
-                </div>
-                <div className="group">
-                  <div className="aspect-[16/10] mb-4 overflow-hidden rounded-sm">
-                    <img
-                      alt="Azure Horizon Deluxe"
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuCC3y_1k7XNTK052dFSt5N9t_BHCkuCnV6E0cuLmFfjgBiMoWF4FrGBgjCsJjttW3iKDwymj0bRc-jeiSE-9IUHuM_5fbtvtubXNjU0QGujRzxb2O7H31m-Z0MJY7k5uQBnW61NyK3k49m-dnl1XFLhIzoFV_5RubwzDZGpIN9Nt0ZrRibrLh-gZ46oTr-fjbKt4cpWPGJjHUVKlMPk_qWlV_MYwsvb2y87onqU-qqavVzyF2JWwBVlOylooltMp1S7JGbLLU-V6nQ"
-                    />
-                  </div>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-outline">Kỳ nghỉ trước</span>
-                      <h3 className="font-headline text-xl text-primary mt-1">Azure Horizon Deluxe</h3>
-                      <p className="text-sm text-outline font-body mt-1">02 Th08 — 09 Th08, 2024</p>
-                    </div>
-                    <span className="px-3 py-1 bg-surface-container-high text-on-surface-variant font-label text-[0.6rem] uppercase tracking-widest">Đã hoàn thành</span>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
 

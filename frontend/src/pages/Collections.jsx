@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import API_BASE from '../config';
 import bookingImage from '../assets/booking_images_1.jpg';
+import HeroHeader from '../components/HeroHeader';
 
 const getToday = () => new Date().toISOString().split('T')[0];
 const getTomorrow = () => {
@@ -10,8 +12,17 @@ const getTomorrow = () => {
   return d.toISOString().split('T')[0];
 };
 
+// Helper: lấy danh sách amenities từ API response (room.items[].item.name)
+const getRoomAmenities = (room) => {
+  if (room.items && room.items.length > 0) {
+    return room.items.map(ri => ri.item?.name).filter(Boolean);
+  }
+  return [];
+};
+
 export default function Collections() {
   const navigate = useNavigate();
+  const [originalRooms, setOriginalRooms] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -23,6 +34,25 @@ export default function Collections() {
 
   const [checkIn, setCheckIn] = useState(getToday);
   const [checkOut, setCheckOut] = useState(getTomorrow);
+
+  const [maxPrice, setMaxPrice] = useState(1500000);
+  const [guests, setGuests] = useState(2);
+  const [selectedAmenities, setSelectedAmenities] = useState([]);
+
+  const handleResetFilters = () => {
+    const scrollY = window.scrollY;
+    setMaxPrice(1500000);
+    setGuests(2);
+    setSelectedAmenities([]);
+    setRooms(originalRooms);
+    requestAnimationFrame(() => window.scrollTo(0, scrollY));
+  };
+
+  const handleAmenityToggle = (label) => {
+    setSelectedAmenities(prev => 
+      prev.includes(label) ? prev.filter(a => a !== label) : [...prev, label]
+    );
+  };
 
   const showToast = (message, icon = 'error') => {
     setToast({ message, icon });
@@ -56,10 +86,34 @@ export default function Collections() {
   }, [lastScrollY]);
 
   useEffect(() => {
-    axios.get('http://localhost:8080/api/room-types', { withCredentials: true })
-      .then(res => { setRooms(res.data); setLoading(false); })
+    axios.get(`${API_BASE}/api/room-types`, { withCredentials: true })
+      .then(res => { 
+        setOriginalRooms(res.data);
+        setRooms(res.data); 
+        setLoading(false); 
+      })
       .catch(() => setLoading(false));
   }, []);
+
+  const handleApplyFilters = () => {
+    const scrollY = window.scrollY;
+    let filtered = [...originalRooms];
+
+    filtered = filtered.filter(r => (r.pricePerNight || 0) <= maxPrice);
+    filtered = filtered.filter(r => (r.capacity || 2) >= guests);
+    
+    if (selectedAmenities.length > 0) {
+      filtered = filtered.filter(r => {
+        const roomAmns = getRoomAmenities(r);
+        return selectedAmenities.every(a => roomAmns.includes(a));
+      });
+    }
+    
+    setRooms(filtered);
+    // Giữ nguyên vị trí scroll sau khi filter để sidebar không nhảy
+    requestAnimationFrame(() => window.scrollTo(0, scrollY));
+    showToast(filtered.length > 0 ? `Tìm thấy ${filtered.length} phòng phù hợp` : 'Không có phòng nào khớp bộ lọc', filtered.length > 0 ? 'done' : 'hotel');
+  };
 
   const handleSearch = () => {
     const today = getToday();
@@ -73,24 +127,20 @@ export default function Collections() {
       showToast('Ngày trả phòng phải sau ngày nhận phòng.', 'calendar_today');
       return;
     }
-    roomListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     // TODO: gọi API lọc phòng trống theo checkIn/checkOut
   };
 
   const capacityIcon = (cap) => cap >= 4 ? 'group' : 'person';
 
-  const CAPACITY_OPTIONS = [
-    { label: '1 Người', defaultChecked: false },
-    { label: '2 Người', defaultChecked: true },
-    { label: '4 Người', defaultChecked: false },
-  ];
+  const CAPACITY_OPTIONS = [1, 2, 3, 4];
 
-  const AMENITY_OPTIONS = [
-    { label: 'Máy lạnh', defaultChecked: true },
-    { label: 'Máy sấy tóc', defaultChecked: false },
-    { label: 'Tivi thông minh', defaultChecked: true },
-    { label: 'Tủ lạnh mini', defaultChecked: false },
-  ];
+  const AMENITY_OPTIONS = React.useMemo(() => {
+    const amenitiesSet = new Set();
+    originalRooms.forEach(r => {
+      getRoomAmenities(r).forEach(a => amenitiesSet.add(a));
+    });
+    return Array.from(amenitiesSet);
+  }, [originalRooms]);
 
   return (
     <>
@@ -130,79 +180,12 @@ export default function Collections() {
         </div>
       )}
 
-      {/* Hero */}
-      <header className="pt-32 pb-16 px-12 bg-cover bg-center relative" style={{ backgroundImage: `url(${bookingImage})` }}>
-        <div className="absolute inset-0 bg-slate-900/60"></div>
-        <div className="max-w-7xl mx-auto relative z-10">
-          <h1 className="font-headline text-4xl text-white mb-8 tracking-tight drop-shadow-md">Đặt phòng ngay</h1>
-        </div>
-      </header>
+      <HeroHeader image={bookingImage} altText="Đặt phòng GOAT HOTEL" />
 
-      {/* Sticky Search Bar */}
-      <div className={`sticky z-40 w-full px-12 -mt-10 transition-all duration-500 ${navVisible ? 'top-[80px]' : 'top-0'}`}>
-        <div className="max-w-[1050px] mx-auto bg-surface-container-lowest p-2 flex flex-col md:flex-row items-stretch gap-2 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.4)] rounded-[40px] md:rounded-full">
-
-          {/* Ngày nhận phòng */}
-          <div
-            className={`flex-1 px-8 py-2.5 flex flex-col justify-center hover:bg-black/5 transition-colors rounded-[32px] md:rounded-full relative group cursor-pointer ${shakeField === 'checkIn' ? 'field-shake ring-2 ring-red-400/60 ring-inset' : ''}`}
-            onClick={(e) => { const i = e.currentTarget.querySelector('input'); if (i && i.showPicker) i.showPicker(); }}
-          >
-            <label className="text-[10px] uppercase tracking-[0.2em] text-outline font-bold mb-1 group-hover:text-secondary transition-colors cursor-pointer">Ngày nhận phòng</label>
-            <div className="flex justify-between items-center">
-              <span className="text-primary font-headline text-lg tracking-tight pointer-events-none">{formatDate(checkIn)}</span>
-              <div className="relative w-10 h-10 flex items-center justify-center bg-surface-container-low rounded-full group-hover:bg-secondary/10 transition-colors">
-                <span className="material-symbols-outlined text-secondary text-xl pointer-events-none">calendar_month</span>
-                <input
-                  lang="en-GB" className="absolute inset-0 opacity-0 cursor-pointer" type="date"
-                  value={checkIn} min={getToday()}
-                  onChange={(e) => {
-                    setCheckIn(e.target.value);
-                    if (checkOut <= e.target.value) {
-                      const next = new Date(e.target.value);
-                      next.setDate(next.getDate() + 1);
-                      setCheckOut(next.toISOString().split('T')[0]);
-                    }
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="w-px bg-outline-variant/30 hidden md:block my-4 mx-2"></div>
-
-          {/* Ngày trả phòng */}
-          <div
-            className={`flex-1 px-8 py-2.5 flex flex-col justify-center hover:bg-black/5 transition-colors rounded-[32px] md:rounded-full relative group cursor-pointer ${shakeField === 'checkOut' ? 'field-shake ring-2 ring-red-400/60 ring-inset' : ''}`}
-            onClick={(e) => { const i = e.currentTarget.querySelector('input'); if (i && i.showPicker) i.showPicker(); }}
-          >
-            <label className="text-[10px] uppercase tracking-[0.2em] text-outline font-bold mb-1 group-hover:text-secondary transition-colors cursor-pointer">Ngày trả phòng</label>
-            <div className="flex justify-between items-center">
-              <span className="text-primary font-headline text-lg tracking-tight pointer-events-none">{formatDate(checkOut)}</span>
-              <div className="relative w-10 h-10 flex items-center justify-center bg-surface-container-low rounded-full group-hover:bg-secondary/10 transition-colors">
-                <span className="material-symbols-outlined text-secondary text-xl pointer-events-none">calendar_month</span>
-                <input
-                  lang="en-GB" className="absolute inset-0 opacity-0 cursor-pointer" type="date"
-                  value={checkOut} min={checkIn || getToday()}
-                  onChange={(e) => setCheckOut(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          <button
-            className="bg-secondary text-white px-8 py-3 font-bold tracking-widest uppercase text-xs hover:bg-[#5d4201] transition-all flex items-center justify-center gap-3 rounded-full md:ml-4 shadow-lg hover:shadow-xl hover:-translate-y-0.5 group"
-            onClick={handleSearch}
-          >
-            TÌM PHÒNG
-            <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
-          </button>
-        </div>
-      </div>
-
-      <main className="max-w-7xl mx-auto px-12 pt-16 pb-20 flex flex-col md:flex-row gap-10 flex-grow">
+      <main className="max-w-7xl mx-auto px-12 pt-16 pb-20 grid md:grid-cols-[256px_1fr] gap-10 items-start min-h-[calc(100vh-120px)]">
 
         {/* ── FILTER SIDEBAR ── */}
-        <aside className={`w-full md:w-64 flex-shrink-0 sticky h-fit transition-all duration-500 ${navVisible ? 'top-[200px]' : 'top-[120px]'}`}>
+        <aside className="w-full md:w-auto self-start sticky top-28">
           <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl shadow-[0_4px_24px_-4px_rgba(0,0,0,0.12)] flex flex-col" style={{maxHeight: 'calc(100vh - 220px)'}}>
 
             {/* Card Header */}
@@ -221,11 +204,11 @@ export default function Collections() {
               <section>
                 <div className="flex justify-between items-center mb-2">
                   <h3 className="text-[9px] font-bold uppercase tracking-widest text-secondary">Mức giá</h3>
-                  <span className="text-[9px] font-semibold text-primary px-2 py-0.5 rounded-full bg-secondary/10">≤ 15.000.000đ</span>
+                  <span className="text-[9px] font-semibold text-primary px-2 py-0.5 rounded-full bg-secondary/10">≤ {maxPrice.toLocaleString('vi-VN')}đ</span>
                 </div>
-                <input className="w-full h-1 bg-surface-container-highest appearance-none rounded-full accent-secondary cursor-pointer" max="50000000" min="2000000" step="500000" type="range" />
+                <input className="w-full h-1 bg-surface-container-highest appearance-none rounded-full accent-secondary cursor-pointer" max="2000000" min="200000" step="100000" value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))} type="range" />
                 <div className="flex justify-between text-[9px] text-outline font-bold mt-1">
-                  <span>2tr</span><span>50tr</span>
+                  <span>200k</span><span>2tr</span>
                 </div>
               </section>
 
@@ -235,10 +218,16 @@ export default function Collections() {
               <section>
                 <h3 className="text-[9px] font-bold uppercase tracking-widest text-secondary mb-2">Số người</h3>
                 <div className="flex flex-col gap-1">
-                  {CAPACITY_OPTIONS.map(({ label, defaultChecked }) => (
-                    <label key={label} className="flex items-center gap-2.5 group cursor-pointer py-1.5 px-2 rounded-lg hover:bg-secondary/5 transition-colors">
-                      <input defaultChecked={defaultChecked} className="w-3.5 h-3.5 accent-secondary rounded-sm" type="checkbox" />
-                      <span className="text-[10px] uppercase tracking-widest text-on-surface-variant group-hover:text-primary transition-colors">{label}</span>
+                  {CAPACITY_OPTIONS.map((num) => (
+                    <label key={num} className="flex items-center gap-2.5 group cursor-pointer py-1.5 px-2 rounded-lg hover:bg-secondary/5 transition-colors">
+                      <input 
+                        checked={guests === num} 
+                        onChange={() => setGuests(num)} 
+                        name="guests"
+                        className="w-3.5 h-3.5 accent-secondary cursor-pointer" 
+                        type="radio" 
+                      />
+                      <span className="text-[10px] uppercase tracking-widest text-on-surface-variant group-hover:text-primary transition-colors">{num} Khách</span>
                     </label>
                   ))}
                 </div>
@@ -250,9 +239,14 @@ export default function Collections() {
               <section>
                 <h3 className="text-[9px] font-bold uppercase tracking-widest text-secondary mb-2">Tiện ích</h3>
                 <div className="flex flex-col gap-1">
-                  {AMENITY_OPTIONS.map(({ label, defaultChecked }) => (
+                  {AMENITY_OPTIONS.map((label) => (
                     <label key={label} className="flex items-center gap-2.5 group cursor-pointer py-1.5 px-2 rounded-lg hover:bg-secondary/5 transition-colors">
-                      <input defaultChecked={defaultChecked} className="w-3.5 h-3.5 accent-secondary rounded-sm" type="checkbox" />
+                      <input 
+                        checked={selectedAmenities.includes(label)}
+                        onChange={() => handleAmenityToggle(label)}
+                        className="w-3.5 h-3.5 accent-secondary rounded-sm cursor-pointer" 
+                        type="checkbox" 
+                      />
                       <span className="text-[10px] uppercase tracking-widest text-on-surface-variant group-hover:text-primary transition-colors">{label}</span>
                     </label>
                   ))}
@@ -260,27 +254,40 @@ export default function Collections() {
               </section>
             </div>
 
-            {/* Apply Button — luôn dính ở đáy card */}
-            <div className="px-5 pb-5">
-              <button className="w-full bg-secondary text-white py-3 font-bold tracking-widest uppercase text-[9px] rounded-xl hover:bg-[#5d4201] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-md shadow-secondary/20">
+            {/* Apply Button & Reset Button */}
+            <div className="px-5 pb-5 pt-2 flex flex-col gap-3">
+              <button 
+                onClick={handleApplyFilters} 
+                className="w-full bg-secondary text-white py-3 font-bold tracking-widest uppercase text-[9px] rounded-xl hover:bg-[#5d4201] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-md shadow-secondary/20"
+              >
                 <span className="material-symbols-outlined text-sm">search</span>
                 Áp dụng Bộ lọc
+              </button>
+              <button 
+                onClick={handleResetFilters} 
+                className="w-full text-on-surface-variant font-bold tracking-widest uppercase text-[9px] hover:text-primary transition-colors py-2 focus:outline-none underline underline-offset-4 decoration-outline-variant/30 hover:decoration-primary/50"
+              >
+                Xóa bộ lọc
               </button>
             </div>
           </div>
         </aside>
 
         {/* ── ROOM LIST ── */}
-        <div ref={roomListRef} className="flex-1 flex flex-col gap-12">
+        <div ref={roomListRef} className="flex flex-col gap-12 min-h-[500px] w-full">
           {loading && (
             <div className="flex items-center justify-center py-24">
               <span className="material-symbols-outlined animate-spin text-secondary text-4xl">progress_activity</span>
             </div>
           )}
           {!loading && rooms.length === 0 && (
-            <div className="text-center py-24 text-on-surface-variant">
-              <span className="material-symbols-outlined text-5xl mb-4 block">hotel</span>
-              <p className="font-headline text-xl">Không có phòng nào trống</p>
+            <div className="flex flex-col items-center justify-center py-20 text-on-surface-variant gap-4">
+              <span className="material-symbols-outlined text-6xl text-outline/50">hotel</span>
+              <p className="font-headline text-xl text-primary">Không có phòng nào trống</p>
+              <p className="text-sm text-outline max-w-xs text-center">Thử điều chỉnh lại bộ lọc hoặc thay đổi ngày nhận phòng để tìm phòng phù hợp.</p>
+              <button onClick={handleResetFilters} className="mt-2 px-6 py-2 border border-secondary text-secondary font-label text-xs uppercase tracking-widest hover:bg-secondary hover:text-white transition-all rounded-full">
+                Xóa bộ lọc
+              </button>
             </div>
           )}
           {rooms.map((room) => (
@@ -304,9 +311,9 @@ export default function Collections() {
                   </div>
                   <p className="text-on-surface-variant text-sm leading-relaxed mb-6 font-light italic">{room.description}</p>
                   <div className="flex flex-wrap gap-2 mb-8">
-                    {room.items && room.items.map((rti) => (
-                      <span key={rti.item?.id} className="px-3 py-1 bg-surface-container-low text-[9px] uppercase tracking-widest font-bold text-on-surface-variant border border-outline-variant/20">
-                        {rti.item?.name}
+                    {getRoomAmenities(room).slice(0, 5).map((label, idx) => (
+                      <span key={idx} className="px-3 py-1 bg-surface-container-low text-[9px] uppercase tracking-widest font-bold text-on-surface-variant border border-outline-variant/20">
+                        {label}
                       </span>
                     ))}
                   </div>

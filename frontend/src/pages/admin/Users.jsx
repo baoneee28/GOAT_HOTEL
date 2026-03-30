@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import API_BASE from '../../config';
 const Swal = window.Swal;
 
 export default function Users() {
@@ -14,7 +15,7 @@ export default function Users() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await axios.get(`http://localhost:8080/api/admin/users?q=${q}&page=${page}`, { withCredentials: true });
+      const res = await axios.get(`${API_BASE}/api/admin/users?q=${q}&page=${page}`, { withCredentials: true });
       setData(res.data);
     } catch (err) { console.error(err); }
   }, [q, page]);
@@ -30,7 +31,7 @@ export default function Users() {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const res = await axios.delete(`http://localhost:8080/api/admin/users/${id}`, { withCredentials: true });
+          const res = await axios.delete(`${API_BASE}/api/admin/users/${id}`, { withCredentials: true });
           if (res.data.success) {
             Swal.fire({ icon: 'success', title: 'Thành công', timer: 1500, showConfirmButton: false });
             fetchData();
@@ -57,7 +58,7 @@ export default function Users() {
   const handleSave = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post('http://localhost:8080/api/admin/users', formData, { withCredentials: true });
+      const res = await axios.post(`${API_BASE}/api/admin/users`, formData, { withCredentials: true });
       if (res.data.success) {
         Swal.fire({ icon: 'success', title: 'Thành công', timer: 1500, showConfirmButton: false });
         setShowModal(false);

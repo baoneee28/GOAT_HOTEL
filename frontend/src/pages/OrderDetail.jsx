@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import API_BASE, { imageUrl } from '../config';
 
 // Helper: format datetime string
 const formatDate = (dateValue) => {
@@ -34,16 +35,39 @@ const STATUS_STEPS = [
 const STATUS_ORDER = { pending: 0, confirmed: 1, completed: 2, cancelled: 3 };
 
 const getRoomImageUrl = (url) => {
-  if (!url) return 'https://lh3.googleusercontent.com/aida-public/AB6AXuAfp90yg3OkRye5eebeEZtq10QTRmiou6TQBzkhJVTNoGsNtHOzIi7csj2tBD_SdOrW9FnqF3Bz0ZjG5_fJ3ev-b3Xu3SGU1Xb6Ihhb0sds2y6GrDkD4WGjHtUI_CXHUBbycy1kzApt4V9R7cxxDffDgQTsWervJ0R_fyYTyWtFzzV176BeeC6ASUpMdapBKHmHSgLg1RPW-VjLj5MeFIuvouBJvo5v2rIYN9wsmR55zNXU2VBhJLxThuoJxZQ1xpey5B8biV7fCDg';
-  return url.startsWith('http') ? url : `http://localhost:8080${url.startsWith('/') ? '' : '/'}${url}`;
+  return imageUrl(url);
 };
 
 export default function OrderDetail() {
   const location = useLocation();
   const navigate = useNavigate();
-  const booking = location.state?.booking;
-
+  const { id } = useParams();
+  const [booking, setBooking] = useState(location.state?.booking || null);
   const [cancelling, setCancelling] = useState(false);
+  const [loading, setLoading] = useState(!location.state?.booking);
+
+  React.useEffect(() => {
+    if (!booking && id) {
+      axios.get(`${API_BASE}/api/admin/bookings/${id}`, { withCredentials: true })
+        .then(res => {
+          if (res.data) setBooking(res.data);
+        })
+        .catch(err => {
+          console.error('Không thể tải chi tiết booking:', err);
+          // Fallback thử tải từ history cá nhân
+          axios.get(`${API_BASE}/api/bookings/history?page=1`, { withCredentials: true })
+            .then(hist => {
+              const matched = hist.data?.bookings?.find(b => String(b.id) === String(id));
+              if (matched) setBooking(matched);
+            }).catch(() => {});
+        })
+        .finally(() => setLoading(false));
+    }
+  }, [id, booking]);
+
+  if (loading) {
+    return <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-6"><p className="text-secondary">Đang tải...</p></div>;
+  }
 
   if (!booking) {
     return (
@@ -60,15 +84,16 @@ export default function OrderDetail() {
   const nights = calcNights(detail?.totalHours);
   const pricePerNight = detail?.priceAtBooking ?? 0;
   const baseTotal = pricePerNight * nights;
-  const fees = +(baseTotal * 0.08).toFixed(2);
-  const taxes = +(baseTotal * 0.14).toFixed(2);
-  const grandTotal = (baseTotal + fees + taxes).toFixed(2);
+  const serviceFee = booking.serviceFee || 0;
+  const tax = booking.tax || 0;
+  const totalFees = serviceFee + tax;
+  const grandTotal = booking.totalAmount || (baseTotal + totalFees);
 
   const handleCancel = async () => {
     if (!window.confirm('Bạn có chắc muốn hủy đơn này?')) return;
     setCancelling(true);
     try {
-      const res = await axios.delete(`http://localhost:8080/api/bookings/${booking.id}?userId=${booking.user?.id || 1}`, { withCredentials: true });
+      const res = await axios.delete(`${API_BASE}/api/bookings/${booking.id}?userId=${booking.user?.id || 1}`, { withCredentials: true });
       if (res.data?.success) {
         if (window.Swal) window.Swal.fire({ icon: 'success', title: 'Đã hủy đơn', showConfirmButton: false, timer: 1500 });
         navigate('/history');
@@ -212,7 +237,7 @@ export default function OrderDetail() {
                         Phòng {detail.room?.roomNumber || 'N/A'}
                       </h2>
                       <p className="font-label text-[0.7rem] text-secondary tracking-[0.3em] uppercase font-bold">
-                        {detail.room?.roomType?.name || 'Phòng Tiêu chuẩn'}
+                        {detail.room?.roomType?.typeName || 'Phòng Tiêu chuẩn'}
                       </p>
                     </div>
                     <p className="font-body text-slate-400 leading-relaxed text-sm">
@@ -222,7 +247,7 @@ export default function OrderDetail() {
                       <div className="flex items-center gap-3">
                         <span className="material-symbols-outlined text-secondary text-sm">bed</span>
                         <span className="text-[0.65rem] uppercase tracking-widest text-slate-300">
-                          {detail.room?.roomType?.name || 'Giường King'}
+                          {detail.room?.roomType?.typeName || 'Giường King'}
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
@@ -255,13 +280,9 @@ export default function OrderDetail() {
                   </span>
                   <span className="font-headline text-white">{baseTotal.toLocaleString('vi-VN')}đ</span>
                 </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-400 font-light tracking-wide">Phí Dịch vụ (8%)</span>
-                  <span className="font-headline text-white">{Math.round(fees).toLocaleString('vi-VN')}đ</span>
-                </div>
                 <div className="flex justify-between items-center text-sm pb-6 border-b border-slate-800/50">
-                  <span className="text-slate-400 font-light tracking-wide">Thuế Phí (14%)</span>
-                  <span className="font-headline text-white">{Math.round(taxes).toLocaleString('vi-VN')}đ</span>
+                  <span className="text-slate-400 font-light tracking-wide">Thuế & Phí Dịch vụ</span>
+                  <span className="font-headline text-white">{Math.round(totalFees).toLocaleString('vi-VN')}đ</span>
                 </div>
                 <div className="flex justify-between items-end pt-4">
                   <div className="space-y-1">

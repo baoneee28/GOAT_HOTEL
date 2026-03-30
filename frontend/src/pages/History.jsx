@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import axios from 'axios';
+import API_BASE, { imageUrl } from '../config';
 
 const STATUS_STYLES = {
   pending: {
@@ -35,8 +36,7 @@ const formatDate = (dateValue) => {
 };
 
 const getRoomImage = (url) => {
-  if (!url) return 'https://lh3.googleusercontent.com/aida-public/AB6AXuAfp90yg3OkRye5eebeEZtq10QTRmiou6TQBzkhJVTNoGsNtHOzIi7csj2tBD_SdOrW9FnqF3Bz0ZjG5_fJ3ev-b3Xu3SGU1Xb6Ihhb0sds2y6GrDkD4WGjHtUI_CXHUBbycy1kzApt4V9R7cxxDffDgQTsWervJ0R_fyYTyWtFzzV176BeeC6ASUpMdapBKHmHSgLg1RPW-VjLj5MeFIuvouBJvo5v2rIYN9wsmR55zNXU2VBhJLxThuoJxZQ1xpey5B8biV7fCDg';
-  return url.startsWith('http') ? url : `http://localhost:8080${url.startsWith('/') ? '' : '/'}${url}`;
+  return imageUrl(url);
 };
 
 const FILTERS = ['all', 'pending', 'confirmed', 'completed', 'cancelled'];
@@ -58,7 +58,7 @@ export default function History() {
     try {
       const params = new URLSearchParams({ userId: currentUserId, page: pg });
       if (filter !== 'all') params.append('status', filter);
-      const res = await axios.get(`http://localhost:8080/api/bookings/history?${params}`, { withCredentials: true });
+      const res = await axios.get(`${API_BASE}/api/bookings/history?${params}`, { withCredentials: true });
       setBookings(res.data?.bookings || []);
       setTotalPages(res.data?.totalPages || 1);
     } catch (err) {
@@ -164,7 +164,7 @@ export default function History() {
                           </span>
                         </div>
                         <h3 className="font-headline text-2xl text-white italic">
-                          {detail?.room?.roomType?.name || 'Phòng Tiêu chuẩn'}
+                          {detail?.room?.roomType?.typeName || 'Phòng Tiêu chuẩn'}
                         </h3>
                         <p className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">
                           Phòng {detail?.room?.roomNumber || 'N/A'}

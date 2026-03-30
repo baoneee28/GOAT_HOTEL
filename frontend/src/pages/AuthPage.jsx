@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
+import API_BASE from '../config';
 import Navbar from '../components/Navbar';
 
 export default function AuthPage() {
@@ -14,14 +15,14 @@ export default function AuthPage() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    axios.get('http://localhost:8080/api/home/', { withCredentials: true })
+    axios.get(`${API_BASE}/api/home/`, { withCredentials: true })
       .then(res => { if (res.data.user_logged_in) setUser(res.data.user_logged_in); })
       .catch(() => {});
   }, []);
 
   const handleLogout = async () => {
     try {
-      await axios.post('http://localhost:8080/api/auth/logout', {}, { withCredentials: true });
+      await axios.post(`${API_BASE}/api/auth/logout`, {}, { withCredentials: true });
       setUser(null);
       navigate('/');
     } catch {}
@@ -30,7 +31,7 @@ export default function AuthPage() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post('http://localhost:8080/api/auth/login', { email, password }, { withCredentials: true });
+      const res = await axios.post(`${API_BASE}/api/auth/login`, { email, password }, { withCredentials: true });
       // Accept any 2xx or explicit success flag
       if (res.status === 200 || res.data?.success) {
         const msg = res.data?.message || 'Đăng nhập thành công!';
@@ -57,7 +58,7 @@ export default function AuthPage() {
   const handleRegister = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post('http://localhost:8080/api/auth/register', formData, { withCredentials: true });
+      const res = await axios.post(`${API_BASE}/api/auth/register`, formData, { withCredentials: true });
       if (res.data.success) {
         if (window.Swal) {
           window.Swal.fire({ icon: 'success', title: 'Thành công', text: res.data.message }).then(() => setActiveTab('login'));

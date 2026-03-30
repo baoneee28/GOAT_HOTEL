@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import API_BASE from '../../config';
 
 export default function Items() {
   const [data, setData] = useState({ items: [], totalPages: 1, currentPage: 1 });
@@ -11,7 +12,7 @@ export default function Items() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await axios.get(`http://localhost:8080/api/admin/items?q=${q}&page=${page}`, { withCredentials: true });
+      const res = await axios.get(`${API_BASE}/api/admin/items?q=${q}&page=${page}`, { withCredentials: true });
       setData(res.data);
     } catch (err) { console.error(err); }
   }, [q, page]);
@@ -25,7 +26,7 @@ export default function Items() {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const res = await axios.delete(`http://localhost:8080/api/admin/items/${id}`, { withCredentials: true });
+          const res = await axios.delete(`${API_BASE}/api/admin/items/${id}`, { withCredentials: true });
           if (res.data.success) {
             window.Swal.fire({ icon: 'success', title: 'Thành công', timer: 1500, showConfirmButton: false });
             fetchData();
@@ -56,7 +57,7 @@ export default function Items() {
           image: formData.image
       };
 
-      const res = await axios.post('http://localhost:8080/api/admin/items', payload, { withCredentials: true });
+      const res = await axios.post(`${API_BASE}/api/admin/items`, payload, { withCredentials: true });
       if (res.data.success) {
           window.Swal.fire({ icon: 'success', title: 'Thành công', timer: 1500, showConfirmButton: false });
           setShowModal(false);
@@ -97,7 +98,7 @@ export default function Items() {
                       {data.items?.length > 0 ? data.items.map(i => (
                           <tr key={i.id}>
                               <td>
-                                  <img src={i.image?.startsWith('http') || i.image?.startsWith('/uploads') ? i.image : `http://localhost:8080${i.image}`} 
+                                  <img src={i.image?.startsWith('http') || i.image?.startsWith('/uploads') ? i.image : `${API_BASE}${i.image}`} 
                                        className="item-icon-img" alt={i.name} onError={(e)=>{e.target.onerror=null; e.target.src='https://via.placeholder.com/40'}} />
                               </td>
                               <td className="fw-bold">{i.name}</td>

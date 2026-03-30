@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE, { imageUrl } from '../config';
 import HeroHeader from '../components/HeroHeader';
@@ -14,20 +14,26 @@ function fmtDate(d) {
 export default function BookingConfirmation() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { user: sessionUser } = useOutletContext() || {};
+  const { user: sessionUser, setUser } = useOutletContext() || {};
+  const [searchParams] = useSearchParams();
+  const contentRef = React.useRef(null);
+  const hasAutoScrolledRef = React.useRef(false);
 
-  // Mock initial state if loaded without state
-  const booking = {
-    physicalRoomNumber: state?.physicalRoomNumber ?? '101',
-    room: state?.room ?? 'Standard Room',
-    pricePerNight: state?.pricePerNight ?? 350000,
-    image: imageUrl(state?.image, '/images/rooms/standard-room.jpg')
-  };
+  const roomId = state?.roomId || searchParams.get('roomId') || '';
+  const hasBookingContext = Boolean(roomId);
+
+  const [booking, setBooking] = useState({
+    roomId,
+    physicalRoomNumber: state?.physicalRoomNumber ?? searchParams.get('physicalRoomNumber') ?? '',
+    room: state?.room ?? searchParams.get('room') ?? '',
+    pricePerNight: Number(state?.pricePerNight ?? searchParams.get('pricePerNight') ?? 0),
+    image: imageUrl(state?.image ?? searchParams.get('image'), '/images/rooms/standard-room.jpg')
+  });
 
   const [formData, setFormData] = useState({
-    checkIn: state?.checkIn ?? new Date().toISOString().split('T')[0],
-    checkOut: state?.checkOut ?? new Date(Date.now() + 86400000).toISOString().split('T')[0],
-    guests: state?.guests ?? 2,
+    checkIn: state?.checkIn ?? searchParams.get('checkIn') ?? new Date().toISOString().split('T')[0],
+    checkOut: state?.checkOut ?? searchParams.get('checkOut') ?? new Date(Date.now() + 86400000).toISOString().split('T')[0],
+    guests: Number(state?.guests ?? searchParams.get('guests') ?? 2),
     fullName: '',
     phone: '',
     email: '',
@@ -45,8 +51,42 @@ export default function BookingConfirmation() {
 
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (!roomId || state?.room) return;
+    axios.get(`${API_BASE}/api/rooms/${roomId}`, { withCredentials: true })
+      .then((res) => {
+        const roomData = res.data;
+        if (!roomData) return;
+        setBooking((prev) => ({
+          roomId,
+          physicalRoomNumber: roomData.roomNumber || prev.physicalRoomNumber,
+          room: roomData.roomType?.typeName || prev.room,
+          pricePerNight: roomData.roomType?.pricePerNight || prev.pricePerNight,
+          image: imageUrl(roomData.roomType?.image, prev.image),
+        }));
+      })
+      .catch((err) => console.error('Không thể tải lại thông tin phòng:', err));
+  }, [roomId, state?.room]);
+
+  useEffect(() => {
+    if (hasAutoScrolledRef.current || !contentRef.current) return;
+
+    const scrollTimer = window.setTimeout(() => {
+      contentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      hasAutoScrolledRef.current = true;
+    }, 150);
+
+    return () => window.clearTimeout(scrollTimer);
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!hasBookingContext) {
+      if (window.Swal) window.Swal.fire('Thiếu dữ liệu', 'Vui lòng chọn phòng từ danh sách trước khi xác nhận lưu trú.', 'warning');
+      else alert('Vui lòng chọn phòng từ danh sách trước khi xác nhận lưu trú.');
+      navigate('/collections');
+      return;
+    }
     if(nights <= 0) {
       if (window.Swal) window.Swal.fire('Lỗi', 'Ngày trả phòng phải sau ngày nhận phòng.', 'warning');
       else alert('Ngày trả phòng phải sau ngày nhận phòng.');
@@ -67,11 +107,18 @@ export default function BookingConfirmation() {
       return;
     }
 
+    const effectiveRoomId = booking.roomId || roomId;
+    if (!effectiveRoomId) {
+      if (window.Swal) window.Swal.fire('Thiếu dữ liệu', 'Không xác định được phòng cần đặt. Vui lòng chọn lại phòng.', 'warning');
+      else alert('Không xác định được phòng cần đặt. Vui lòng chọn lại phòng.');
+      navigate(-1);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const payload = {
-        userId: String(sessionUser.id),
-        roomId: String(state?.id || 1), // fallback nếu ko có
+        roomId: String(effectiveRoomId),
         checkIn: formData.checkIn,
         checkOut: formData.checkOut
       };
@@ -91,12 +138,42 @@ export default function BookingConfirmation() {
       }
     } catch (err) {
       console.error(err);
+      if (err.response?.status === 401) {
+        setUser?.(null);
+        if (window.Swal) {
+          window.Swal.fire('Phiên đăng nhập đã hết', 'Vui lòng đăng nhập lại để tiếp tục đặt phòng.', 'warning')
+            .then(() => navigate('/login'));
+        } else {
+          alert('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
+          navigate('/login');
+        }
+        return;
+      }
       if (window.Swal) window.Swal.fire('Lỗi', err.response?.data?.message || 'Không thể kết nối với máy chủ.', 'error');
       else alert('Không thể kết nối với máy chủ.');
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (!hasBookingContext) {
+    return (
+      <div className="bg-surface text-on-surface min-h-screen flex items-center justify-center px-6">
+        <div className="max-w-lg text-center space-y-5">
+          <h1 className="font-headline text-4xl text-primary">Thiếu thông tin đặt phòng</h1>
+          <p className="font-body text-on-surface-variant">
+            Bạn cần chọn một phòng cụ thể trước khi vào bước xác nhận lưu trú.
+          </p>
+          <button
+            onClick={() => navigate('/collections')}
+            className="bg-primary text-on-primary px-8 py-4 font-label text-xs uppercase tracking-widest hover:bg-primary-container transition-all"
+          >
+            Quay lại chọn phòng
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-surface text-on-surface font-body min-h-screen flex flex-col">
@@ -118,7 +195,7 @@ export default function BookingConfirmation() {
       </div>
 
       {/* ── MAIN CONTENT GRID ────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-8 md:px-16 py-12 md:py-20 grid grid-cols-1 lg:grid-cols-3 gap-16 flex-grow">
+      <section ref={contentRef} className="max-w-7xl mx-auto px-8 md:px-16 py-12 md:py-20 grid grid-cols-1 lg:grid-cols-3 gap-16 flex-grow scroll-mt-28">
         
         {/* LEFT: INFO & FORM ─────────────────────────────────────── */}
         <div className="lg:col-span-2">

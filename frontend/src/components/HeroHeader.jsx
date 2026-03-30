@@ -1,10 +1,11 @@
 import React from 'react';
+import { imageUrl } from '../config';
 
 export default function HeroHeader({ image, altText = "Room Preview", children }) {
   return (
     <section className="relative h-[45vh] lg:h-[55vh] min-h-[350px] overflow-hidden flex items-end">
       <img
-        src={image || 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=2070&auto=format&fit=crop'}
+        src={image || imageUrl('/images/home/hero_slider_2.jpg')}
         alt={altText}
         className="absolute inset-0 w-full h-full object-cover"
       />

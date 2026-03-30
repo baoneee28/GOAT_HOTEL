@@ -87,6 +87,12 @@ public class AdminBookingController {
         if (booking_id != null && booking_id > 0) {
             Optional<Booking> existingOpt = bookingRepository.findById(booking_id);
             if (existingOpt.isEmpty()) return "redirect:/admin/bookings";
+            
+            long overlapCount = bookingRepository.countOverlappingBookingsExcept(room_id, check_in, check_out, booking_id);
+            if (overlapCount > 0 && !"cancelled".equalsIgnoreCase(status) && !"refused".equalsIgnoreCase(status)) {
+                return "redirect:/admin/bookings?error=overlap";
+            }
+            
             Booking existing = existingOpt.get();
             existing.setTotalPrice(totalPrice);
             existing.setStatus(status);
@@ -103,6 +109,11 @@ public class AdminBookingController {
         } else {
             User user = userRepository.findById(user_id).orElse(null);
             if (user == null) return "redirect:/admin/bookings";
+            
+            long overlapCount = bookingRepository.countOverlappingBookings(room_id, check_in, check_out);
+            if (overlapCount > 0 && !"cancelled".equalsIgnoreCase(status) && !"refused".equalsIgnoreCase(status)) {
+                return "redirect:/admin/bookings?error=overlap";
+            }
 
             Booking booking = new Booking();
             booking.setUser(user);
@@ -119,8 +130,7 @@ public class AdminBookingController {
             detail.setTotalHours(totalHours);
             bookingDetailRepository.save(detail);
 
-            room.setStatus("booked");
-            roomRepository.save(room);
+            // KHÔNG setStatus("booked") vật lý
         }
 
         return "redirect:/admin/bookings";

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { imageUrl } from '../config';
 import HeroHeader from '../components/HeroHeader';
 
 const CONTACT_INFO = [
@@ -65,7 +66,7 @@ export default function ContactPage() {
 
       {/* ── HERO ────────────────────────────────────────────────────── */}
       <HeroHeader
-        image="https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=2000&auto=format&fit=crop"
+        image={imageUrl('/images/contact/contact_hero_bg.jpg')}
         altText="Liên hệ với GOAT HOTEL"
       />
 

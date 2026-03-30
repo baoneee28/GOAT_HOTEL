@@ -9,7 +9,9 @@ import com.hotel.repository.BookingDetailRepository;
 import com.hotel.repository.RoomRepository;
 import com.hotel.repository.UserRepository;
 import com.hotel.service.BookingService;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
@@ -41,6 +43,19 @@ public class BookingApiController {
     private UserRepository userRepository;
 
     private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    private User getSessionUser(HttpSession session) {
+        Object userObj = session.getAttribute("user");
+        return userObj instanceof User ? (User) userObj : null;
+    }
+
+    private ResponseEntity<Map<String, Object>> authRequiredResponse() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", "Vui lòng đăng nhập để tiếp tục.");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    }
+
     private LocalDateTime parseDate(String dateStr) {
         if (dateStr.contains("T")) {
             dateStr = dateStr.replace("T", " ");
@@ -49,23 +64,32 @@ public class BookingApiController {
         return LocalDateTime.parse(dateStr, formatter);
     }
 
+    private String requirePayloadField(Map<String, String> payload, String key, String label) {
+        String value = payload.get(key);
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(label + " không được để trống.");
+        }
+        return value.trim();
+    }
+
     @PostMapping("/bookings")
-    public ResponseEntity<Map<String, Object>> bookRoom(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<Map<String, Object>> bookRoom(@RequestBody Map<String, String> payload, HttpSession session) {
         Map<String, Object> response = new HashMap<>();
         try {
-            Integer userId = Integer.parseInt(payload.get("userId"));
-            Integer roomId = Integer.parseInt(payload.get("roomId"));
-            LocalDateTime checkIn = parseDate(payload.get("checkIn"));
-            LocalDateTime checkOut = parseDate(payload.get("checkOut"));
-
-            User user = userRepository.findById(userId).orElse(null);
-            if (user == null) {
-                response.put("success", false);
-                response.put("message", "User không tồn tại");
-                return ResponseEntity.badRequest().body(response);
+            User currentUser = getSessionUser(session);
+            if (currentUser == null) {
+                return authRequiredResponse();
             }
 
-            Booking activeBooking = bookingService.getActiveBooking(userId);
+            String roomIdRaw = requirePayloadField(payload, "roomId", "Phòng");
+            String checkInRaw = requirePayloadField(payload, "checkIn", "Ngày nhận phòng");
+            String checkOutRaw = requirePayloadField(payload, "checkOut", "Ngày trả phòng");
+
+            Integer roomId = Integer.parseInt(roomIdRaw);
+            LocalDateTime checkIn = parseDate(checkInRaw);
+            LocalDateTime checkOut = parseDate(checkOutRaw);
+
+            Booking activeBooking = bookingService.getActiveBooking(currentUser.getId());
             if (activeBooking != null) {
                 String roomNum = "N/A";
                 if(activeBooking.getDetails() != null && !activeBooking.getDetails().isEmpty()){
@@ -76,7 +100,7 @@ public class BookingApiController {
                 return ResponseEntity.badRequest().body(response);
             }
 
-            String error = bookingService.bookRoom(user, roomId, checkIn, checkOut);
+            String error = bookingService.bookRoom(currentUser, roomId, checkIn, checkOut);
             if (error != null) {
                 response.put("success", false);
                 response.put("message", error);
@@ -86,6 +110,10 @@ public class BookingApiController {
             response.put("success", true);
             response.put("message", "Đặt phòng thành công!");
             return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "Lỗi dữ liệu đầu vào: " + e.getMessage());
@@ -95,22 +123,56 @@ public class BookingApiController {
 
     @GetMapping("/bookings/history")
     public ResponseEntity<Map<String, Object>> getHistory(
-            @RequestParam("userId") Integer userId,
             @RequestParam(value = "status", defaultValue = "") String status,
-            @RequestParam(value = "page", defaultValue = "1") int page) {
-        
-        Page<Booking> historyPage = bookingService.getHistory(userId, status.isBlank() ? null : status, page);
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            HttpSession session) {
+        User currentUser = getSessionUser(session);
+        if (currentUser == null) {
+            return authRequiredResponse();
+        }
+
+        Page<Booking> historyPage = bookingService.getHistory(currentUser.getId(), status.isBlank() ? null : status, page);
         Map<String, Object> response = new HashMap<>();
         response.put("bookings", historyPage.getContent());
         response.put("totalPages", historyPage.getTotalPages());
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/bookings/{id}")
+    public ResponseEntity<Map<String, Object>> getBookingDetail(@PathVariable("id") Integer id, HttpSession session) {
+        User currentUser = getSessionUser(session);
+        if (currentUser == null) {
+            return authRequiredResponse();
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        Optional<Booking> bookingOpt = bookingRepository.findById(id);
+        if (bookingOpt.isEmpty()) {
+            response.put("success", false);
+            response.put("message", "Không tìm thấy đơn đặt phòng.");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+
+        Booking booking = bookingOpt.get();
+        if (booking.getUser() == null || !currentUser.getId().equals(booking.getUser().getId())) {
+            response.put("success", false);
+            response.put("message", "Bạn không có quyền xem đơn đặt phòng này.");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+
+        response.put("success", true);
+        response.put("booking", booking);
+        return ResponseEntity.ok(response);
+    }
+
     @DeleteMapping("/bookings/{id}")
-    public ResponseEntity<Map<String, Object>> cancelBooking(
-            @PathVariable("id") Integer id,
-            @RequestParam("userId") Integer userId) {
-        boolean success = bookingService.cancelBooking(id, userId);
+    public ResponseEntity<Map<String, Object>> cancelBooking(@PathVariable("id") Integer id, HttpSession session) {
+        User currentUser = getSessionUser(session);
+        if (currentUser == null) {
+            return authRequiredResponse();
+        }
+
+        boolean success = bookingService.cancelBooking(id, currentUser.getId());
         Map<String, Object> response = new HashMap<>();
         if (success) {
             response.put("success", true);
@@ -163,11 +225,20 @@ public class BookingApiController {
             double totalPrice = priceInfo.get("total");
 
             if (bookingIdStr != null && !bookingIdStr.isBlank()) {
-                Optional<Booking> existingOpt = bookingRepository.findById(Integer.parseInt(bookingIdStr));
+                Integer existingBookingId = Integer.parseInt(bookingIdStr);
+                Optional<Booking> existingOpt = bookingRepository.findById(existingBookingId);
                 if (existingOpt.isEmpty()) {
                     response.put("success", false);
                     return ResponseEntity.badRequest().body(response);
                 }
+                
+                long overlapCount = bookingRepository.countOverlappingBookingsExcept(roomId, checkIn, checkOut, existingBookingId);
+                if (overlapCount > 0 && !"cancelled".equalsIgnoreCase(status) && !"refused".equalsIgnoreCase(status)) {
+                    response.put("success", false);
+                    response.put("message", "Xung đột lịch! Đã có đơn đặt phòng khác được duyệt trong thời gian này.");
+                    return ResponseEntity.badRequest().body(response);
+                }
+
                 Booking existing = existingOpt.get();
                 existing.setTotalPrice(totalPrice);
                 existing.setStatus(status);
@@ -180,13 +251,25 @@ public class BookingApiController {
                     detail.setTotalHours(totalHours);
                     detail.setRoom(room);
                     bookingDetailRepository.save(detail);
+
+                    // KHÔNG CẬP NHẬT TRẠNG THÁI BOOKED VẬT LÝ NỮA
                 }
             } else {
                 User user = userRepository.findById(userId).orElse(null);
                 if (user == null) {
                     response.put("success", false);
+                    response.put("message", "Khách hàng không tồn tại!");
                     return ResponseEntity.badRequest().body(response);
                 }
+
+                // Check overlap cho Admin
+                long overlapCount = bookingRepository.countOverlappingBookings(roomId, checkIn, checkOut);
+                if (overlapCount > 0 && !"cancelled".equalsIgnoreCase(status) && !"refused".equalsIgnoreCase(status)) {
+                    response.put("success", false);
+                    response.put("message", "Xung đột lịch! Đã có đơn đặt phòng khác được duyệt trong thời gian này.");
+                    return ResponseEntity.badRequest().body(response);
+                }
+
                 Booking booking = new Booking();
                 booking.setUser(user);
                 booking.setStatus(status);
@@ -202,10 +285,10 @@ public class BookingApiController {
                 detail.setTotalHours(totalHours);
                 bookingDetailRepository.save(detail);
 
-                room.setStatus("booked");
-                roomRepository.save(room);
+                // KHÔNG CẬP NHẬT TRẠNG THÁI BOOKED VẬT LÝ, HỆ THỐNG DÙNG DATE OVERLAP
             }
             response.put("success", true);
+            response.put("message", "Đã lưu đơn đặt phòng.");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);

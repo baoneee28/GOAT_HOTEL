@@ -49,3 +49,5 @@ bin/
 *.zip
 *.tar.gz
 *.rar
+backend/target/
+frontend/dist/

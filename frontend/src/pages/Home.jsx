@@ -20,6 +20,10 @@ export default function Home() {
   const [isFading, setIsFading] = useState(false);
   const [aboutContent, setAboutContent] = useState('');
 
+  const normalizeFeaturedNews = (items) => {
+    return (items || []).map((entry) => entry?.news || entry).filter(Boolean);
+  };
+
   const handleNextNews = () => {
     if (featuredNews.length <= 1 || isFading) return; // Ngăn chặn spam-click khi đang chuyển slide
     setIsFading(true);
@@ -48,6 +52,7 @@ export default function Home() {
         setFeaturedRooms(res.data.featured_rooms || []);
         setActiveBooking(res.data.active_booking || null);
         if (res.data.slider_images) setSliderImages(res.data.slider_images);
+        setFeaturedNews(normalizeFeaturedNews(res.data.featured_news));
       } catch (error) {
         console.error("Error fetching home data:", error);
       }
@@ -59,18 +64,6 @@ export default function Home() {
       .then(res => setAboutContent(res.data.content))
       .catch(err => console.error("Error fetching description:", err));
 
-    // Fetch tin tức nổi bật từ API
-    axios.get(`${API_BASE}/api/news`, { withCredentials: true })
-      .then(res => {
-        const allNews = res.data || [];
-        // Lấy 3 bài đầu tiên làm featured
-        setFeaturedNews(allNews.slice(0, 3));
-      })
-      .catch(err => {
-        console.error("Error fetching news:", err);
-        // Fallback: nếu API fail, hiển thị placeholder
-        setFeaturedNews([]);
-      });
   }, []);
 
   const goToRoom = (room) => {
@@ -90,7 +83,7 @@ export default function Home() {
     e.preventDefault();
     closeModal();
     if(window.Swal) window.Swal.fire({ icon: 'success', title: 'Đã nhận yêu cầu', text: 'Chuyển sang trang đặt phòng...', timer: 1500, showConfirmButton: false });
-    setTimeout(() => { navigate('/collections'); }, 1500);
+    setTimeout(() => { navigate('/collections', { state: { checkIn, checkOut } }); }, 1500);
   };
 
   const bgImageUrl = featuredNews[currentNewsIndex]?.image
@@ -114,10 +107,10 @@ export default function Home() {
         <div className="absolute inset-0 z-10 pointer-events-none bg-gradient-to-tr from-primary via-primary/20 to-transparent"></div>
         <div className="relative z-20 h-full flex items-center px-12 md:px-24">
           <div 
-             className={`max-w-2xl glass p-10 rounded-xl border border-white/10 shadow-2xl transition-all duration-500 ease-in-out cursor-pointer hover:bg-white/5 hover:border-white/20 hover:shadow-[0_20px_50px_rgba(0,0,0,0.5)] ${isFading ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+               className={`max-w-2xl glass p-10 rounded-xl border border-white/10 shadow-2xl transition-all duration-500 ease-in-out cursor-pointer hover:bg-white/5 hover:border-white/20 hover:shadow-[0_20px_50px_rgba(0,0,0,0.5)] ${isFading ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
              onClick={() => {
                const news = featuredNews[currentNewsIndex];
-               if (news) navigate(`/news/${news.slug || news.id}`);
+               if (news) navigate(`/news/${news.id}`);
              }}
           >
             <span className="label-md font-sans uppercase tracking-[0.2em] text-secondary mb-4 block">Tin nổi bật</span>
@@ -134,7 +127,7 @@ export default function Home() {
                 onClick={(e) => {
                   e.stopPropagation();
                   const news = featuredNews[currentNewsIndex];
-                  if (news) navigate(`/news/${news.slug || news.id}`);
+                  if (news) navigate(`/news/${news.id}`);
                 }}
               >
                 Xem chi tiết

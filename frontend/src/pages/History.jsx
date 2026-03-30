@@ -56,7 +56,7 @@ export default function History() {
     if (!currentUserId) return;
     setLoading(true);
     try {
-      const params = new URLSearchParams({ userId: currentUserId, page: pg });
+      const params = new URLSearchParams({ page: pg });
       if (filter !== 'all') params.append('status', filter);
       const res = await axios.get(`${API_BASE}/api/bookings/history?${params}`, { withCredentials: true });
       setBookings(res.data?.bookings || []);

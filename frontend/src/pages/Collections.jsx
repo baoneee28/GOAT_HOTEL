@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import API_BASE from '../config';
 import bookingImage from '../assets/booking_images_1.jpg';
 import HeroHeader from '../components/HeroHeader';
@@ -22,6 +22,7 @@ const getRoomAmenities = (room) => {
 
 export default function Collections() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [originalRooms, setOriginalRooms] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,37 +86,31 @@ export default function Collections() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [lastScrollY]);
 
-  useEffect(() => {
-    axios.get(`${API_BASE}/api/room-types`, { withCredentials: true })
+  const fetchRooms = (inDate, outDate) => {
+    setLoading(true);
+    let url = `${API_BASE}/api/room-types`;
+    if (inDate && outDate) {
+      url += `?checkIn=${inDate}&checkOut=${outDate}`;
+    }
+    axios.get(url, { withCredentials: true })
       .then(res => { 
         setOriginalRooms(res.data);
-        setRooms(res.data); 
+        setRooms(res.data);
+        // Ngay sau khi load xong lần đầu, nếu muốn filter ngay thì gọi ở applyFilters
         setLoading(false); 
       })
       .catch(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    const stateCheckIn = location.state?.checkIn || getToday();
+    const stateCheckOut = location.state?.checkOut || getTomorrow();
+    setCheckIn(stateCheckIn);
+    setCheckOut(stateCheckOut);
+    fetchRooms(stateCheckIn, stateCheckOut);
   }, []);
 
   const handleApplyFilters = () => {
-    const scrollY = window.scrollY;
-    let filtered = [...originalRooms];
-
-    filtered = filtered.filter(r => (r.pricePerNight || 0) <= maxPrice);
-    filtered = filtered.filter(r => (r.capacity || 2) >= guests);
-    
-    if (selectedAmenities.length > 0) {
-      filtered = filtered.filter(r => {
-        const roomAmns = getRoomAmenities(r);
-        return selectedAmenities.every(a => roomAmns.includes(a));
-      });
-    }
-    
-    setRooms(filtered);
-    // Giữ nguyên vị trí scroll sau khi filter để sidebar không nhảy
-    requestAnimationFrame(() => window.scrollTo(0, scrollY));
-    showToast(filtered.length > 0 ? `Tìm thấy ${filtered.length} phòng phù hợp` : 'Không có phòng nào khớp bộ lọc', filtered.length > 0 ? 'done' : 'hotel');
-  };
-
-  const handleSearch = () => {
     const today = getToday();
     if (checkIn < today) {
       triggerShake('checkIn');
@@ -127,7 +122,39 @@ export default function Collections() {
       showToast('Ngày trả phòng phải sau ngày nhận phòng.', 'calendar_today');
       return;
     }
-    // TODO: gọi API lọc phòng trống theo checkIn/checkOut
+
+    const scrollY = window.scrollY;
+    setLoading(true);
+    let url = `${API_BASE}/api/room-types?checkIn=${checkIn}&checkOut=${checkOut}`;
+    
+    axios.get(url, { withCredentials: true })
+      .then(res => {
+        setOriginalRooms(res.data);
+        let filtered = [...res.data];
+        filtered = filtered.filter(r => (r.pricePerNight || 0) <= maxPrice);
+        filtered = filtered.filter(r => (r.capacity || 2) >= guests);
+        
+        if (selectedAmenities.length > 0) {
+          filtered = filtered.filter(r => {
+            const roomAmns = getRoomAmenities(r);
+            return selectedAmenities.every(a => roomAmns.includes(a));
+          });
+        }
+        
+        setRooms(filtered);
+        setLoading(false);
+        requestAnimationFrame(() => window.scrollTo(0, scrollY));
+        
+        const availableTypesCount = filtered.filter(r => r.availableCount > 0).length;
+        if (availableTypesCount > 0) {
+           showToast(`Tìm thấy ${availableTypesCount} hạng phòng khả dụng`, 'done');
+        } else if (filtered.length > 0) {
+           showToast(`Phù hợp bộ lọc nhưng tất cả đã hết phòng trống.`, 'event_busy');
+        } else {
+           showToast('Không có hạng phòng nào khớp bộ lọc', 'search_off');
+        }
+      })
+      .catch(() => setLoading(false));
   };
 
   const capacityIcon = (cap) => cap >= 4 ? 'group' : 'person';
@@ -199,6 +226,34 @@ export default function Collections() {
 
             {/* Filter Body — scrollable khi viewport thấp */}
             <div className="px-5 py-5 flex flex-col gap-5 overflow-y-auto flex-1">
+
+              {/* Date Filter */}
+              <section className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-secondary flex items-center justify-between">
+                    Nhận phòng <span className="material-symbols-outlined text-[14px]">calendar_today</span>
+                  </label>
+                  <input 
+                    type="date" 
+                    value={checkIn}
+                    onChange={(e) => setCheckIn(e.target.value)}
+                    className={`text-xs p-2 rounded-lg bg-surface-container border ${shakeField === 'checkIn' ? 'border-red-500 field-shake' : 'border-outline-variant/30 focus:border-secondary'} focus:ring-0 outline-none`}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-secondary flex items-center justify-between">
+                    Trả phòng <span className="material-symbols-outlined text-[14px]">event_available</span>
+                  </label>
+                  <input 
+                    type="date" 
+                    value={checkOut}
+                    onChange={(e) => setCheckOut(e.target.value)}
+                    className={`text-xs p-2 rounded-lg bg-surface-container border ${shakeField === 'checkOut' ? 'border-red-500 field-shake' : 'border-outline-variant/30 focus:border-secondary'} focus:ring-0 outline-none`}
+                  />
+                </div>
+              </section>
+
+              <div className="h-px bg-outline-variant/15" />
 
               {/* Price */}
               <section>
@@ -290,49 +345,65 @@ export default function Collections() {
               </button>
             </div>
           )}
-          {rooms.map((room) => (
-            <article key={room.id} className="flex flex-col lg:flex-row bg-surface-container-lowest overflow-hidden group hover:shadow-2xl transition-all duration-500 border-l-4 border-transparent hover:border-secondary">
-              <div className="lg:w-[34%] relative overflow-hidden h-56 lg:h-auto">
-                <img
-                  alt={room.typeName}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                  src={room.image || 'https://via.placeholder.com/600x400?text=No+Image'}
-                />
-                <div className="absolute inset-0 bg-primary/10 group-hover:bg-transparent transition-colors"></div>
-              </div>
-              <div className="lg:w-[66%] p-8 flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-4">
-                    <h2 className="font-headline text-2xl text-primary tracking-tight">{room.typeName}</h2>
-                    <div className="flex items-center gap-1 text-secondary">
-                      <span className="material-symbols-outlined text-sm">{capacityIcon(room.capacity)}</span>
-                      <span className="text-[10px] font-bold tracking-widest uppercase">{room.capacity} Người</span>
+            {rooms.map((room) => {
+              const outOfRooms = room.availableCount === 0;
+              return (
+              <article key={room.id} className={`flex flex-col lg:flex-row bg-surface-container-lowest overflow-hidden group hover:shadow-2xl transition-all duration-500 border-l-4 border-transparent ${outOfRooms ? 'opacity-60 grayscale border-slate-300' : 'hover:border-secondary'}`}>
+                <div className="lg:w-[34%] relative overflow-hidden h-56 lg:h-auto">
+                  <img
+                    alt={room.typeName}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    src={room.image || 'https://via.placeholder.com/600x400?text=No+Image'}
+                  />
+                  <div className="absolute inset-0 bg-primary/10 group-hover:bg-transparent transition-colors"></div>
+                  {outOfRooms && (
+                    <div className="absolute top-4 left-4 bg-red-600/90 backdrop-blur-sm text-white px-3 py-1 text-[9px] uppercase tracking-widest font-bold rounded-full shadow-lg">
+                      Hết phòng giai đoạn này
+                    </div>
+                  )}
+                </div>
+                <div className="lg:w-[66%] p-8 flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <h2 className={`font-headline text-2xl tracking-tight ${outOfRooms ? 'text-slate-500 line-through decoration-red-500/50' : 'text-primary'}`}>{room.typeName}</h2>
+                      <div className="flex items-center gap-1 text-secondary">
+                        <span className="material-symbols-outlined text-sm">{capacityIcon(room.capacity)}</span>
+                        <span className="text-[10px] font-bold tracking-widest uppercase">{room.capacity} Người</span>
+                      </div>
+                    </div>
+                    <p className="text-on-surface-variant text-sm leading-relaxed mb-6 font-light italic">{room.description}</p>
+                    <div className="flex flex-wrap gap-2 mb-8">
+                      {getRoomAmenities(room).slice(0, 5).map((label, idx) => (
+                        <span key={idx} className="px-3 py-1 bg-surface-container-low text-[9px] uppercase tracking-widest font-bold text-on-surface-variant border border-outline-variant/20">
+                          {label}
+                        </span>
+                      ))}
                     </div>
                   </div>
-                  <p className="text-on-surface-variant text-sm leading-relaxed mb-6 font-light italic">{room.description}</p>
-                  <div className="flex flex-wrap gap-2 mb-8">
-                    {getRoomAmenities(room).slice(0, 5).map((label, idx) => (
-                      <span key={idx} className="px-3 py-1 bg-surface-container-low text-[9px] uppercase tracking-widest font-bold text-on-surface-variant border border-outline-variant/20">
-                        {label}
-                      </span>
-                    ))}
-                  </div>
-                </div>
                 <div className="flex items-center justify-between pt-6 border-t border-outline-variant/10">
                   <div className="flex flex-col">
                     <span className="text-[10px] uppercase tracking-widest text-outline">Bắt đầu từ</span>
                     <span className="text-2xl font-headline text-primary">{room.pricePerNight?.toLocaleString('vi-VN')}đ <span className="text-xs">/ ĐÊM</span></span>
                   </div>
                   <button
-                    className="bg-secondary text-white px-8 py-4 font-bold tracking-widest uppercase text-[10px] hover:bg-[#5d4201] transition-all"
-                    onClick={() => navigate(`/rooms/${room.id}`, { state: room })}
+                    disabled={outOfRooms}
+                    className={`${outOfRooms ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-secondary text-white hover:bg-[#5d4201]'} px-8 py-4 font-bold tracking-widest uppercase text-[10px]  transition-all`}
+                    onClick={() => {
+                      const query = new URLSearchParams({
+                        checkIn,
+                        checkOut,
+                        guests: String(guests),
+                      }).toString();
+                      navigate(`/rooms/${room.id}?${query}`, { state: { room, checkIn, checkOut, guests } });
+                    }}
                   >
-                    CHỌN PHÒNG
+                    {outOfRooms ? 'KHÔNG KẾT QUẢ' : 'CHỌN PHÒNG'}
                   </button>
                 </div>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       </main>
     </>

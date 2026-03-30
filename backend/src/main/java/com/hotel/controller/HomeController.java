@@ -44,9 +44,9 @@ public class HomeController {
 
         // Trả về danh sách URL của ảnh slider từ backend
         List<String> sliderImages = Arrays.asList(
-                "http://localhost:8080/images/Featured_news/news_featured_1.jpg",
-                "http://localhost:8080/images/Featured_news/news_featured_2.jpg",
-                "http://localhost:8080/images/Featured_news/news_featured_3.jpg");
+                "/images/Featured_news/news_featured_1.jpg",
+                "/images/Featured_news/news_featured_2.jpg",
+                "/images/Featured_news/news_featured_3.jpg");
         response.put("slider_images", sliderImages);
 
         return ResponseEntity.ok(response);

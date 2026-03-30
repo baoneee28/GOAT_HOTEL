@@ -14,4 +14,11 @@ public interface RoomTypeRepository extends JpaRepository<RoomType, Integer> {
 
     @Query("SELECT t FROM RoomType t WHERE :search IS NULL OR :search = '' OR t.typeName LIKE %:search%")
     Page<RoomType> findWithSearch(@Param("search") String search, Pageable pageable);
+
+    @Query("SELECT r.roomType.id, COUNT(r) FROM Room r WHERE r.status != 'maintenance' AND r.id NOT IN " +
+           "(SELECT bd.room.id FROM BookingDetail bd JOIN bd.booking b " +
+           "WHERE b.status IN ('pending', 'confirmed') AND (bd.checkIn < :checkOut AND bd.checkOut > :checkIn)) " +
+           "GROUP BY r.roomType.id")
+    java.util.List<Object[]> countAvailableRoomsByDate(@Param("checkIn") java.time.LocalDateTime checkIn, 
+                                             @Param("checkOut") java.time.LocalDateTime checkOut);
 }

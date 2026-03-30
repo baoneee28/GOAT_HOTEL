@@ -48,9 +48,9 @@ export default function OrderDetail() {
 
   React.useEffect(() => {
     if (!booking && id) {
-      axios.get(`${API_BASE}/api/admin/bookings/${id}`, { withCredentials: true })
+      axios.get(`${API_BASE}/api/bookings/${id}`, { withCredentials: true })
         .then(res => {
-          if (res.data) setBooking(res.data);
+          if (res.data?.booking) setBooking(res.data.booking);
         })
         .catch(err => {
           console.error('Không thể tải chi tiết booking:', err);
@@ -84,16 +84,14 @@ export default function OrderDetail() {
   const nights = calcNights(detail?.totalHours);
   const pricePerNight = detail?.priceAtBooking ?? 0;
   const baseTotal = pricePerNight * nights;
-  const serviceFee = booking.serviceFee || 0;
-  const tax = booking.tax || 0;
-  const totalFees = serviceFee + tax;
-  const grandTotal = booking.totalAmount || (baseTotal + totalFees);
+  const totalFees = 0;
+  const grandTotal = booking.totalPrice ?? baseTotal;
 
   const handleCancel = async () => {
     if (!window.confirm('Bạn có chắc muốn hủy đơn này?')) return;
     setCancelling(true);
     try {
-      const res = await axios.delete(`${API_BASE}/api/bookings/${booking.id}?userId=${booking.user?.id || 1}`, { withCredentials: true });
+      const res = await axios.delete(`${API_BASE}/api/bookings/${booking.id}`, { withCredentials: true });
       if (res.data?.success) {
         if (window.Swal) window.Swal.fire({ icon: 'success', title: 'Đã hủy đơn', showConfirmButton: false, timer: 1500 });
         navigate('/history');

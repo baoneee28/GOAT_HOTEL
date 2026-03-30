@@ -89,6 +89,12 @@ public class BookingService {
         Optional<Room> roomOpt = roomRepository.findById(roomId);
         if (roomOpt.isEmpty()) return "Phòng không tồn tại!";
 
+        // Check date overlap
+        long overlapCount = bookingRepository.countOverlappingBookings(roomId, checkIn, checkOut);
+        if (overlapCount > 0) {
+            return "Phòng đã có người đặt trong thời gian này!";
+        }
+
         Room room = roomOpt.get();
         double pricePerHour = room.getRoomType().getPricePerNight();
 
@@ -110,9 +116,6 @@ public class BookingService {
         detail.setTotalHours(totalHours);
         bookingDetailRepository.save(detail);
 
-        room.setStatus("booked");
-        roomRepository.save(room);
-
         return null;
     }
 
@@ -128,15 +131,6 @@ public class BookingService {
         booking.setStatus("cancelled");
         bookingRepository.save(booking);
 
-        if(booking.getDetails() != null) {
-            for(BookingDetail detail : booking.getDetails()){
-                Room room = detail.getRoom();
-                if(room != null){
-                    room.setStatus("available");
-                    roomRepository.save(room);
-                }
-            }
-        }
         return true;
     }
 

@@ -4,6 +4,17 @@ import axios from 'axios';
 import API_BASE, { imageUrl } from '../config';
 import HeroHeader from '../components/HeroHeader';
 
+function formatDate(dateValue) {
+  if (!dateValue) return '';
+  if (Array.isArray(dateValue)) {
+    const [year, month, day] = dateValue;
+    return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+  }
+  const parsed = new Date(dateValue);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleDateString('vi-VN');
+}
+
 export default function NewsDetail() {
   const { id } = useParams(); // URL path /news/:id
   const navigate = useNavigate();
@@ -44,7 +55,7 @@ export default function NewsDetail() {
       <div className="w-full bg-surface pt-12 pb-4 px-8 md:px-16 text-center">
         <div className="max-w-4xl mx-auto">
           <p className="font-label uppercase tracking-[0.3em] text-secondary text-xs mb-4">
-            {news.categoryName} <span className="text-on-surface-variant ml-2 opacity-60">• {news.publishDate}</span>
+            {news.categoryName || 'GOAT HOTEL Editorial'} <span className="text-on-surface-variant ml-2 opacity-60">• {news.publishDate || formatDate(news.createdAt)}</span>
           </p>
           <h1 className="font-headline text-primary text-4xl md:text-5xl lg:text-6xl leading-tight tracking-tight">
             {news.title}
@@ -90,8 +101,8 @@ export default function NewsDetail() {
           {/* Signature / Author */}
           <div className="mt-16 pt-8 border-t border-outline-variant/30 flex items-center justify-between">
             <div>
-              <p className="font-label uppercase tracking-widest text-xs text-secondary">Người viết</p>
-              <p className="font-headline text-lg mt-1">Ban Biên Tập GOAT Hotel</p>
+            <p className="font-label uppercase tracking-widest text-xs text-secondary">Người viết</p>
+            <p className="font-headline text-lg mt-1">Ban Biên Tập GOAT Hotel</p>
             </div>
             <div className="flex gap-4">
               {/* Share actions */}
@@ -131,7 +142,7 @@ export default function NewsDetail() {
                   </div>
                   <div className="flex flex-col gap-2">
                     <p className="font-label uppercase tracking-[0.15em] text-secondary text-[9px]">
-                      {item.categoryName} <span className="opacity-50 ml-1">• {item.publishDate}</span>
+                      {item.categoryName || 'Editorial'} <span className="opacity-50 ml-1">• {item.publishDate || formatDate(item.createdAt)}</span>
                     </p>
                     <h4 className="font-headline text-on-surface text-[15px] leading-snug group-hover:text-secondary transition-colors line-clamp-2">
                       {item.title}

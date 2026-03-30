@@ -17,6 +17,12 @@ public interface RoomRepository extends JpaRepository<Room, Integer> {
 
     List<Room> findByRoomTypeIdAndStatusOrderByRoomNumberAsc(Integer typeId, String status);
 
+    @Query("SELECT r FROM Room r WHERE r.roomType.id = :typeId AND r.status != 'maintenance' AND r.id NOT IN " +
+           "(SELECT bd.room.id FROM BookingDetail bd JOIN bd.booking b " +
+           "WHERE b.status IN ('pending', 'confirmed') AND (bd.checkIn < :checkOut AND bd.checkOut > :checkIn))")
+    List<Room> findAvailableRoomsByDate(@Param("typeId") Integer typeId, 
+                                        @Param("checkIn") java.time.LocalDateTime checkIn, 
+                                        @Param("checkOut") java.time.LocalDateTime checkOut);
 
     List<Room> findByStatus(String status);
 

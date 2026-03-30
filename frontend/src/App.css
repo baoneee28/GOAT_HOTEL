@@ -91,8 +91,8 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg-
    ========================================== */
 .auth-container { min-height: calc(100vh - 80px); background-color: #f8faff; display: flex; align-items: center; justify-content: center; padding: 40px 0; }
 .auth-card { background: #fff; border-radius: 30px; box-shadow: 0 20px 60px rgba(0,0,0,0.08); overflow: hidden; width: 1000px; max-width: 95%; display: flex; min-height: 600px; }
-.auth-banner { flex: 1; background: linear-gradient(135deg, rgba(78, 49, 170, 0.9), rgba(139, 92, 246, 0.9)), url('https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=2070&auto=format&fit=crop') center/cover; color: white; padding: 60px; display: flex; flex-direction: column; justify-content: center; position: relative; }
-.auth-banner::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: url('https://www.transparenttextures.com/patterns/cubes.png'); opacity: 0.1; }
+.auth-banner { flex: 1; background: linear-gradient(135deg, rgba(78, 49, 170, 0.9), rgba(139, 92, 246, 0.9)), url('/images/home/hero_slider_3.jpg') center/cover; color: white; padding: 60px; display: flex; flex-direction: column; justify-content: center; position: relative; }
+.auth-banner::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at top right, rgba(255,255,255,0.12), transparent 40%), radial-gradient(circle at bottom left, rgba(255,255,255,0.08), transparent 35%); opacity: 0.8; }
 .auth-form-wrapper { flex: 1; padding: 60px; display: flex; flex-direction: column; justify-content: center; background: #fff; }
 .nav-auth { display: flex; background: #f1f5f9; padding: 5px; border-radius: 50px; margin-bottom: 40px; width: fit-content; margin-left: auto; margin-right: auto; }
 .nav-auth .nav-link { border-radius: 50px; padding: 10px 40px !important; color: #64748b !important; font-weight: 700; transition: 0.3s; border: none; cursor: pointer; }

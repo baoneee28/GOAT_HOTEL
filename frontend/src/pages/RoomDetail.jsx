@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE, { imageUrl } from '../config';
 import HeroHeader from '../components/HeroHeader';
@@ -45,13 +45,15 @@ export default function RoomDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const [room, setRoom] = useState(location.state || null);
+  const [searchParams] = useSearchParams();
+  const initialStateRoom = location.state?.room ? location.state.room : (location.state?.id ? location.state : null);
+  const [room, setRoom] = useState(initialStateRoom);
   const [activeImg, setActiveImg] = useState(0);
 
   const [formData, setFormData] = useState({
-    checkIn: new Date().toISOString().split('T')[0],
-    checkOut: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-    guests: 2
+    checkIn: location.state?.checkIn || searchParams.get('checkIn') || new Date().toISOString().split('T')[0],
+    checkOut: location.state?.checkOut || searchParams.get('checkOut') || new Date(Date.now() + 86400000).toISOString().split('T')[0],
+    guests: location.state?.guests || searchParams.get('guests') || 2
   });
 
   useEffect(() => {
@@ -74,17 +76,29 @@ export default function RoomDetail() {
     e.preventDefault();
     const ci = new Date(formData.checkIn);
     const co = new Date(formData.checkOut);
+    const guests = Number(formData.guests);
     if(ci >= co) {
         if(window.Swal) window.Swal.fire('Lỗi', 'Ngày trả phòng phải sau ngày nhận phòng', 'warning');
         else alert('Ngày trả không hợp lệ');
         return;
     }
+    if (guests > (room.capacity || 2)) {
+        if(window.Swal) window.Swal.fire('Lỗi', `Hạng phòng này chỉ phù hợp tối đa ${room.capacity || 2} khách.`, 'warning');
+        else alert('Số khách vượt quá sức chứa phòng');
+        return;
+    }
+    const query = new URLSearchParams({
+      checkIn: formData.checkIn,
+      checkOut: formData.checkOut,
+      guests: String(guests),
+    }).toString();
     navigate(`/rooms/${id}/available`, { 
+      search: `?${query}`,
       state: { 
         roomData: room,
         checkIn: formData.checkIn,
         checkOut: formData.checkOut,
-        guests: formData.guests
+        guests
       } 
     });
   };

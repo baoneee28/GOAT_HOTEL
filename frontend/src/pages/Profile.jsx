@@ -34,7 +34,7 @@ export default function Profile() {
     fetchProfile();
 
     // Fetch recent bookings
-    axios.get(`${API_BASE}/api/bookings/history?userId=${currentUserId}&page=1`, { withCredentials: true })
+    axios.get(`${API_BASE}/api/bookings/history?page=1`, { withCredentials: true })
       .then(res => setRecentBookings((res.data?.bookings || []).slice(0, 2)))
       .catch(() => {});
   }, [currentUserId]);
@@ -59,7 +59,7 @@ export default function Profile() {
   };
 
   const getAvatarUrl = (url) => {
-    return imageUrl(url, '/images/rooms/standard-room.jpg');
+    return imageUrl(url, '/images/default_avatar.png');
   };
 
   if (loading) {
@@ -73,7 +73,7 @@ export default function Profile() {
   return (
     <div className="bg-surface font-body text-on-surface min-h-screen">
       <style>{`
-        .hero-gradient { background: linear-gradient(135deg, #000614 0%, #001f41 100%); }
+        .hero-gradient { background: linear-gradient(135deg, rgba(0, 6, 20, 0.76) 0%, rgba(0, 31, 65, 0.58) 100%); }
         .glass-card { background: rgba(255,255,255,0.7); backdrop-filter: blur(20px); border: 1px solid rgba(196,198,207,0.2); }
         input:focus + label, input:not(:placeholder-shown) + label {
           transform: translateY(-1.5rem) scale(0.85); color: #775a19;
@@ -82,13 +82,14 @@ export default function Profile() {
 
       {/* Hero Section */}
       <section className="hero-gradient relative py-32 px-12 overflow-hidden">
-        <div className="absolute inset-0 opacity-30 mix-blend-overlay">
+        <div className="absolute inset-0 opacity-55">
           <img
             alt="Sovereign ambiance"
             className="w-full h-full object-cover"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuCkzqUcwJwThy2XUO4RWs307igqJkBIgKZJMgcSDeCzdNgGhgCV6ZMo5cVq0EkjDK2q1AjOGXt0vTIwg2AFHpFMSAM3rHaN6Yzy744PDbObAJsvaZ4jWL1iWem0kKSUBY9mAdk4OsvrSLVTtUZQ6EYLXQAE1jJPv7j-d8pRFzTrezCCY5YJUP-l1sViEOW9tF68V-AxGsTme2i5ckEaz0tVjAN4rXzhVH1hM61-7ZhguVBKVdyrVXUqJexWF7FgMlzx54urR0TV1pw"
+            src={imageUrl('/images/home/profile_hero.jpg')}
           />
         </div>
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/70 via-primary/35 to-transparent"></div>
         <div className="relative z-10 max-w-6xl mx-auto">
           <p className="text-secondary font-label text-[0.75rem] uppercase tracking-[0.3em] mb-4">ĐẶC QUYỀN KHÁCH HÀNG</p>
           <h1 className="font-headline text-5xl md:text-[3.5rem] text-white leading-tight -tracking-[0.02em] mb-6">
@@ -107,6 +108,21 @@ export default function Profile() {
 
             {/* Personal Info */}
             <div className="space-y-8">
+              <div className="flex flex-col items-center text-center gap-4 pb-2">
+                <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-[0_18px_40px_-18px_rgba(0,0,0,0.35)] bg-surface-container-high">
+                  <img
+                    src={getAvatarUrl(user?.image)}
+                    alt={user?.fullName || 'Avatar người dùng'}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div>
+                  <p className="font-headline text-xl text-primary">{user?.fullName || 'Khách hàng GOAT HOTEL'}</p>
+                  <p className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-on-surface-variant mt-1">
+                    {user?.email || 'Thành viên'}
+                  </p>
+                </div>
+              </div>
               <div className="flex items-center justify-between border-b border-outline-variant/20 pb-4">
                 <h2 className="font-headline text-2xl text-primary">Thông tin Cá nhân</h2>
                 <button

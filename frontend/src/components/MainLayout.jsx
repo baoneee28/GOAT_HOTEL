@@ -14,9 +14,14 @@ export default function MainLayout() {
       .then((res) => {
         if (res.data.user_logged_in) {
           setUser(res.data.user_logged_in);
+        } else {
+          setUser(null);
         }
       })
-      .catch((err) => console.error(err));
+      .catch((err) => {
+        setUser(null);
+        console.error(err);
+      });
   }, []);
 
   const handleLogout = async () => {

@@ -61,4 +61,19 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT COUNT(b) FROM Booking b " +
            "WHERE (:status IS NULL OR :status = '' OR b.status = :status)")
     long countAdminBookings(@Param("status") String status);
+
+    @Query("SELECT COUNT(b) FROM BookingDetail bd JOIN bd.booking b " +
+           "WHERE bd.room.id = :roomId AND b.status IN ('pending', 'confirmed') " +
+           "AND bd.checkIn < :checkOut AND bd.checkOut > :checkIn")
+    long countOverlappingBookings(@Param("roomId") Integer roomId, 
+                                  @Param("checkIn") java.time.LocalDateTime checkIn, 
+                                  @Param("checkOut") java.time.LocalDateTime checkOut);
+
+    @Query("SELECT COUNT(b) FROM BookingDetail bd JOIN bd.booking b " +
+           "WHERE bd.room.id = :roomId AND b.id != :excludeBookingId AND b.status IN ('pending', 'confirmed') " +
+           "AND bd.checkIn < :checkOut AND bd.checkOut > :checkIn")
+    long countOverlappingBookingsExcept(@Param("roomId") Integer roomId, 
+                                        @Param("checkIn") java.time.LocalDateTime checkIn, 
+                                        @Param("checkOut") java.time.LocalDateTime checkOut,
+                                        @Param("excludeBookingId") Integer excludeBookingId);
 }

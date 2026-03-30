@@ -28,14 +28,36 @@ public class RoomApiController {
     }
 
     // Lấy danh sách phòng lọc theo Loại phòng — mặc định chỉ trả phòng "available"
-    // Admin / internal: gọi ?status=all để lấy tất cả
+    // Nếu truyền checkIn và checkOut sẽ tính trùng lịch, Admin/internal gán ?status=all
     @GetMapping("/type/{typeId}")
     public List<Room> getRoomsByType(
             @PathVariable("typeId") Integer typeId,
-            @RequestParam(defaultValue = "available") String status) {
+            @RequestParam(value = "status", defaultValue = "available") String status,
+            @RequestParam(value = "checkIn", required = false) String checkIn,
+            @RequestParam(value = "checkOut", required = false) String checkOut) {
+        
         if ("all".equalsIgnoreCase(status)) {
             return roomRepository.findByRoomTypeIdOrderByRoomNumberAsc(typeId);
         }
+
+        if (checkIn != null && !checkIn.isBlank() && checkOut != null && !checkOut.isBlank()) {
+            try {
+                java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+                String startStr = checkIn.contains("T") ? checkIn.replace("T", " ") : checkIn;
+                String endStr = checkOut.contains("T") ? checkOut.replace("T", " ") : checkOut;
+                if (startStr.length() == 10) startStr += " 12:00";
+                if (endStr.length() == 10) endStr += " 12:00";
+                
+                java.time.LocalDateTime start = java.time.LocalDateTime.parse(startStr, formatter);
+                java.time.LocalDateTime end = java.time.LocalDateTime.parse(endStr, formatter);
+                
+                return roomRepository.findAvailableRoomsByDate(typeId, start, end);
+            } catch (Exception e) {
+                // Ignore parse error, fallback to normal status check
+                e.printStackTrace();
+            }
+        }
+
         return roomRepository.findByRoomTypeIdAndStatusOrderByRoomNumberAsc(typeId, status);
     }
 

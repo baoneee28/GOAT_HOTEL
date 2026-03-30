@@ -3,7 +3,9 @@ package com.hotel.controller.api;
 import com.hotel.entity.User;
 import com.hotel.repository.UserRepository;
 import com.hotel.service.FileUploadService;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,9 +24,36 @@ public class ProfileApiController {
     @Autowired
     private FileUploadService fileUploadService;
 
+    private User getSessionUser(HttpSession session) {
+        Object userObj = session.getAttribute("user");
+        return userObj instanceof User ? (User) userObj : null;
+    }
+
+    private ResponseEntity<Map<String, Object>> authRequiredResponse() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", "Vui lòng đăng nhập để tiếp tục.");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    }
+
+    private ResponseEntity<Map<String, Object>> forbiddenResponse() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", "Bạn không có quyền truy cập hồ sơ này.");
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
     // FE gọi API này để lấy cục data JSON của User lên form Đổi thông tin
     @GetMapping("/{userId}")
-    public ResponseEntity<Map<String, Object>> getProfile(@PathVariable("userId") Integer userId) {
+    public ResponseEntity<Map<String, Object>> getProfile(@PathVariable("userId") Integer userId, HttpSession session) {
+        User currentUser = getSessionUser(session);
+        if (currentUser == null) {
+            return authRequiredResponse();
+        }
+        if (!currentUser.getId().equals(userId)) {
+            return forbiddenResponse();
+        }
+
         User user = userRepository.findById(userId).orElse(null);
         Map<String, Object> response = new HashMap<>();
         if (user == null) {
@@ -43,7 +72,16 @@ public class ProfileApiController {
     @PostMapping("/{userId}")
     public ResponseEntity<Map<String, Object>> updateProfile(
             @PathVariable("userId") Integer userId,
-            @RequestBody Map<String, String> payload) {
+            @RequestBody Map<String, String> payload,
+            HttpSession session) {
+        User currentUser = getSessionUser(session);
+        if (currentUser == null) {
+            return authRequiredResponse();
+        }
+        if (!currentUser.getId().equals(userId)) {
+            return forbiddenResponse();
+        }
+
         User user = userRepository.findById(userId).orElse(null);
         Map<String, Object> response = new HashMap<>();
         if (user == null) {
@@ -71,8 +109,16 @@ public class ProfileApiController {
     @PostMapping("/{userId}/avatar")
     public ResponseEntity<Map<String, Object>> uploadAvatar(
             @PathVariable("userId") Integer userId,
-            @RequestParam("avatar") MultipartFile avatar) {
+            @RequestParam("avatar") MultipartFile avatar,
+            HttpSession session) {
         Map<String, Object> response = new HashMap<>();
+        User currentUser = getSessionUser(session);
+        if (currentUser == null) {
+            return authRequiredResponse();
+        }
+        if (!currentUser.getId().equals(userId)) {
+            return forbiddenResponse();
+        }
         try {
             String fileName = fileUploadService.uploadUserAvatar(avatar, userId);
             response.put("success", true);

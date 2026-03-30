@@ -3,6 +3,7 @@ package com.hotel.controller.api;
 import com.hotel.entity.News;
 import com.hotel.repository.NewsRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,7 +19,7 @@ public class NewsApiController {
     // Lấy tất cả tin tức
     @GetMapping
     public List<News> getAllNews() {
-        return newsRepository.findAll();
+        return newsRepository.findAllLatestFirst();
     }
 
     // Lấy top 4 tin mới nhất (dùng cho trang chủ)
@@ -28,9 +29,18 @@ public class NewsApiController {
     }
 
     // Lấy chi tiết tin tức theo ID
-    @GetMapping("/{id}")
-    public News getNewsById(@PathVariable("id") int id) {
-        return newsRepository.findById(id).orElse(null);
+    @GetMapping("/{idOrSlug}")
+    public ResponseEntity<News> getNewsByIdOrSlug(@PathVariable("idOrSlug") String idOrSlug) {
+        try {
+            Integer id = Integer.parseInt(idOrSlug);
+            return newsRepository.findById(id)
+                    .map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.notFound().build());
+        } catch (NumberFormatException ignored) {
+            return newsRepository.findBySlug(idOrSlug)
+                    .map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.notFound().build());
+        }
     }
 
     // ==========================================

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE, { imageUrl } from '../config';
 import HeroHeader from '../components/HeroHeader';
@@ -22,13 +22,16 @@ export default function AvailableRooms() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [roomData, setRoomData] = useState(location.state?.roomData || null);
-  const [checkIn] = useState(location.state?.checkIn || new Date().toISOString().split('T')[0]);
-  const [checkOut] = useState(location.state?.checkOut || (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; })());
-  const [guests] = useState(location.state?.guests || 2);
+  const [checkIn] = useState(location.state?.checkIn || searchParams.get('checkIn') || new Date().toISOString().split('T')[0]);
+  const [checkOut] = useState(location.state?.checkOut || searchParams.get('checkOut') || (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; })());
+  const [guests] = useState(location.state?.guests || searchParams.get('guests') || 2);
   const [availableRooms, setAvailableRooms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const resultsRef = React.useRef(null);
+  const hasAutoScrolledRef = React.useRef(false);
 
   const nights = calcNights(checkIn, checkOut);
 
@@ -42,22 +45,26 @@ export default function AvailableRooms() {
           setRoomData(typeRes.data);
         }
 
-        // Chỉ lấy phòng available (backend mặc định đã filter)
-        const res = await axios.get(`${API_BASE}/api/rooms/type/${id}`, { withCredentials: true });
+        // Cập nhật lấy phòng available theo ngày đã chọn
+        const res = await axios.get(`${API_BASE}/api/rooms/type/${id}?checkIn=${checkIn}&checkOut=${checkOut}`, { withCredentials: true });
 
         const baseCapacity = currentRoomData?.capacity || 2;
         const requestedGuests = parseInt(guests) || 1;
-        const actualCapacity = requestedGuests > baseCapacity ? (requestedGuests > 2 ? 4 : baseCapacity) : baseCapacity;
+        if (requestedGuests > baseCapacity) {
+          setAvailableRooms([]);
+          return;
+        }
+
         const actualRoomName = currentRoomData?.typeName || currentRoomData?.name || 'Standard Room';
-        const actualBeds = actualCapacity >= 4 ? '2 giường đôi' : (currentRoomData?.beds || '1 giường đôi');
-        const actualPrice = actualCapacity > baseCapacity ? 850000 : (currentRoomData?.pricePerNight || currentRoomData?.price || 350000);
+        const actualBeds = currentRoomData?.beds || (baseCapacity >= 4 ? '2 giường đôi' : '1 giường đôi');
+        const actualPrice = currentRoomData?.pricePerNight || currentRoomData?.price || 350000;
 
         const mapped = res.data.map(r => ({
           id: r.id,
           roomNumber: r.roomNumber,
-          status: (r.status || 'available').toLowerCase(),
+          status: (r.status || 'available').toLowerCase().trim(),
           price: actualPrice,
-          capacity: actualCapacity,
+          capacity: baseCapacity,
           beds: actualBeds,
           name: actualRoomName,
         }));
@@ -71,11 +78,33 @@ export default function AvailableRooms() {
       }
     };
     if (id) fetchRoomsAndType();
-  }, [id]);
+  }, [id, checkIn, checkOut, guests]);
+
+  useEffect(() => {
+    if (loading || hasAutoScrolledRef.current || !resultsRef.current) return;
+
+    const scrollTimer = window.setTimeout(() => {
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      hasAutoScrolledRef.current = true;
+    }, 150);
+
+    return () => window.clearTimeout(scrollTimer);
+  }, [loading]);
 
   const handleBook = (e, room) => {
     e.preventDefault();
+    const query = new URLSearchParams({
+      roomId: String(room.id || id),
+      physicalRoomNumber: room.roomNumber || '',
+      room: room.name || '',
+      pricePerNight: String(room.price || 0),
+      image: roomData?.image || roomData?.images?.[0] || '',
+      checkIn,
+      checkOut,
+      guests: String(guests),
+    }).toString();
     navigate('/booking/confirmation', {
+      search: `?${query}`,
       state: {
         roomId: room.id || id,
         physicalRoomNumber: room.roomNumber,
@@ -118,7 +147,7 @@ export default function AvailableRooms() {
         </div>
 
         {/* BREADCRUMB + TITLE */}
-        <div className="flex flex-col items-start gap-4 mb-8">
+        <div ref={resultsRef} className="flex flex-col items-start gap-4 mb-8 scroll-mt-28">
           <button
             onClick={() => navigate(-1)}
             className="inline-flex items-center gap-2 font-label uppercase tracking-widest text-xs text-on-surface-variant hover:text-secondary transition-colors"

@@ -1,7 +1,7 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import axios from 'axios';
-import API_BASE, { imageUrl } from '../config';
+import API_BASE, { calculateBookingDisplayTotal, calculateStayNights, imageUrl, uploadedImageUrl } from '../config';
 
 function formatDate(value) {
   if (!value) return 'Chưa cập nhật';
@@ -56,11 +56,12 @@ function getBookingCode(id) {
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user: sessionUser } = useOutletContext() || {};
-  const [user, setUser] = useState(null);
+  const { user: sessionUser, setUser } = useOutletContext() || {};
+  const [profileUser, setProfileUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({ fullName: '', email: '', phone: '' });
+  const profileInfoRef = useRef(null);
 
   const currentUserId = sessionUser?.id;
 
@@ -73,7 +74,7 @@ export default function Profile() {
         const res = await axios.get(`${API_BASE}/api/profile/${currentUserId}`, { withCredentials: true });
         if (res.data?.success) {
           const u = res.data.user;
-          setUser(u);
+          setProfileUser(u);
           setFormData({ fullName: u.fullName || '', email: u.email || '', phone: u.phone || '' });
         }
       } catch (err) {
@@ -99,7 +100,8 @@ export default function Profile() {
         phone: formData.phone,
       }, { withCredentials: true });
       if (res.data?.success) {
-        setUser(res.data.user);
+        setProfileUser(res.data.user);
+        setUser?.(res.data.user);
         setIsEditing(false);
         if (window.Swal) window.Swal.fire({ icon: 'success', title: 'Đã cập nhật', showConfirmButton: false, timer: 1500 });
       }
@@ -122,7 +124,7 @@ export default function Profile() {
     const pendingCount = recentBookings.filter((booking) => ['pending', 'confirmed'].includes((booking.status || '').toLowerCase())).length;
     const totalSpent = recentBookings
       .filter((booking) => (booking.status || '').toLowerCase() === 'completed')
-      .reduce((sum, booking) => sum + Number(booking.totalPrice || 0), 0);
+      .reduce((sum, booking) => sum + calculateBookingDisplayTotal(booking), 0);
 
     return { completedCount, pendingCount, totalSpent };
   }, [recentBookings]);
@@ -132,6 +134,11 @@ export default function Profile() {
     if (stats.completedCount >= 2) return 'Preferred Guest';
     return 'Classic Member';
   }, [stats.completedCount]);
+
+  const handleEditProfileClick = () => {
+    setIsEditing(true);
+    profileInfoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   if (loading) {
     return (
@@ -207,22 +214,22 @@ export default function Profile() {
               <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-5">
                   <div className="h-24 w-24 overflow-hidden rounded-[28px] border border-white/15 bg-white/10 shadow-[0_18px_42px_-28px_rgba(0,0,0,0.7)] sm:h-28 sm:w-28">
-                    <img src={getAvatarUrl(user?.image)} alt={user?.fullName || 'Avatar thành viên'} className="h-full w-full object-cover" />
+                    <img src={getAvatarUrl(profileUser?.image)} alt={profileUser?.fullName || 'Avatar thành viên'} className="h-full w-full object-cover" />
                   </div>
                   <div className="min-w-0">
                     <div className="inline-flex items-center rounded-full border border-secondary/25 bg-secondary/10 px-3 py-1 font-label text-[0.6rem] uppercase tracking-[0.28em] text-secondary">
                       {memberTier}
                     </div>
-                    <h2 className="mt-4 font-headline text-3xl leading-tight text-white sm:text-[2.2rem]">{user?.fullName || 'Khách hàng GOAT HOTEL'}</h2>
-                    <p className="mt-2 text-sm text-white/68">{user?.email || 'Thành viên đặc quyền'}</p>
-                    <p className="mt-1 text-sm text-white/58">{user?.phone || 'Chưa cập nhật số điện thoại'}</p>
+                    <h2 className="mt-4 font-headline text-3xl leading-tight text-white sm:text-[2.2rem]">{profileUser?.fullName || 'Khách hàng GOAT HOTEL'}</h2>
+                    <p className="mt-2 text-sm text-white/68">{profileUser?.email || 'Thành viên đặc quyền'}</p>
+                    <p className="mt-1 text-sm text-white/58">{profileUser?.phone || 'Chưa cập nhật số điện thoại'}</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:justify-end">
                   <button
                     type="button"
-                    onClick={() => setIsEditing(true)}
+                    onClick={handleEditProfileClick}
                     className="rounded-full border border-white/70 bg-white px-5 py-3 font-label text-[0.68rem] uppercase tracking-[0.24em] text-primary transition-all hover:bg-[#f7f0e4] hover:border-[#f7f0e4]"
                   >
                     Chỉnh sửa hồ sơ
@@ -261,18 +268,15 @@ export default function Profile() {
 
               <div className="mt-8 space-y-4">
                 <div className="rounded-[22px] border border-outline-variant/15 bg-white/75 p-4">
-                  <p className="font-label text-[0.62rem] uppercase tracking-[0.24em] text-on-surface-variant">Lần lưu trú gần nhất</p>
+                  <p className="font-label text-[0.62rem] uppercase tracking-[0.24em] text-on-surface-variant">Kỳ lưu trú tiếp theo</p>
                   <p className="mt-2 font-headline text-xl text-primary">{nextStay?.details?.[0]?.room?.roomType?.typeName || 'Chưa có kỳ lưu trú sắp tới'}</p>
                   <p className="mt-2 text-sm text-on-surface-variant">
                     {nextStay ? `${formatDate(nextStay.details?.[0]?.checkIn)} — ${formatDate(nextStay.details?.[0]?.checkOut)}` : 'Khám phá bộ sưu tập phòng để lên kế hoạch cho kỳ nghỉ tiếp theo.'}
                   </p>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <button type="button" onClick={() => setIsEditing(true)} className="rounded-full border border-primary/12 bg-primary px-5 py-3 font-label text-[0.68rem] uppercase tracking-[0.22em] text-on-primary transition-all hover:brightness-105">
-                    Chỉnh sửa
-                  </button>
-                  <button type="button" onClick={() => navigate('/history')} className="rounded-full border border-outline-variant/25 bg-transparent px-5 py-3 font-label text-[0.68rem] uppercase tracking-[0.22em] text-primary transition-all hover:border-secondary/40 hover:text-secondary">
+                <div>
+                  <button type="button" onClick={() => navigate('/history')} className="w-full rounded-full border border-outline-variant/25 bg-transparent px-5 py-3 font-label text-[0.68rem] uppercase tracking-[0.22em] text-primary transition-all hover:border-secondary/40 hover:text-secondary">
                     Xem lịch sử
                   </button>
                 </div>
@@ -283,7 +287,7 @@ export default function Profile() {
 
         <section className="mt-10 grid gap-8 xl:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.65fr)]">
           <div className="space-y-8">
-            <section className="profile-panel rounded-[30px] p-6 sm:p-8">
+            <section ref={profileInfoRef} className="profile-panel scroll-mt-32 rounded-[30px] p-6 sm:p-8">
               <div className="flex flex-col gap-4 border-b border-outline-variant/15 pb-6 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <p className="font-label text-[0.64rem] uppercase tracking-[0.28em] text-secondary">Tài khoản thành viên</p>
@@ -319,7 +323,7 @@ export default function Profile() {
                   </div>
                   <div>
                     <p className="font-label text-[0.62rem] uppercase tracking-[0.24em] text-on-surface-variant">Mã khách hàng</p>
-                    <p className="mt-2 font-headline text-xl text-primary">MEM-{String(user?.id || 0).padStart(4, '0')}</p>
+                    <p className="mt-2 font-headline text-xl text-primary">MEM-{String(profileUser?.id || 0).padStart(4, '0')}</p>
                   </div>
                 </div>
 
@@ -389,63 +393,65 @@ export default function Profile() {
                 const statusMeta = getStatusMeta(booking.status);
                 const roomTypeName = detail?.room?.roomType?.typeName || 'Phòng tiêu chuẩn';
                 const roomNumber = detail?.room?.roomNumber || 'N/A';
-                const imageSrc = imageUrl(detail?.room?.image);
+                const imageSrc = uploadedImageUrl(detail?.room?.roomType?.image, '/images/rooms/standard-room.jpg');
+                const stayNights = calculateStayNights(detail?.checkIn, detail?.checkOut);
+                const displayTotal = calculateBookingDisplayTotal(booking);
 
                 return (
-                  <article key={booking.id} className="group overflow-hidden rounded-[28px] border border-outline-variant/12 bg-white/80 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_-40px_rgba(15,23,42,0.45)]">
-                    <div className="grid gap-0 lg:grid-cols-[230px_minmax(0,1fr)]">
-                      <div className="relative min-h-[210px] overflow-hidden bg-surface-container-low">
+                  <article key={booking.id} className="group overflow-hidden rounded-[24px] border border-outline-variant/12 bg-white/80 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_-40px_rgba(15,23,42,0.45)]">
+                    <div className="grid gap-0 lg:grid-cols-[175px_minmax(0,1fr)]">
+                      <div className="relative min-h-[160px] overflow-hidden bg-surface-container-low lg:min-h-[100%]">
                         <img src={imageSrc} alt={roomTypeName} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-primary/75 to-transparent p-5">
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-primary/75 to-transparent p-4">
                           <p className="font-label text-[0.6rem] uppercase tracking-[0.24em] text-white/75">Booking code</p>
-                          <p className="mt-2 font-headline text-2xl text-white">{getBookingCode(booking.id)}</p>
+                          <p className="mt-1.5 font-headline text-xl text-white">{getBookingCode(booking.id)}</p>
                         </div>
                       </div>
 
-                      <div className="flex flex-col justify-between p-6 sm:p-7">
-                        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="flex flex-col justify-between p-4 sm:p-5">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                           <div>
                             <div className="inline-flex items-center gap-2 rounded-full bg-secondary/10 px-3 py-1 font-label text-[0.58rem] uppercase tracking-[0.24em] text-secondary">
                               {statusMeta.summary}
                             </div>
-                            <h3 className="mt-4 font-headline text-3xl leading-tight text-primary">{roomTypeName}</h3>
-                            <p className="mt-2 text-sm text-on-surface-variant">Phòng {roomNumber}</p>
+                            <h3 className="mt-3 font-headline text-[2rem] leading-tight text-primary lg:text-[2.15rem]">{roomTypeName}</h3>
+                            <p className="mt-1 text-sm text-on-surface-variant">Phòng {roomNumber}</p>
                           </div>
 
-                          <span className={`inline-flex rounded-full px-4 py-2 font-label text-[0.62rem] uppercase tracking-[0.22em] ${statusMeta.className}`}>
+                          <span className={`inline-flex rounded-full px-3.5 py-1.5 font-label text-[0.58rem] uppercase tracking-[0.22em] ${statusMeta.className}`}>
                             {statusMeta.label}
                           </span>
                         </div>
 
-                        <div className="mt-7 grid grid-cols-2 gap-4 rounded-[24px] border border-outline-variant/10 bg-[linear-gradient(180deg,rgba(248,244,238,0.82)_0%,rgba(255,255,255,0.94)_100%)] p-5 2xl:grid-cols-4">
+                        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 rounded-[20px] border border-outline-variant/10 bg-[linear-gradient(180deg,rgba(248,244,238,0.82)_0%,rgba(255,255,255,0.94)_100%)] p-4 xl:grid-cols-4">
                           <div>
                             <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Nhận phòng</p>
-                            <p className="mt-2 font-headline text-lg leading-tight text-primary xl:text-xl">{formatDate(detail?.checkIn)}</p>
+                            <p className="mt-1.5 font-headline text-base leading-tight text-primary xl:text-lg">{formatDate(detail?.checkIn)}</p>
                           </div>
                           <div>
                             <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Trả phòng</p>
-                            <p className="mt-2 font-headline text-lg leading-tight text-primary xl:text-xl">{formatDate(detail?.checkOut)}</p>
+                            <p className="mt-1.5 font-headline text-base leading-tight text-primary xl:text-lg">{formatDate(detail?.checkOut)}</p>
                           </div>
                           <div>
                             <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Ngày đặt</p>
-                            <p className="mt-2 font-headline text-lg leading-tight text-primary xl:text-xl">{formatDate(booking.createdAt || detail?.checkIn)}</p>
+                            <p className="mt-1.5 font-headline text-base leading-tight text-primary xl:text-lg">{formatDate(booking.createdAt || detail?.checkIn)}</p>
                           </div>
                           <div>
                             <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Tổng giá trị</p>
-                            <p className="mt-2 font-headline text-lg leading-tight text-primary xl:text-xl">{formatCurrency(booking.totalPrice)}đ</p>
+                            <p className="mt-1.5 font-headline text-base leading-tight text-primary xl:text-lg">{formatCurrency(displayTotal)}đ</p>
                           </div>
                         </div>
 
-                        <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
-                          <p className="text-sm leading-7 text-on-surface-variant">
-                            {detail?.totalHours
-                              ? `Thời lượng lưu trú dự kiến ${detail.totalHours} giờ.`
+                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                          <p className="text-sm leading-6 text-on-surface-variant">
+                            {stayNights > 0
+                              ? `Lưu trú dự kiến ${stayNights} đêm.`
                               : 'Thông tin lưu trú đã được lưu trong hồ sơ thành viên của bạn.'}
                           </p>
                           <button
                             type="button"
                             onClick={() => navigate(`/booking/${booking.id}`, { state: { booking } })}
-                            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 font-label text-[0.66rem] uppercase tracking-[0.22em] text-on-primary transition-all hover:brightness-105"
+                            className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 font-label text-[0.62rem] uppercase tracking-[0.22em] text-on-primary transition-all hover:brightness-105"
                           >
                             Xem chi tiết
                             <span className="material-symbols-outlined text-base">north_east</span>

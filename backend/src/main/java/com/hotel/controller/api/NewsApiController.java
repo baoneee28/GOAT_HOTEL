@@ -61,6 +61,7 @@ public class NewsApiController {
         java.util.Map<String, Object> response = new java.util.HashMap<>();
         response.put("newsList", newsPage.getContent());
         response.put("totalPages", newsPage.getTotalPages());
+        response.put("currentPage", page);
         return org.springframework.http.ResponseEntity.ok(response);
     }
 

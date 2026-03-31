@@ -15,6 +15,12 @@ public class RoomType {
     private Double pricePerNight;
     @Column(name = "capacity", nullable = false)
     private Integer capacity;
+    @Column(name = "room_size", length = 50)
+    private String size;
+    @Column(name = "beds", length = 100)
+    private String beds;
+    @Column(name = "view_description", length = 100)
+    private String view;
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
     @Column(name = "image", columnDefinition = "NVARCHAR(MAX)")

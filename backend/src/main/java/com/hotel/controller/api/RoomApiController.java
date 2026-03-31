@@ -82,6 +82,7 @@ public class RoomApiController {
         java.util.Map<String, Object> response = new java.util.HashMap<>();
         response.put("rooms", roomPage.getContent());
         response.put("totalPages", roomPage.getTotalPages());
+        response.put("currentPage", page);
         return org.springframework.http.ResponseEntity.ok(response);
     }
 
@@ -93,24 +94,45 @@ public class RoomApiController {
         }
         Integer typeId = Integer.parseInt(payload.get("typeId").toString());
         String status = payload.get("status").toString();
-        String itemsIds = payload.get("itemsIds") != null ? payload.get("itemsIds").toString() : "";
+        String roomNumber = payload.get("roomNumber") != null ? payload.get("roomNumber").toString().trim() : "";
+
+        if (roomNumber.isBlank()) {
+            return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of(
+                    "success", false,
+                    "message", "Số phòng không được để trống."
+            ));
+        }
 
         com.hotel.entity.RoomType roomType = roomTypeRepository.findById(typeId).orElse(null);
         if (roomType == null) {
-            return org.springframework.http.ResponseEntity.badRequest().build();
+            return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of(
+                    "success", false,
+                    "message", "Loại phòng không tồn tại."
+            ));
         }
 
         Room room;
         if (roomId != null && roomId > 0) {
             room = roomRepository.findById(roomId).orElse(null);
-            if (room == null) return org.springframework.http.ResponseEntity.badRequest().build();
+            if (room == null) {
+                return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of(
+                        "success", false,
+                        "message", "Phòng không tồn tại."
+                ));
+            }
         } else {
             room = new Room();
-            Integer maxId = roomRepository.findMaxId();
-            int nextId = (maxId != null ? maxId : 0) + 1;
-            room.setRoomNumber("P" + String.format("%03d", nextId));
         }
 
+        java.util.Optional<Room> roomNumberOwner = roomRepository.findByRoomNumber(roomNumber);
+        if (roomNumberOwner.isPresent() && (room.getId() == null || !roomNumberOwner.get().getId().equals(room.getId()))) {
+            return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of(
+                    "success", false,
+                    "message", "Số phòng này đã tồn tại."
+            ));
+        }
+
+        room.setRoomNumber(roomNumber);
         room.setRoomType(roomType);
         room.setStatus(status);
         room = roomRepository.save(room);

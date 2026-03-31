@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import API_BASE, { imageUrl } from '../config';
+import API_BASE, { imageUrl, uploadedImageUrl } from '../config';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -49,12 +49,46 @@ export default function Home() {
     const fetchData = async () => {
       try {
         const res = await axios.get(`${API_BASE}/api/home/`, { withCredentials: true });
-        setFeaturedRooms(res.data.featured_rooms || []);
+        const homeFeaturedRooms = res.data.featured_rooms || [];
+        const homeFeaturedNews = normalizeFeaturedNews(res.data.featured_news);
+
+        if (homeFeaturedRooms.length > 0) {
+          setFeaturedRooms(homeFeaturedRooms);
+        } else {
+          const roomTypesRes = await axios.get(`${API_BASE}/api/room-types`, { withCredentials: true });
+          const fallbackRooms = (roomTypesRes.data || []).slice(0, 4).map((roomType) => ({
+            id: `fallback-room-${roomType.id}`,
+            roomType
+          }));
+          setFeaturedRooms(fallbackRooms);
+        }
+
         setActiveBooking(res.data.active_booking || null);
         if (res.data.slider_images) setSliderImages(res.data.slider_images);
-        setFeaturedNews(normalizeFeaturedNews(res.data.featured_news));
+        if (homeFeaturedNews.length > 0) {
+          setFeaturedNews(homeFeaturedNews);
+        } else {
+          const latestNewsRes = await axios.get(`${API_BASE}/api/news/latest`, { withCredentials: true });
+          setFeaturedNews(latestNewsRes.data || []);
+        }
       } catch (error) {
         console.error("Error fetching home data:", error);
+        try {
+          const [roomTypesRes, latestNewsRes] = await Promise.all([
+            axios.get(`${API_BASE}/api/room-types`, { withCredentials: true }),
+            axios.get(`${API_BASE}/api/news/latest`, { withCredentials: true })
+          ]);
+
+          const fallbackRooms = (roomTypesRes.data || []).slice(0, 4).map((roomType) => ({
+            id: `fallback-room-${roomType.id}`,
+            roomType
+          }));
+
+          setFeaturedRooms(fallbackRooms);
+          setFeaturedNews(latestNewsRes.data || []);
+        } catch (fallbackError) {
+          console.error("Error fetching home fallback data:", fallbackError);
+        }
       }
     };
     fetchData();
@@ -87,7 +121,7 @@ export default function Home() {
   };
 
   const bgImageUrl = featuredNews[currentNewsIndex]?.image
-    ? imageUrl(featuredNews[currentNewsIndex].image)
+    ? uploadedImageUrl(featuredNews[currentNewsIndex].image, '/images/news/news-banner.png')
     : imageUrl('/images/news/news-banner.png');
 
   return (
@@ -206,7 +240,7 @@ export default function Home() {
               {featuredRooms.map((featured) => (
                 <div key={featured.id} className="group flex items-center gap-6 p-4 rounded-xl bg-white/70 hover:bg-white transition-all cursor-pointer border border-[#c5bba8] hover:border-[#a99880] hover:shadow-md" onClick={() => goToRoom(featured.roomType)}>
                   <div className="w-24 h-24 flex-shrink-0 overflow-hidden rounded-xl shadow-lg">
-                    <img alt={featured.roomType.typeName} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" src={imageUrl(featured.roomType.image)}/>
+                    <img alt={featured.roomType.typeName} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" src={uploadedImageUrl(featured.roomType.image, '/images/rooms/standard-room.jpg')}/>
                   </div>
                   <div>
                     <h3 className="font-headline text-xl text-slate-800">{featured.roomType.typeName}</h3>

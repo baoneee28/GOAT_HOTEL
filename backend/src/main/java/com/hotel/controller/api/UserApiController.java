@@ -1,7 +1,11 @@
 package com.hotel.controller.api;
 
+import com.hotel.entity.Booking;
 import com.hotel.entity.User;
+import com.hotel.repository.BookingRepository;
 import com.hotel.repository.UserRepository;
+import com.hotel.service.AuthService;
+import com.hotel.service.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -21,9 +25,24 @@ public class UserApiController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private BookingRepository bookingRepository;
+
+    @Autowired
+    private BookingService bookingService;
+
+    @Autowired
+    private AuthService authService;
+
+    private User sanitizeUser(User user) {
+        return authService.toClientUser(user);
+    }
+
     @GetMapping("/all")
     public List<User> getAllUsers() {
-        return userRepository.findAll();
+        List<User> users = userRepository.findAll(Sort.by("fullName").ascending());
+        users.forEach(this::sanitizeUser);
+        return users;
     }
 
     @GetMapping
@@ -32,12 +51,11 @@ public class UserApiController {
             @RequestParam(defaultValue = "1") int page) {
 
         int pageSize = 5;
-        // Do đồ án gốc chưa xây dựng Custom Query tìm kiếm User nên Spring Boot chỉ cung cấp findAll -> Gọi chung cho 2 luồng Search và GetList
-        Page<User> userPage = userRepository.findAll(
+        Page<User> userPage = userRepository.findWithSearch(
+                q.isBlank() ? null : q.trim(),
                 PageRequest.of(page - 1, pageSize, Sort.by("id").descending()));
 
-        // Xóa mật khẩu khỏi JSON để bảo mật dữ liệu trước khi ném ra mạng
-        userPage.getContent().forEach(u -> u.setPassword(null));
+        userPage.getContent().forEach(this::sanitizeUser);
 
         Map<String, Object> response = new HashMap<>();
         response.put("users", userPage.getContent());
@@ -60,20 +78,33 @@ public class UserApiController {
         User user;
         if (idStr != null && !idStr.isBlank()) {
             user = userRepository.findById(Integer.parseInt(idStr)).orElse(null);
-            if (user != null) {
-                user.setRole(role); // Logic gốc: Khi sửa, Admin chỉ đổi quyền (Role) chứ không cho đổi tên hay email
-                userRepository.save(user);
+            if (user == null) {
+                return ResponseEntity.status(404).body(Map.of(
+                        "success", false,
+                        "message", "Không tìm thấy người dùng để cập nhật."
+                ));
             }
-        } else {
-            user = new User();
-            user.setFullName(fullName);
-            user.setEmail(email);
-            user.setPhone(phone);
             user.setRole(role);
-            if (password != null && !password.isBlank()) {
-                user.setPassword(password);
+            userRepository.save(user);
+        } else {
+            if (fullName == null || fullName.isBlank() || email == null || email.isBlank() || password == null || password.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Họ tên, email và mật khẩu là bắt buộc."
+                ));
             }
-            // Bỏ qua upload ảnh vì API này chỉ xử lý Text (Ảnh làm hàm rời nếu cần)
+            if (userRepository.findByEmailIgnoreCase(email.trim()).isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Email này đã tồn tại trong hệ thống."
+                ));
+            }
+            user = new User();
+            user.setFullName(fullName.trim());
+            user.setEmail(email.trim());
+            user.setPhone(phone != null ? phone.trim() : null);
+            user.setRole(role != null && !role.isBlank() ? role.trim() : "customer");
+            user.setPassword(password);
             userRepository.save(user);
         }
 
@@ -92,6 +123,39 @@ public class UserApiController {
             response.put("success", false);
             response.put("message", "User này đang giữ Booking, không thể xóa tay!");
         }
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/bookings")
+    public ResponseEntity<Map<String, Object>> getUserBookings(
+            @PathVariable Integer id,
+            @RequestParam(defaultValue = "") String status,
+            @RequestParam(defaultValue = "1") int page) {
+        User user = userRepository.findById(id).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(404).body(Map.of(
+                    "success", false,
+                    "message", "Không tìm thấy người dùng."
+            ));
+        }
+
+        Page<Booking> bookingPage = bookingRepository.findAdminBookingsByUserId(
+                id,
+                status.isBlank() ? null : status.trim(),
+                PageRequest.of(page - 1, 5, Sort.by("id").descending())
+        );
+        bookingService.normalizeBookingFinancials(bookingPage.getContent());
+        double totalSpent = bookingService.getTotalSpent(id);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("user", sanitizeUser(user));
+        response.put("bookings", bookingPage.getContent());
+        response.put("totalPages", bookingPage.getTotalPages());
+        response.put("currentPage", page);
+        response.put("status", status);
+        response.put("totalSpent", totalSpent);
+        response.put("totalBookings", bookingRepository.countByUserIdAndStatus(id, null));
         return ResponseEntity.ok(response);
     }
 }

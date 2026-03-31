@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import API_BASE, { imageUrl } from '../config';
+import API_BASE, { imageUrl, uploadedImageUrl } from '../config';
 import HeroHeader from '../components/HeroHeader';
 
 function formatDate(dateValue) {
@@ -49,7 +49,7 @@ export default function NewsDetail() {
     <div className="bg-surface text-on-surface font-body min-h-screen flex flex-col">
 
       {/* ── BẮT TAY COMPONENT HERO ĐỒNG NHẤT ──────────────────────── */}
-      <HeroHeader image={imageUrl(news.image || news.heroImage)} altText={news.title} />
+      <HeroHeader image={uploadedImageUrl(news.image || news.heroImage, '/images/news/news-default.png')} altText={news.title} />
 
       {/* ── TIÊU ĐỀ BÀI VIẾT (TÁCH KHỎI ẢNH ĐỂ KHÔNG ĐÈ NAVBAR) ───── */}
       <div className="w-full bg-surface pt-12 pb-4 px-8 md:px-16 text-center">
@@ -134,7 +134,7 @@ export default function NewsDetail() {
                 >
                   <div className="w-full aspect-video overflow-hidden rounded-md bg-surface-container-high relative">
                     <img
-                      src={imageUrl(item.image || item.thumbnail)}
+                      src={uploadedImageUrl(item.image || item.thumbnail, '/images/news/news-default.png')}
                       alt={item.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                     />

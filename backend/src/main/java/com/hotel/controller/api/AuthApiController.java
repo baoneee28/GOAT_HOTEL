@@ -17,6 +17,24 @@ public class AuthApiController {
     @Autowired
     private AuthService authService;
 
+    @GetMapping("/session")
+    public ResponseEntity<Map<String, Object>> getSession(jakarta.servlet.http.HttpSession session) {
+        Map<String, Object> response = new HashMap<>();
+        Object userObj = session.getAttribute("user");
+
+        if (userObj instanceof User user) {
+            response.put("authenticated", true);
+            response.put("user", authService.toClientUser(user));
+            response.put("role", authService.resolveClientRole(user));
+            response.put("redirectTo", authService.resolveDefaultRedirect(user));
+        } else {
+            response.put("authenticated", false);
+            response.put("user", null);
+        }
+
+        return ResponseEntity.ok(response);
+    }
+
     // API Đăng nhập
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> payload, jakarta.servlet.http.HttpSession session) {
@@ -24,17 +42,20 @@ public class AuthApiController {
         String password = payload.get("password");
 
         // Gọi logic Đăng nhập bên Service
-        User user = authService.login(email, password, null);
+        User user = authService.login(email, password, session);
 
         Map<String, Object> response = new HashMap<>();
         if (user != null) {
-            session.setAttribute("user", user); // Lưu phiên làm việc cho /api/home/book
             response.put("success", true);
+            response.put("authenticated", true);
             response.put("message", "Đăng nhập thành công!");
-            response.put("user", user);
+            response.put("user", authService.toClientUser(user));
+            response.put("role", authService.resolveClientRole(user));
+            response.put("redirectTo", authService.resolveDefaultRedirect(user));
             return ResponseEntity.ok(response);
         } else {
             response.put("success", false);
+            response.put("authenticated", false);
             response.put("message", "Email hoặc mật khẩu không chính xác!");
             return ResponseEntity.badRequest().body(response);
         }
@@ -75,6 +96,7 @@ public class AuthApiController {
         session.invalidate(); // Hủy toàn bộ thông tin đăng nhập cũ
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
+        response.put("authenticated", false);
         response.put("message", "Đăng xuất thành công!");
         return ResponseEntity.ok(response);
     }

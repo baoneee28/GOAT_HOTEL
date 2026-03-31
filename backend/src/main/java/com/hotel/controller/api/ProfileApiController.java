@@ -2,6 +2,7 @@ package com.hotel.controller.api;
 
 import com.hotel.entity.User;
 import com.hotel.repository.UserRepository;
+import com.hotel.service.AuthService;
 import com.hotel.service.FileUploadService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,9 @@ public class ProfileApiController {
 
     @Autowired
     private FileUploadService fileUploadService;
+
+    @Autowired
+    private AuthService authService;
 
     private User getSessionUser(HttpSession session) {
         Object userObj = session.getAttribute("user");
@@ -61,10 +65,8 @@ public class ProfileApiController {
             return ResponseEntity.badRequest().body(response);
         }
         
-        // ⚠️ Dấu nhẹm password không ném ngược về phía FE
-        user.setPassword(null);
         response.put("success", true);
-        response.put("user", user);
+        response.put("user", authService.toClientUser(user));
         return ResponseEntity.ok(response);
     }
 
@@ -97,10 +99,10 @@ public class ProfileApiController {
             user.setImage(payload.get("avatar"));
         }
         userRepository.save(user);
+        session.setAttribute("user", user);
 
-        user.setPassword(null);
         response.put("success", true);
-        response.put("user", user);
+        response.put("user", authService.toClientUser(user));
         return ResponseEntity.ok(response);
     }
 

@@ -1,33 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import API_BASE from '../config';
 import Navbar from './Navbar';
 import Footer from './Footer';
+import { useAuth } from '../auth/useAuth';
 
 export default function MainLayout() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    axios.get(`${API_BASE}/api/home/`, { withCredentials: true })
-      .then((res) => {
-        if (res.data.user_logged_in) {
-          setUser(res.data.user_logged_in);
-        } else {
-          setUser(null);
-        }
-      })
-      .catch((err) => {
-        setUser(null);
-        console.error(err);
-      });
-  }, []);
+  const { user, setUser, logout } = useAuth();
 
   const handleLogout = async () => {
     try {
-      await axios.post(`${API_BASE}/api/auth/logout`, {}, { withCredentials: true });
-      setUser(null);
+      await logout();
       navigate('/');
     } catch (error) {
       console.error('Logout failed:', error);

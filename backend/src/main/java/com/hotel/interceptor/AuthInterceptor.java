@@ -17,6 +17,11 @@ public class AuthInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws Exception {
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            response.setStatus(HttpServletResponse.SC_OK);
+            return true;
+        }
+
         // Lấy session hiện tại (false nghĩa là nếu chưa có session thì không tự động tạo mới)
         HttpSession session = request.getSession(false);
         

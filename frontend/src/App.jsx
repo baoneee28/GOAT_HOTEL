@@ -26,46 +26,62 @@ import Items from './pages/admin/Items';
 import Bookings from './pages/admin/Bookings';
 import Users from './pages/admin/Users';
 import News from './pages/admin/News';
+import Inbox from './pages/admin/Inbox';
+import UserBookings from './pages/admin/UserBookings';
 import Collections from './pages/Collections';
 import MainLayout from './components/MainLayout';
+import { AuthProvider, ProtectedRoute, PublicOnlyRoute } from './auth/AuthContext';
 import './App.css';
 
 
 function App() {
   return (
     <BrowserRouter>
-      <ScrollToTop />
-      <Routes>
-        {/* Frontend Public Routes - with shared Navbar + Footer */}
-        <Route element={<MainLayout />}>
-          <Route path="/" element={<Home />} />
-          <Route path="/collections" element={<Collections />} />
-          <Route path="/news" element={<NewsPage />} />
-          <Route path="/news/:id" element={<NewsDetail />} />
-          <Route path="/contact" element={<ContactPage />} />
-          <Route path="/rooms/:id" element={<RoomDetail />} />
-          <Route path="/rooms/:id/available" element={<AvailableRooms />} />
-          <Route path="/booking/confirmation" element={<BookingConfirmation />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/history" element={<History />} />
-          <Route path="/booking/:id" element={<OrderDetail />} />
-        </Route>
+      <AuthProvider>
+        <ScrollToTop />
+        <Routes>
+          {/* Frontend Public Routes - with shared Navbar + Footer */}
+          <Route element={<MainLayout />}>
+            <Route path="/" element={<Home />} />
+            <Route path="/collections" element={<Collections />} />
+            <Route path="/news" element={<NewsPage />} />
+            <Route path="/news/:id" element={<NewsDetail />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/rooms/:id" element={<RoomDetail />} />
+            <Route path="/rooms/:id/available" element={<AvailableRooms />} />
+          </Route>
 
-        {/* Standalone pages with their own custom navigation */}
-        <Route path="/login" element={<AuthPage />} />
-        <Route path="/register" element={<AuthPage />} />
+          <Route element={<ProtectedRoute />}>
+            <Route element={<MainLayout />}>
+              <Route path="/booking/confirmation" element={<BookingConfirmation />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/history" element={<History />} />
+              <Route path="/booking/:id" element={<OrderDetail />} />
+            </Route>
+          </Route>
 
-        {/* Admin Routes */}
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="rooms" element={<Rooms />} />
-          <Route path="room-types" element={<RoomTypes />} />
-          <Route path="items" element={<Items />} />
-          <Route path="bookings" element={<Bookings />} />
-          <Route path="users" element={<Users />} />
-          <Route path="news" element={<News />} />
-        </Route>
-      </Routes>
+          {/* Standalone auth pages */}
+          <Route element={<PublicOnlyRoute />}>
+            <Route path="/login" element={<AuthPage />} />
+            <Route path="/register" element={<AuthPage />} />
+          </Route>
+
+          {/* Admin Routes */}
+          <Route element={<ProtectedRoute adminOnly />}>
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="rooms" element={<Rooms />} />
+              <Route path="room-types" element={<RoomTypes />} />
+              <Route path="items" element={<Items />} />
+              <Route path="bookings" element={<Bookings />} />
+              <Route path="users" element={<Users />} />
+              <Route path="users/:id/bookings" element={<UserBookings />} />
+              <Route path="news" element={<News />} />
+              <Route path="inbox" element={<Inbox />} />
+            </Route>
+          </Route>
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

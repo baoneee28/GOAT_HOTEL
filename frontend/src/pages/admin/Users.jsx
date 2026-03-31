@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import API_BASE from '../../config';
 const Swal = window.Swal;
 
 export default function Users() {
+  const navigate = useNavigate();
   const [data, setData] = useState({ users: [], totalPages: 1, currentPage: 1 });
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
@@ -65,7 +67,7 @@ export default function Users() {
         fetchData();
       }
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Lỗi', text: 'Có lỗi xảy ra' });
+      Swal.fire({ icon: 'error', title: 'Lỗi', text: err.response?.data?.message || 'Có lỗi xảy ra' });
     }
   };
 
@@ -119,6 +121,7 @@ export default function Users() {
                               <td>{u.phone}</td>
                               <td><span className={`badge-role ${u.role === 'admin' ? 'role-admin' : 'role-customer'}`}>{u.role}</span></td>
                               <td className="text-end">
+                                  <button className="btn-action bg-light text-dark me-1" title="Xem booking" onClick={() => navigate(`/admin/users/${u.id}/bookings`)}>🧾</button>
                                   <button className="btn-action bg-light text-primary me-1" onClick={() => handleEdit(u)}>✎</button>
                                   <button className="btn-action bg-light text-danger" onClick={() => handleDelete(u.id)}>🗑</button>
                               </td>

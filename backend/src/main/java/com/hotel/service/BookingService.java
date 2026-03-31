@@ -33,10 +33,18 @@ public class BookingService {
     @Autowired
     private RoomRepository roomRepository;
 
-    public long calculatePriceIndex(LocalDateTime checkIn, LocalDateTime checkOut, double pricePerHour) {
-        long totalSeconds = ChronoUnit.SECONDS.between(checkIn, checkOut);
-        double hours = totalSeconds / 3600.0;
-        return (long) Math.ceil(hours * pricePerHour);
+    public long calculateStayNights(LocalDateTime checkIn, LocalDateTime checkOut) {
+        if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
+            return 0;
+        }
+
+        long nights = ChronoUnit.DAYS.between(checkIn.toLocalDate(), checkOut.toLocalDate());
+        return Math.max(1, nights);
+    }
+
+    public long calculatePriceIndex(LocalDateTime checkIn, LocalDateTime checkOut, double pricePerNight) {
+        long nights = calculateStayNights(checkIn, checkOut);
+        return Math.round(nights * pricePerNight);
     }
 
     public double calculateHours(LocalDateTime checkIn, LocalDateTime checkOut) {
@@ -45,36 +53,80 @@ public class BookingService {
         return Math.round(hours * 100.0) / 100.0;
     }
 
-    public Map<String, Double> calculateBookingPriceAdmin(LocalDateTime checkIn, LocalDateTime checkOut, double pricePerHour) {
+    public Map<String, Double> calculateBookingPriceAdmin(LocalDateTime checkIn, LocalDateTime checkOut, double pricePerNight) {
         if (!checkOut.isAfter(checkIn)) {
             Map<String, Double> zero = new HashMap<>();
             zero.put("hours", 0.0);
+            zero.put("nights", 0.0);
             zero.put("total", 0.0);
             return zero;
         }
 
-        long totalMinutes = ChronoUnit.MINUTES.between(checkIn, checkOut);
-        long hours = totalMinutes / 60;
-        long minutes = totalMinutes % 60;
-
-        double finalHours;
-        if (minutes > 30) {
-            finalHours = hours + 1.0;
-        } else if (minutes > 0) {
-            finalHours = hours + 0.5;
-        } else {
-            finalHours = hours;
-        }
+        double totalHours = calculateHours(checkIn, checkOut);
+        long totalNights = calculateStayNights(checkIn, checkOut);
 
         Map<String, Double> result = new HashMap<>();
-        result.put("hours", finalHours);
-        result.put("total", finalHours * pricePerHour);
+        result.put("hours", totalHours);
+        result.put("nights", (double) totalNights);
+        result.put("total", totalNights * pricePerNight);
         return result;
     }
 
     public Booking getActiveBooking(Integer userId) {
         List<Booking> list = bookingRepository.findActiveBookingByUserId(userId);
         return list.isEmpty() ? null : list.get(0);
+    }
+
+    public double calculateBookingTotal(Booking booking) {
+        if (booking == null || booking.getDetails() == null || booking.getDetails().isEmpty()) {
+            return booking != null && booking.getTotalPrice() != null ? booking.getTotalPrice() : 0.0;
+        }
+
+        double total = 0.0;
+        for (BookingDetail detail : booking.getDetails()) {
+            if (detail == null
+                    || detail.getPriceAtBooking() == null
+                    || detail.getCheckIn() == null
+                    || detail.getCheckOut() == null) {
+                continue;
+            }
+            total += calculatePriceIndex(detail.getCheckIn(), detail.getCheckOut(), detail.getPriceAtBooking());
+        }
+        return total;
+    }
+
+    public Booking normalizeBookingFinancials(Booking booking) {
+        if (booking == null) {
+            return null;
+        }
+
+        if (booking.getDetails() != null) {
+            for (BookingDetail detail : booking.getDetails()) {
+                if (detail == null || detail.getCheckIn() == null || detail.getCheckOut() == null) {
+                    continue;
+                }
+
+                double recalculatedHours = calculateHours(detail.getCheckIn(), detail.getCheckOut());
+                if (detail.getTotalHours() == null || Math.abs(detail.getTotalHours() - recalculatedHours) > 0.01) {
+                    detail.setTotalHours(recalculatedHours);
+                }
+            }
+        }
+
+        double recalculatedTotal = calculateBookingTotal(booking);
+        if (recalculatedTotal > 0 && (booking.getTotalPrice() == null || Math.abs(booking.getTotalPrice() - recalculatedTotal) > 0.01)) {
+            booking.setTotalPrice(recalculatedTotal);
+        }
+
+        return booking;
+    }
+
+    public List<Booking> normalizeBookingFinancials(List<Booking> bookings) {
+        if (bookings == null) {
+            return List.of();
+        }
+        bookings.forEach(this::normalizeBookingFinancials);
+        return bookings;
     }
 
     @Transactional
@@ -96,9 +148,9 @@ public class BookingService {
         }
 
         Room room = roomOpt.get();
-        double pricePerHour = room.getRoomType().getPricePerNight();
+        double pricePerNight = room.getRoomType().getPricePerNight();
 
-        long totalPrice = calculatePriceIndex(checkIn, checkOut, pricePerHour);
+        long totalPrice = calculatePriceIndex(checkIn, checkOut, pricePerNight);
         double totalHours = calculateHours(checkIn, checkOut);
 
         Booking booking = new Booking();
@@ -110,7 +162,7 @@ public class BookingService {
         BookingDetail detail = new BookingDetail();
         detail.setBooking(booking);
         detail.setRoom(room);
-        detail.setPriceAtBooking(pricePerHour);
+        detail.setPriceAtBooking(pricePerNight);
         detail.setCheckIn(checkIn);
         detail.setCheckOut(checkOut);
         detail.setTotalHours(totalHours);
@@ -135,11 +187,16 @@ public class BookingService {
     }
 
     public Page<Booking> getHistory(Integer userId, String status, int page) {
-        return bookingRepository.findByUserIdAndStatus(userId, status, PageRequest.of(page - 1, 5));
+        Page<Booking> historyPage = bookingRepository.findByUserIdAndStatus(userId, status, PageRequest.of(page - 1, 5));
+        normalizeBookingFinancials(historyPage.getContent());
+        return historyPage;
     }
 
     public double getTotalSpent(Integer userId) {
-        Double total = bookingRepository.sumTotalPriceByUserIdAndCompleted(userId);
-        return total != null ? total : 0;
+        List<Booking> completedBookings = bookingRepository.findAllByUserIdAndStatus(userId, "completed");
+        normalizeBookingFinancials(completedBookings);
+        return completedBookings.stream()
+                .mapToDouble(booking -> booking.getTotalPrice() != null ? booking.getTotalPrice() : 0.0)
+                .sum();
     }
 }

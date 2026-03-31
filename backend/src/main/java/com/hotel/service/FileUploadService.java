@@ -42,6 +42,9 @@ public class FileUploadService {
     
     public String uploadGeneral(MultipartFile file, String prefix) throws IOException {
         String ext = getExtension(file.getOriginalFilename());
+        if (!ALLOWED_EXTENSIONS.contains(ext.toLowerCase())) {
+            throw new IllegalArgumentException("Chỉ chấp nhận file JPG, PNG, GIF");
+        }
         String fileName = prefix + System.currentTimeMillis() / 1000 + "." + ext;
         saveFile(file, fileName);
         return fileName;
@@ -50,6 +53,10 @@ public class FileUploadService {
     
     public String uploadNews(MultipartFile file) throws IOException {
         String originalName = file.getOriginalFilename();
+        String ext = getExtension(originalName);
+        if (!ALLOWED_EXTENSIONS.contains(ext.toLowerCase())) {
+            throw new IllegalArgumentException("Chỉ chấp nhận file JPG, PNG, GIF");
+        }
         String fileName = System.currentTimeMillis() / 1000 + "_" + originalName;
         saveFile(file, fileName);
         return fileName;

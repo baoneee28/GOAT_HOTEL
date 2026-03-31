@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import API_BASE, { imageUrl } from '../config';
+import API_BASE, { imageUrl, uploadedImageUrl } from '../config';
 import HeroHeader from '../components/HeroHeader';
 
 function formatDate(dateValue) {
@@ -69,12 +69,12 @@ export default function NewsPage() {
               <Link
                 key={article.id}
                 to={`/news/${article.id}`}
-                className="group flex flex-col bg-surface rounded-xl overflow-hidden shadow-lg border border-outline-variant/10 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-300 hover:-translate-y-1 active:scale-95 cursor-pointer relative z-20"
+                className="group relative z-20 flex cursor-pointer flex-col overflow-hidden rounded-xl border border-outline-variant/10 bg-surface no-underline shadow-lg transition-all duration-300 hover:-translate-y-1 hover:no-underline hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] active:scale-95"
               >
                 {/* Ảnh bài viết tỉ lệ 16:9 */}
                 <div className="relative aspect-video overflow-hidden">
                   <img
-                    src={imageUrl(article.image || article.thumbnail, '/images/news/news-default.png')}
+                    src={uploadedImageUrl(article.image || article.thumbnail, '/images/news/news-default.png')}
                     alt={article.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out"
                   />

@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import axios from 'axios';
-import API_BASE, { imageUrl } from '../config';
+import API_BASE, { calculateBookingDisplayTotal, calculateStayNights, imageUrl, uploadedImageUrl } from '../config';
 
 const FILTERS = ['all', 'pending', 'confirmed', 'completed', 'cancelled'];
 
@@ -54,7 +54,7 @@ function getBookingCode(id) {
 }
 
 function getRoomImage(url) {
-  return imageUrl(url);
+  return uploadedImageUrl(url, '/images/rooms/standard-room.jpg');
 }
 
 export default function History() {
@@ -223,6 +223,8 @@ export default function History() {
                 const statusMeta = STATUS_STYLES[status] || STATUS_STYLES.pending;
                 const roomTypeName = detail?.room?.roomType?.typeName || 'Phòng tiêu chuẩn';
                 const roomNumber = detail?.room?.roomNumber || 'N/A';
+                const stayNights = calculateStayNights(detail?.checkIn, detail?.checkOut);
+                const displayTotal = calculateBookingDisplayTotal(booking);
 
                 return (
                   <article
@@ -233,7 +235,7 @@ export default function History() {
                       <div className="relative min-h-[260px] overflow-hidden">
                         <img
                           alt={`Phòng ${roomNumber}`}
-                          src={getRoomImage(detail?.room?.image)}
+                          src={getRoomImage(detail?.room?.roomType?.image)}
                           className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/20 to-transparent"></div>
@@ -265,7 +267,7 @@ export default function History() {
 
                           <div className="rounded-[24px] border border-outline-variant/12 bg-white/65 px-5 py-4 text-left xl:min-w-[220px] xl:text-right">
                             <p className="font-label text-[0.58rem] uppercase tracking-[0.24em] text-primary/42">Tổng thanh toán</p>
-                            <p className="mt-3 font-headline text-3xl text-secondary">{formatCurrency(booking.totalPrice)}đ</p>
+                            <p className="mt-3 font-headline text-3xl text-secondary">{formatCurrency(displayTotal)}đ</p>
                             <p className="mt-2 text-xs uppercase tracking-[0.22em] text-primary/32">Đã lưu vào hồ sơ</p>
                           </div>
                         </div>
@@ -293,8 +295,8 @@ export default function History() {
 
                         <div className="mt-7 flex flex-col gap-4 border-t border-outline-variant/12 pt-6 md:flex-row md:items-center md:justify-between">
                           <p className="text-sm leading-7 text-on-surface-variant">
-                            {detail?.totalHours
-                              ? `Thời lượng lưu trú dự kiến ${detail.totalHours} giờ, đồng bộ trong hồ sơ đặt phòng của bạn.`
+                            {stayNights > 0
+                              ? `Lưu trú dự kiến ${stayNights} đêm, đã đồng bộ trong hồ sơ đặt phòng của bạn.`
                               : 'Mọi chi tiết lưu trú đã được GOAT HOTEL lưu lại cho trải nghiệm thành viên liền mạch.'}
                           </p>
 

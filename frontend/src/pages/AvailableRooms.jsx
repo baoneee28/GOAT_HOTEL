@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import API_BASE, { imageUrl } from '../config';
+import API_BASE, { calculateStayNights, uploadedImageUrl, resolveRoomTypeSpec } from '../config';
 import HeroHeader from '../components/HeroHeader';
 
 function fmtDate(d) {
@@ -12,10 +12,7 @@ function fmtDate(d) {
 }
 
 function calcNights(checkIn, checkOut) {
-  if (!checkIn || !checkOut) return 1;
-  const diff = new Date(checkOut) - new Date(checkIn);
-  const nights = Math.round(diff / (1000 * 60 * 60 * 24));
-  return nights > 0 ? nights : 1;
+  return calculateStayNights(checkIn, checkOut) || 1;
 }
 
 export default function AvailableRooms() {
@@ -56,7 +53,7 @@ export default function AvailableRooms() {
         }
 
         const actualRoomName = currentRoomData?.typeName || currentRoomData?.name || 'Standard Room';
-        const actualBeds = currentRoomData?.beds || (baseCapacity >= 4 ? '2 giường đôi' : '1 giường đôi');
+        const actualBeds = resolveRoomTypeSpec(actualRoomName, 'beds', currentRoomData?.beds);
         const actualPrice = currentRoomData?.pricePerNight || currentRoomData?.price || 350000;
 
         const mapped = res.data.map(r => ({
@@ -111,6 +108,10 @@ export default function AvailableRooms() {
         room: room.name,
         pricePerNight: room.price,
         image: roomData?.image || roomData?.images?.[0],
+        size: resolveRoomTypeSpec(roomData?.typeName || room.name, 'size', roomData?.size),
+        beds: resolveRoomTypeSpec(roomData?.typeName || room.name, 'beds', roomData?.beds || room.beds),
+        view: resolveRoomTypeSpec(roomData?.typeName || room.name, 'view', roomData?.view),
+        capacity: roomData?.capacity || room.capacity || '',
         checkIn,
         checkOut,
         guests,
@@ -122,7 +123,7 @@ export default function AvailableRooms() {
     <div className="bg-surface text-on-surface font-body min-h-screen flex flex-col">
 
       {/* HERO */}
-      <HeroHeader image={imageUrl(roomData?.image || roomData?.images?.[0])} altText={roomData?.typeName || 'Room'} />
+      <HeroHeader image={uploadedImageUrl(roomData?.image || roomData?.images?.[0], '/images/rooms/standard-room.jpg')} altText={roomData?.typeName || 'Room'} />
 
       <div className="max-w-4xl mx-auto px-8 py-10 w-full flex-grow">
 

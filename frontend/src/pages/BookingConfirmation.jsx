@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import API_BASE, { imageUrl } from '../config';
+import API_BASE, { calculateStayNights, uploadedImageUrl, resolveRoomTypeSpec } from '../config';
 import HeroHeader from '../components/HeroHeader';
 
 function fmtDate(d) {
@@ -12,7 +12,8 @@ function fmtDate(d) {
 }
 
 export default function BookingConfirmation() {
-  const { state } = useLocation();
+  const location = useLocation();
+  const { state } = location;
   const navigate = useNavigate();
   const { user: sessionUser, setUser } = useOutletContext() || {};
   const [searchParams] = useSearchParams();
@@ -27,7 +28,11 @@ export default function BookingConfirmation() {
     physicalRoomNumber: state?.physicalRoomNumber ?? searchParams.get('physicalRoomNumber') ?? '',
     room: state?.room ?? searchParams.get('room') ?? '',
     pricePerNight: Number(state?.pricePerNight ?? searchParams.get('pricePerNight') ?? 0),
-    image: imageUrl(state?.image ?? searchParams.get('image'), '/images/rooms/standard-room.jpg')
+    image: uploadedImageUrl(state?.image ?? searchParams.get('image'), '/images/rooms/standard-room.jpg'),
+    size: state?.size ?? searchParams.get('size') ?? '',
+    beds: state?.beds ?? searchParams.get('beds') ?? '',
+    view: state?.view ?? searchParams.get('view') ?? '',
+    capacity: Number(state?.capacity ?? searchParams.get('capacity') ?? searchParams.get('guests') ?? 0),
   });
 
   const [formData, setFormData] = useState({
@@ -41,8 +46,12 @@ export default function BookingConfirmation() {
   });
 
   const nights = formData.checkIn && formData.checkOut
-    ? Math.max(0, Math.round((new Date(formData.checkOut) - new Date(formData.checkIn)) / 86400000))
+    ? calculateStayNights(formData.checkIn, formData.checkOut)
     : 0; 
+  const displayCapacity = booking.capacity || formData.guests || 0;
+  const displaySize = resolveRoomTypeSpec(booking.room, 'size', booking.size);
+  const displayBeds = resolveRoomTypeSpec(booking.room, 'beds', booking.beds);
+  const displayView = resolveRoomTypeSpec(booking.room, 'view', booking.view);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -52,7 +61,18 @@ export default function BookingConfirmation() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!roomId || state?.room) return;
+    if (!sessionUser) return;
+    setFormData((prev) => ({
+      ...prev,
+      fullName: prev.fullName || sessionUser.fullName || '',
+      phone: prev.phone || sessionUser.phone || '',
+      email: prev.email || sessionUser.email || '',
+    }));
+  }, [sessionUser]);
+
+  useEffect(() => {
+    const needsRoomRefresh = !state?.room || !state?.size || !state?.beds || !state?.view || !state?.capacity;
+    if (!roomId || !needsRoomRefresh) return;
     axios.get(`${API_BASE}/api/rooms/${roomId}`, { withCredentials: true })
       .then((res) => {
         const roomData = res.data;
@@ -62,11 +82,15 @@ export default function BookingConfirmation() {
           physicalRoomNumber: roomData.roomNumber || prev.physicalRoomNumber,
           room: roomData.roomType?.typeName || prev.room,
           pricePerNight: roomData.roomType?.pricePerNight || prev.pricePerNight,
-          image: imageUrl(roomData.roomType?.image, prev.image),
+          image: uploadedImageUrl(roomData.roomType?.image, prev.image),
+          size: roomData.roomType?.size || prev.size,
+          beds: roomData.roomType?.beds || prev.beds,
+          view: roomData.roomType?.view || prev.view,
+          capacity: roomData.roomType?.capacity || prev.capacity,
         }));
       })
       .catch((err) => console.error('Không thể tải lại thông tin phòng:', err));
-  }, [roomId, state?.room]);
+  }, [roomId, state?.room, state?.size, state?.beds, state?.view, state?.capacity]);
 
   useEffect(() => {
     if (hasAutoScrolledRef.current || !contentRef.current) return;
@@ -97,7 +121,7 @@ export default function BookingConfirmation() {
     if (!sessionUser?.id) {
        if (window.Swal) window.Swal.fire('Chú ý', 'Bạn cần đăng nhập để đặt phòng.', 'warning');
        else alert('Bạn cần đăng nhập để đặt phòng.');
-       navigate('/login');
+       navigate('/login', { state: { from: location } });
        return;
     }
 
@@ -142,10 +166,10 @@ export default function BookingConfirmation() {
         setUser?.(null);
         if (window.Swal) {
           window.Swal.fire('Phiên đăng nhập đã hết', 'Vui lòng đăng nhập lại để tiếp tục đặt phòng.', 'warning')
-            .then(() => navigate('/login'));
+            .then(() => navigate('/login', { state: { from: location } }));
         } else {
           alert('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
-          navigate('/login');
+          navigate('/login', { state: { from: location } });
         }
         return;
       }
@@ -364,9 +388,10 @@ export default function BookingConfirmation() {
                 <h4 className="font-headline text-3xl tracking-tight text-on-surface mb-1">PHÒNG {booking.physicalRoomNumber}</h4>
                 <p className="font-body text-sm text-on-surface-variant font-medium">{booking.room}</p>
                 <div className="flex items-center gap-2 font-body text-[10px] uppercase tracking-wider text-on-surface-variant mt-2 opacity-80 flex-wrap">
-                  <span>20m²</span><span>•</span>
-                  <span>Hướng vườn</span><span>•</span>
-                  <span>{formData.guests} Khách</span>
+                  <span>{displaySize}</span><span>•</span>
+                  <span>{displayBeds}</span><span>•</span>
+                  <span>{displayView}</span><span>•</span>
+                  <span>{displayCapacity} Khách</span>
                 </div>
               </div>
             </div>

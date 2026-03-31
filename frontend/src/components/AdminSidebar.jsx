@@ -1,14 +1,14 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import API_BASE from '../config';
+import { useAuth } from '../auth/useAuth';
 
 export default function AdminSidebar() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const handleLogout = async () => {
     try {
-      await axios.post(`${API_BASE}/api/auth/logout`, {}, { withCredentials: true });
+      await logout();
       navigate('/login');
     } catch (error) {
       console.error(error);
@@ -46,6 +46,9 @@ export default function AdminSidebar() {
               </NavLink>
               <NavLink to="/admin/news" className={({isActive}) => isActive ? "menu-item active" : "menu-item"}>
                   <i className="bi bi-newspaper"></i> <span>Tin tức & Sự kiện</span>
+              </NavLink>
+              <NavLink to="/admin/inbox" className={({isActive}) => isActive ? "menu-item active" : "menu-item"}>
+                  <i className="bi bi-envelope-fill"></i> <span>Inbox liên hệ</span>
               </NavLink>
               <NavLink to="/admin/room-types" className={({isActive}) => isActive ? "menu-item active" : "menu-item"}>
                   <i className="bi bi-collection-fill"></i> <span>Loại phòng</span>

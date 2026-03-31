@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
-import API_BASE, { imageUrl } from '../config';
+import API_BASE, { calculateBookingDisplayTotal, calculateStayNights, imageUrl, uploadedImageUrl, resolveRoomTypeSpec } from '../config';
 
 // Helper: format datetime string
 const formatDate = (dateValue) => {
@@ -18,12 +18,6 @@ const formatDate = (dateValue) => {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-// Helper: calculate nights from hours
-const calcNights = (hours) => {
-  if (!hours) return 1;
-  return Math.max(1, Math.round(hours / 24));
-};
-
 // Status step definitions
 const STATUS_STEPS = [
   { key: 'pending',   label: 'Chờ xử lý',   icon: 'check' },
@@ -35,7 +29,7 @@ const STATUS_STEPS = [
 const STATUS_ORDER = { pending: 0, confirmed: 1, completed: 2, cancelled: 3 };
 
 const getRoomImageUrl = (url) => {
-  return imageUrl(url);
+  return uploadedImageUrl(url, '/images/rooms/standard-room.jpg');
 };
 
 export default function OrderDetail() {
@@ -79,13 +73,17 @@ export default function OrderDetail() {
   }
 
   const detail = booking.details?.[0];
+  const roomType = detail?.room?.roomType;
   const currentStatus = booking.status?.toLowerCase() || 'pending';
   const currentStatusIndex = STATUS_ORDER[currentStatus] ?? 0;
-  const nights = calcNights(detail?.totalHours);
+  const nights = calculateStayNights(detail?.checkIn, detail?.checkOut) || 1;
   const pricePerNight = detail?.priceAtBooking ?? 0;
   const baseTotal = pricePerNight * nights;
   const totalFees = 0;
-  const grandTotal = booking.totalPrice ?? baseTotal;
+  const grandTotal = calculateBookingDisplayTotal(booking) || baseTotal;
+  const guestLabel = roomType?.capacity ? `Tối đa ${roomType.capacity} khách` : 'Chưa cập nhật';
+  const bedLabel = resolveRoomTypeSpec(roomType?.typeName, 'beds', roomType?.beds, 'Giường chưa cập nhật');
+  const viewLabel = resolveRoomTypeSpec(roomType?.typeName, 'view', roomType?.view, 'Hướng nhìn chưa cập nhật');
 
   const handleCancel = async () => {
     if (!window.confirm('Bạn có chắc muốn hủy đơn này?')) return;
@@ -209,7 +207,7 @@ export default function OrderDetail() {
                 </div>
                 <div className="space-y-2">
                   <p className="font-label text-[0.65rem] uppercase tracking-[0.2em] text-slate-500 font-bold">Khách</p>
-                  <p className="font-headline text-xl text-white">2 Khách</p>
+                  <p className="font-headline text-xl text-white">{guestLabel}</p>
                 </div>
               </div>
             </section>
@@ -222,7 +220,7 @@ export default function OrderDetail() {
                     <img
                       alt={detail.room?.roomNumber || 'Room'}
                       className="w-full h-full object-cover min-h-[300px] transition-transform duration-1000 group-hover:scale-110"
-                      src={getRoomImageUrl(detail.room?.image)}
+                      src={getRoomImageUrl(roomType?.image)}
                     />
                     <div className="absolute inset-0 bg-slate-950/20 group-hover:bg-transparent transition-colors duration-500"></div>
                     <div className="absolute top-4 left-4 bg-secondary p-2 shadow-2xl">
@@ -245,7 +243,7 @@ export default function OrderDetail() {
                       <div className="flex items-center gap-3">
                         <span className="material-symbols-outlined text-secondary text-sm">bed</span>
                         <span className="text-[0.65rem] uppercase tracking-widest text-slate-300">
-                          {detail.room?.roomType?.typeName || 'Giường King'}
+                          {bedLabel}
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
@@ -255,9 +253,9 @@ export default function OrderDetail() {
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-secondary text-sm">hotel</span>
+                        <span className="material-symbols-outlined text-secondary text-sm">visibility</span>
                         <span className="text-[0.65rem] uppercase tracking-widest text-slate-300">
-                          {detail.room?.status || 'Đã đặt'}
+                          {viewLabel}
                         </span>
                       </div>
                     </div>

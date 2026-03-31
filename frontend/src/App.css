@@ -203,6 +203,128 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg-
 .item-option.active .check-mark { opacity: 1; transform: scale(1); }
 .item-option img { width: 40px; height: 40px; object-fit: contain; }
 
+.roomtype-admin-table {
+    width: 100%;
+    table-layout: fixed;
+}
+.roomtype-admin-table thead th {
+    padding: 14px 18px;
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+.roomtype-admin-table tbody td {
+    padding: 16px 18px;
+    font-size: 0.92rem;
+}
+.roomtype-admin-table .roomtype-col-image {
+    width: 90px;
+}
+.roomtype-admin-table .roomtype-col-name {
+    width: 20%;
+}
+.roomtype-admin-table .roomtype-col-price {
+    width: 12%;
+    white-space: nowrap;
+}
+.roomtype-admin-table .roomtype-col-specs {
+    width: 30%;
+}
+.roomtype-admin-table .roomtype-col-description {
+    width: 30%;
+}
+.roomtype-admin-table .roomtype-col-actions {
+    width: 88px;
+    white-space: nowrap;
+}
+.roomtype-admin-table .type-img {
+    width: 54px;
+    height: 54px;
+    border-radius: 10px;
+}
+.roomtype-admin-table .roomtype-col-name .fw-bold {
+    font-size: 0.98rem;
+    line-height: 1.4;
+}
+.roomtype-admin-table .roomtype-col-name small {
+    font-size: 0.78rem;
+}
+.roomtype-admin-table .roomtype-col-price {
+    font-size: 0.98rem;
+}
+.roomtype-admin-table tbody td.roomtype-col-specs,
+.roomtype-admin-table tbody td.roomtype-col-description {
+    vertical-align: top;
+}
+.roomtype-specs-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-width: 100%;
+}
+.roomtype-spec-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 3px;
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+.roomtype-spec-inline-label {
+    color: #64748b;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.roomtype-spec-inline-value {
+    color: #1e293b;
+    font-weight: 600;
+    word-break: break-word;
+}
+.roomtype-spec-warning {
+    display: block;
+    margin-top: 10px;
+    color: #a16207;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.roomtype-desc {
+    color: #64748b;
+    font-size: 0.86rem;
+    line-height: 1.65;
+    display: -webkit-box;
+    -webkit-line-clamp: 6;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+@media (max-width: 1400px) {
+    .roomtype-admin-table thead th {
+        padding: 12px 14px;
+        font-size: 0.78rem;
+    }
+    .roomtype-admin-table tbody td {
+        padding: 14px;
+        font-size: 0.88rem;
+    }
+    .roomtype-admin-table .roomtype-col-name {
+        width: 19%;
+    }
+    .roomtype-admin-table .roomtype-col-specs {
+        width: 29%;
+    }
+    .roomtype-admin-table .roomtype-col-description {
+        width: 31%;
+    }
+    .roomtype-admin-table .roomtype-col-name .fw-bold,
+    .roomtype-admin-table .roomtype-col-price {
+        font-size: 0.92rem;
+    }
+    .roomtype-spec-row {
+        font-size: 0.75rem;
+    }
+    .roomtype-desc {
+        font-size: 0.82rem;
+    }
+}
+
 @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
 
 /* STITCH HOME DESIGN GLOBAL CSS */

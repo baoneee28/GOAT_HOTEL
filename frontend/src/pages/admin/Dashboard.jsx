@@ -32,6 +32,16 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, []);
 
+  const formatCurrencyShort = (value) => {
+    if (value >= 1000000) {
+      return `${(value / 1000000).toFixed(1)}M`;
+    }
+    if (value >= 1000) {
+      return `${(value / 1000).toFixed(0)}K`;
+    }
+    return value;
+  };
+
   useEffect(() => {
     if (stats && waveChartRef.current && pieChartRef.current) {
         if (waveChartInstance.current) waveChartInstance.current.destroy();
@@ -61,7 +71,7 @@ export default function Dashboard() {
                 scales: {
                     y: {
                         beginAtZero: true, grid: { borderDash: [5, 5] },
-                        ticks: { font: { size: 10 }, callback: value => (value / 1000000).toFixed(1) + 'M' }
+                        ticks: { font: { size: 10 }, callback: value => `${formatCurrencyShort(value)}đ` }
                     },
                     x: { grid: { display: false }, ticks: { font: { size: 10 } } }
                 },
@@ -105,6 +115,7 @@ export default function Dashboard() {
           <div style={{ zIndex: 2 }}>
               <h2 className="fw-bold mb-2">Xin chào, <span>{user.fullName}</span>! 👋</h2>
               <p className="mb-0 opacity-75">Hệ thống đang hoạt động ổn định. Bạn có <b>{stats.pending_count}</b> đơn đặt phòng cần duyệt.</p>
+              <p className="mb-0 opacity-75 mt-2">Inbox hiện có <b>{stats.new_contacts || 0}</b> liên hệ mới từ khách.</p>
           </div>
           <div id="realtime-clock">{time}</div>
       </div>
@@ -129,6 +140,9 @@ export default function Dashboard() {
                   <div className="icon-box bg-primary-subtle text-primary">🏣</div>
                   <div className="small text-muted mb-1 text-uppercase fw-bold">Tổng số phòng</div>
                   <h3 className="fw-bold mb-0"><span>{stats.total_rooms}</span> Phòng</h3>
+                  <div className="small text-muted mt-2">
+                    Trống: {stats.rooms_available} · Có khách: {stats.rooms_booked} · Bảo trì: {stats.rooms_maintenance}
+                  </div>
               </div>
           </div>
           <div className="col-md-3">
@@ -145,7 +159,7 @@ export default function Dashboard() {
               <div className="chart-container h-100">
                   <div className="d-flex justify-content-between align-items-center mb-3">
                       <h5 className="fw-bold mb-0">Biểu đồ doanh thu tuần</h5>
-                      <span className="badge bg-light text-dark border">Static Data</span>
+                      <span className="badge bg-light text-dark border">7 ngày gần nhất</span>
                   </div>
                   <div style={{ height: '180px', position: 'relative' }}>
                       <canvas ref={waveChartRef}></canvas>
@@ -162,6 +176,7 @@ export default function Dashboard() {
                   <div className="mt-2 text-center small text-muted">
                       <span className="mx-2">● Trống: <span>{stats.rooms_available}</span></span>
                       <span className="mx-2">● Có khách: <span>{stats.rooms_booked}</span></span>
+                      <span className="mx-2">● Bảo trì: <span>{stats.rooms_maintenance}</span></span>
                   </div>
               </div>
           </div>

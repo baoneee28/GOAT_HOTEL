@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
-import API_BASE from '../../config';
+import API_BASE, { uploadedImageUrl, formatDateValue } from '../../config';
 const Swal = window.Swal;
 
 export default function News() {
@@ -12,6 +12,7 @@ export default function News() {
   const [formData, setFormData] = useState({
     id: '', title: '', summary: '', content: '', image: ''
   });
+  const fileInputRef = useRef(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -47,25 +48,44 @@ export default function News() {
     setFormData({
       id: n.id, title: n.title, summary: n.summary, content: n.content || '', image: n.image || ''
     });
+    if (fileInputRef.current) fileInputRef.current.value = null;
     setShowModal(true);
   };
 
   const handleAddNew = () => {
     setFormData({ id: '', title: '', summary: '', content: '', image: '' });
+    if (fileInputRef.current) fileInputRef.current.value = null;
     setShowModal(true);
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post(`${API_BASE}/api/news/admin`, formData, { withCredentials: true });
+      let finalImageName = formData.image;
+
+      if (fileInputRef.current && fileInputRef.current.files.length > 0) {
+        const uploadData = new FormData();
+        uploadData.append('file', fileInputRef.current.files[0]);
+        uploadData.append('type', 'news');
+
+        const uploadRes = await axios.post(`${API_BASE}/api/upload`, uploadData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          withCredentials: true
+        });
+
+        if (uploadRes.data.success) {
+          finalImageName = uploadRes.data.fileName;
+        }
+      }
+
+      const res = await axios.post(`${API_BASE}/api/news/admin`, { ...formData, image: finalImageName }, { withCredentials: true });
       if (res.data.success) {
         Swal.fire({ icon: 'success', title: 'Thành công', timer: 1500, showConfirmButton: false });
         setShowModal(false);
         fetchData();
       }
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Lỗi', text: 'Có lỗi xảy ra' });
+      Swal.fire({ icon: 'error', title: 'Lỗi', text: err.response?.data?.message || 'Có lỗi xảy ra' });
     }
   };
 
@@ -106,10 +126,10 @@ export default function News() {
                       {data.newsList && data.newsList.length > 0 ? data.newsList.map(n => (
                           <tr key={n.id}>
                               <td className="ps-4 py-3">
-                                  <img src={n.image ? (n.image.startsWith('http') ? n.image : `${API_BASE}/uploads/${n.image}`) : 'https://via.placeholder.com/80x50'} className="news-img" alt="News" />
+                                  <img src={uploadedImageUrl(n.image, '/images/news/news-default.png')} className="news-img" alt="News" />
                               </td>
                               <td className="fw-bold py-3">{n.title}</td>
-                              <td className="py-3">{new Date(n.createdAt).toLocaleDateString('vi-VN')}</td>
+                              <td className="py-3">{formatDateValue(n.createdAt) || 'Chưa cập nhật'}</td>
                               <td className="text-end pe-4 py-3">
                                   <button className="btn btn-sm btn-light text-primary me-1" onClick={() => handleEdit(n)}>✎</button>
                                   <button className="btn btn-sm btn-light text-danger" onClick={() => handleDelete(n.id)}>🗑</button>
@@ -153,7 +173,8 @@ export default function News() {
                               </div>
                               <div className="mb-3">
                                   <label className="form-label fw-bold">Ảnh bìa</label>
-                                  <input type="file" name="image" className="form-control rounded-3" />
+                                  <input type="file" name="image" ref={fileInputRef} className="form-control rounded-3" accept="image/*" />
+                                  {formData.image && <small className="text-muted d-block mt-2">Ảnh hiện tại: {formData.image}</small>}
                               </div>
                               <div className="mb-4">
                                   <label className="form-label fw-bold">Nội dung chi tiết (Cần CKEditor)</label>

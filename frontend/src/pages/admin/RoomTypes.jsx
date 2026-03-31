@@ -1,7 +1,14 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
-import API_BASE from '../../config';
+import API_BASE, { uploadedImageUrl, iconUrl, resolveRoomTypeSpec } from '../../config';
+
+const buildSpecs = (roomType) => ([
+  { icon: 'square_foot', label: 'Kích thước', value: resolveRoomTypeSpec(roomType.typeName, 'size', roomType.size) },
+  { icon: 'group', label: 'Khách', value: `Tối đa ${roomType.capacity || 0} người` },
+  { icon: 'bed', label: 'Giường', value: resolveRoomTypeSpec(roomType.typeName, 'beds', roomType.beds) },
+  { icon: 'visibility', label: 'Hướng nhìn', value: resolveRoomTypeSpec(roomType.typeName, 'view', roomType.view) },
+]);
 
 export default function RoomTypes() {
   const [data, setData] = useState({ roomTypes: [], totalPages: 1 });
@@ -11,7 +18,7 @@ export default function RoomTypes() {
   const [itemSearch, setItemSearch] = useState('');
 
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({ id: '', typeName: '', pricePerNight: '', capacity: '', description: '', currentImage: '', itemsIds: [] });
+  const [formData, setFormData] = useState({ id: '', typeName: '', pricePerNight: '', capacity: '', size: '', beds: '', view: '', description: '', currentImage: '', itemsIds: [] });
   const fileInputRef = useRef(null);
 
   const fetchData = useCallback(async () => {
@@ -47,12 +54,24 @@ export default function RoomTypes() {
 
   const handleEdit = (t) => {
     const existingIds = t.items ? t.items.map(i => i.item?.id).filter(id => id) : [];
-    setFormData({ id: t.id, typeName: t.typeName, pricePerNight: t.pricePerNight, capacity: t.capacity, description: t.description || '', currentImage: t.image || '', itemsIds: existingIds });
+    setFormData({
+      id: t.id,
+      typeName: t.typeName,
+      pricePerNight: t.pricePerNight,
+      capacity: t.capacity,
+      size: resolveRoomTypeSpec(t.typeName, 'size', t.size, ''),
+      beds: resolveRoomTypeSpec(t.typeName, 'beds', t.beds, ''),
+      view: resolveRoomTypeSpec(t.typeName, 'view', t.view, ''),
+      description: t.description || '',
+      currentImage: t.image || '',
+      itemsIds: existingIds
+    });
+    if(fileInputRef.current) fileInputRef.current.value = null;
     setShowModal(true);
   };
 
   const handleAddNew = () => {
-    setFormData({ id: '', typeName: '', pricePerNight: '', capacity: '', description: '', currentImage: '', itemsIds: [] });
+    setFormData({ id: '', typeName: '', pricePerNight: '', capacity: '', size: '', beds: '', view: '', description: '', currentImage: '', itemsIds: [] });
     if(fileInputRef.current) fileInputRef.current.value = null;
     setShowModal(true);
   };
@@ -82,6 +101,9 @@ export default function RoomTypes() {
           typeName: formData.typeName,
           pricePerNight: parseFloat(formData.pricePerNight),
           capacity: parseInt(formData.capacity),
+          size: formData.size,
+          beds: formData.beds,
+          view: formData.view,
           description: formData.description,
           image: finalImageName,
           itemsIds: formData.itemsIds.join(',')
@@ -93,7 +115,7 @@ export default function RoomTypes() {
           setShowModal(false);
           fetchData();
       }
-    } catch (err) { console.error(err); window.Swal.fire({ icon: 'error', title: 'Lỗi', text: 'Có lỗi xảy ra' }); }
+    } catch (err) { console.error(err); window.Swal.fire({ icon: 'error', title: 'Lỗi', text: err.response?.data?.message || 'Có lỗi xảy ra' }); }
   };
 
   const toggleItem = (itemId) => {
@@ -127,31 +149,42 @@ export default function RoomTypes() {
           </div>
 
           <div className="table-responsive">
-              <table className="table mb-0">
+              <table className="table roomtype-admin-table mb-0">
                   <thead>
                       <tr>
-                          <th>Ảnh</th>
-                          <th>Tên loại (Tiện ích)</th>
-                          <th>Giá/h</th>
-                          <th>Sức chứa</th>
-                          <th>Mô tả</th>
-                          <th className="text-end">Hành động</th>
+                          <th className="roomtype-col-image">Ảnh</th>
+                          <th className="roomtype-col-name">Tên loại (Tiện ích)</th>
+                          <th className="roomtype-col-price">Giá/đêm</th>
+                          <th className="roomtype-col-specs">Specs</th>
+                          <th className="roomtype-col-description">Mô tả</th>
+                          <th className="roomtype-col-actions text-end">Hành động</th>
                       </tr>
                   </thead>
                   <tbody>
                       {data.roomTypes?.length > 0 ? data.roomTypes.map(t => (
                           <tr key={t.id}>
-                              <td>
-                                  <img src={t.image ? `${API_BASE}/uploads/${t.image}` : 'https://via.placeholder.com/60'} className="type-img" alt="type" />
+                              <td className="roomtype-col-image">
+                                  <img src={uploadedImageUrl(t.image, '/images/rooms/standard-room.jpg')} className="type-img" alt={t.typeName} />
                               </td>
-                              <td>
+                              <td className="roomtype-col-name">
                                   <div className="fw-bold">{t.typeName}</div>
                                   <small className="text-muted d-block mt-1">{(t.items && t.items.length) || 0} tiện ích</small>
                               </td>
-                              <td className="text-primary fw-bold">{t.pricePerNight.toLocaleString('vi-VN')}đ</td>
-                              <td>{t.capacity} người</td>
-                              <td className="text-muted small" style={{ maxWidth: '250px' }}>{t.description}</td>
-                              <td className="text-end">
+                              <td className="roomtype-col-price text-primary fw-bold">{t.pricePerNight.toLocaleString('vi-VN')}đ</td>
+                              <td className="roomtype-col-specs">
+                                  <div className="roomtype-specs-wrap">
+                                      {buildSpecs(t).map((spec) => (
+                                          <div key={spec.label} className="roomtype-spec-row">
+                                              <span className="roomtype-spec-inline-label">{spec.label}:</span>
+                                              <span className="roomtype-spec-inline-value">{spec.value}</span>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </td>
+                              <td className="roomtype-col-description">
+                                  <div className="roomtype-desc" title={t.description || ''}>{t.description}</div>
+                              </td>
+                              <td className="roomtype-col-actions text-end">
                                   <button className="btn-action btn-edit me-1" onClick={() => handleEdit(t)}>✎</button>
                                   <button className="btn-action btn-delete" onClick={() => handleDelete(t.id)}>🗑</button>
                               </td>
@@ -201,6 +234,44 @@ export default function RoomTypes() {
                                   </div>
                               </div>
                               <div className="row">
+                                  <div className="col-md-4 mb-3">
+                                      <label className="form-label fw-bold">Kích thước</label>
+                                      <input type="text" className="form-control rounded-3" value={formData.size} onChange={e => setFormData({...formData, size: e.target.value})} placeholder="VD: 32m²" />
+                                  </div>
+                                  <div className="col-md-4 mb-3">
+                                      <label className="form-label fw-bold">Giường</label>
+                                      <input type="text" className="form-control rounded-3" value={formData.beds} onChange={e => setFormData({...formData, beds: e.target.value})} placeholder="VD: 1 giường đôi" />
+                                  </div>
+                                  <div className="col-md-4 mb-3">
+                                      <label className="form-label fw-bold">Hướng nhìn</label>
+                                      <input type="text" className="form-control rounded-3" value={formData.view} onChange={e => setFormData({...formData, view: e.target.value})} placeholder="VD: Hướng biển" />
+                                  </div>
+                              </div>
+                              <div className="mb-3">
+                                  <div className="border rounded-4 p-3 bg-light-subtle">
+                                      <div className="fw-bold small text-uppercase text-muted mb-3">Preview specs bên user</div>
+                                      <div className="row g-2">
+                                          {buildSpecs({
+                                              typeName: formData.typeName,
+                                              size: formData.size,
+                                              capacity: formData.capacity,
+                                              beds: formData.beds,
+                                              view: formData.view,
+                                          }).map((spec) => (
+                                              <div key={spec.label} className="col-md-6">
+                                                  <div className="border rounded-3 px-3 py-3 h-100 bg-white">
+                                                      <div className="d-flex align-items-center gap-2 text-muted small mb-1">
+                                                          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>{spec.icon}</span>
+                                                          <span className="fw-semibold">{spec.label}</span>
+                                                      </div>
+                                                      <div className="fw-bold">{spec.value}</div>
+                                                  </div>
+                                              </div>
+                                          ))}
+                                      </div>
+                                  </div>
+                              </div>
+                              <div className="row">
                                   <div className="col-md-6 mb-3">
                                       <label className="form-label fw-bold">Ảnh đại diện</label>
                                       <input type="file" ref={fileInputRef} className="form-control rounded-3" accept="image/*" />
@@ -223,7 +294,7 @@ export default function RoomTypes() {
                                               if(!item) return null;
                                               return (
                                                   <div key={item.id} className="item-brick">
-                                                      <img src={`${API_BASE}${item.image}`} alt={item.name} /> {item.name}
+                                                      <img src={iconUrl(item.image)} alt={item.name} /> {item.name}
                                                       <span className="remove-btn" onClick={() => toggleItem(item.id)}>×</span>
                                                   </div>
                                               )
@@ -242,7 +313,7 @@ export default function RoomTypes() {
                                           <div key={item.id} className="col-md-4 col-sm-6 item-wrapper">
                                               <div className={`item-option d-flex align-items-center ${formData.itemsIds.includes(item.id) ? 'active' : ''}`} onClick={() => toggleItem(item.id)}>
                                                   <div className="check-mark">✔</div>
-                                                  <img src={`${API_BASE}${item.image}`} className="rounded bg-light" alt={item.name} />
+                                                  <img src={iconUrl(item.image)} className="rounded bg-light" alt={item.name} />
                                                   <div className="ms-3 fw-bold small text-truncate">{item.name}</div>
                                               </div>
                                           </div>

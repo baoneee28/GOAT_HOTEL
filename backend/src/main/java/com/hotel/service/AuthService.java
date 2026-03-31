@@ -16,6 +16,38 @@ public class AuthService {
     @Autowired
     private UserRepository userRepository;
 
+    public boolean isAdminRole(String role) {
+        return role != null && "admin".equalsIgnoreCase(role.trim());
+    }
+
+    public boolean isAdmin(User user) {
+        return user != null && isAdminRole(user.getRole());
+    }
+
+    public String resolveClientRole(User user) {
+        return isAdmin(user) ? "ADMIN" : "USER";
+    }
+
+    public String resolveDefaultRedirect(User user) {
+        return isAdmin(user) ? "/admin" : "/";
+    }
+
+    public User toClientUser(User source) {
+        if (source == null) {
+            return null;
+        }
+
+        User safeUser = new User();
+        safeUser.setId(source.getId());
+        safeUser.setFullName(source.getFullName());
+        safeUser.setEmail(source.getEmail());
+        safeUser.setPhone(source.getPhone());
+        safeUser.setImage(source.getImage());
+        safeUser.setRole(source.getRole());
+        safeUser.setCreatedAt(source.getCreatedAt());
+        return safeUser;
+    }
+
     
     // Hàm xử lý Đăng nhập: Gọi xuống DB xem có ông nào khớp email & password không
     public User login(String email, String password, HttpSession session) {

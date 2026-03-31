@@ -12,7 +12,7 @@ export default function Rooms() {
 
   // Modal form state
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({ id: '', typeId: '', status: 'available' });
+  const [formData, setFormData] = useState({ id: '', roomNumber: '', typeId: '', status: 'available' });
 
   const fetchData = useCallback(async () => {
     try {
@@ -50,12 +50,12 @@ export default function Rooms() {
   };
 
   const handleEdit = (r) => {
-    setFormData({ id: r.id, typeId: r.roomType?.id || '', status: r.status });
+    setFormData({ id: r.id, roomNumber: r.roomNumber || '', typeId: r.roomType?.id || '', status: r.status });
     setShowModal(true);
   };
 
   const handleAddNew = () => {
-    setFormData({ id: '', typeId: types[0]?.id || '', status: 'available' });
+    setFormData({ id: '', roomNumber: '', typeId: types[0]?.id || '', status: 'available' });
     setShowModal(true);
   };
 
@@ -64,6 +64,7 @@ export default function Rooms() {
     try {
         const payload = {
             id: formData.id || null,
+            roomNumber: formData.roomNumber,
             typeId: formData.typeId,
             status: formData.status
         };
@@ -74,7 +75,7 @@ export default function Rooms() {
             fetchData();
         }
     } catch (err) {
-        window.Swal.fire({ icon: 'error', title: 'Lỗi', text: 'Có lỗi xảy ra' });
+        window.Swal.fire({ icon: 'error', title: 'Lỗi', text: err.response?.data?.message || 'Có lỗi xảy ra' });
     }
   };
 
@@ -176,6 +177,10 @@ export default function Rooms() {
                       <div className="modal-body p-4 pt-0">
                           <form onSubmit={handleSave}>
                               <div className="row g-3">
+                              <div className="col-12">
+                                      <label className="form-label fw-bold">Số phòng</label>
+                                      <input type="text" className="form-control rounded-3 p-2" value={formData.roomNumber} onChange={e => setFormData({...formData, roomNumber: e.target.value})} placeholder="VD: 101, A203..." required />
+                                  </div>
                                   <div className="col-12">
                                       <label className="form-label fw-bold">Loại phòng</label>
                                       <select className="form-select rounded-3 p-2" value={formData.typeId} onChange={e => setFormData({...formData, typeId: e.target.value})} required>

@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import java.time.LocalDateTime;
 import java.util.List;
 
 
@@ -33,6 +34,9 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
                                          @Param("status") String status,
                                          Pageable pageable);
 
+    @Query("SELECT b FROM Booking b WHERE b.user.id = :userId AND b.status = :status ORDER BY b.id DESC")
+    List<Booking> findAllByUserIdAndStatus(@Param("userId") Integer userId, @Param("status") String status);
+
 
     @Query("SELECT COUNT(b) FROM Booking b " +
            "WHERE b.user.id = :userId AND (:status IS NULL OR :status = 'all' OR b.status = :status)")
@@ -48,6 +52,10 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT SUM(b.totalPrice) FROM Booking b WHERE b.status = 'completed'")
     Double sumTotalRevenue();
 
+    List<Booking> findByStatusAndCreatedAtBetweenOrderByCreatedAtAsc(String status,
+                                                                     LocalDateTime start,
+                                                                     LocalDateTime end);
+
 
 
     long countByStatus(String status);
@@ -57,6 +65,14 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
            "WHERE (:status IS NULL OR :status = '' OR b.status = :status) " +
            "ORDER BY b.id DESC", countQuery = "SELECT COUNT(b) FROM Booking b WHERE (:status IS NULL OR :status = '' OR b.status = :status)")
     Page<Booking> findAdminBookings(@Param("status") String status, Pageable pageable);
+
+    @Query(value = "SELECT b FROM Booking b JOIN FETCH b.user u " +
+           "WHERE b.user.id = :userId AND (:status IS NULL OR :status = '' OR b.status = :status) " +
+           "ORDER BY b.id DESC",
+           countQuery = "SELECT COUNT(b) FROM Booking b WHERE b.user.id = :userId AND (:status IS NULL OR :status = '' OR b.status = :status)")
+    Page<Booking> findAdminBookingsByUserId(@Param("userId") Integer userId,
+                                            @Param("status") String status,
+                                            Pageable pageable);
 
     @Query("SELECT COUNT(b) FROM Booking b " +
            "WHERE (:status IS NULL OR :status = '' OR b.status = :status)")

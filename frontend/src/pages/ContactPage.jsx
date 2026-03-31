@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { imageUrl } from '../config';
+import axios from 'axios';
+import API_BASE from '../config';
 import HeroHeader from '../components/HeroHeader';
+import contactImage from '../assets/contact_1.jpg';
 
 const CONTACT_INFO = [
   {
@@ -23,20 +25,36 @@ const CONTACT_INFO = [
 export default function ContactPage() {
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', message: '' });
   const [sent, setSent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (window.Swal) {
-      window.Swal.fire({
-        icon: 'success',
-        title: 'Đã nhận được tin nhắn',
-        text: 'Đội ngũ của chúng tôi sẽ liên hệ với bạn trong vòng 24 giờ.',
-        timer: 2500,
-        showConfirmButton: false,
-      });
+    try {
+      setSubmitting(true);
+      await axios.post(`${API_BASE}/api/contact`, form, { withCredentials: true });
+      if (window.Swal) {
+        window.Swal.fire({
+          icon: 'success',
+          title: 'Đã nhận được tin nhắn',
+          text: 'Đội ngũ của chúng tôi sẽ liên hệ với bạn trong vòng 24 giờ.',
+          timer: 2500,
+          showConfirmButton: false,
+        });
+      }
+      setSent(true);
+      setForm({ firstName: '', lastName: '', email: '', message: '' });
+    } catch (error) {
+      if (window.Swal) {
+        window.Swal.fire({
+          icon: 'error',
+          title: 'Gửi thất bại',
+          text: error.response?.data?.message || 'Hiện chưa thể gửi liên hệ. Vui lòng thử lại.',
+        });
+      }
+      setSent(false);
+    } finally {
+      setSubmitting(false);
     }
-    setSent(true);
-    setForm({ firstName: '', lastName: '', email: '', message: '' });
   };
 
   return (
@@ -66,7 +84,7 @@ export default function ContactPage() {
 
       {/* ── HERO ────────────────────────────────────────────────────── */}
       <HeroHeader
-        image={imageUrl('/images/contact/contact_hero_bg.jpg')}
+        image={contactImage}
         altText="Liên hệ với GOAT HOTEL"
       />
 
@@ -134,9 +152,10 @@ export default function ContactPage() {
               <div className="pt-6">
                 <button
                   type="submit"
+                  disabled={submitting}
                   className="bg-primary text-on-primary px-12 py-4 font-label text-xs tracking-[0.3em] uppercase hover:bg-primary/90 transition-all active:scale-95"
                 >
-                  GỬI TIN NHẮN
+                  {submitting ? 'ĐANG GỬI...' : 'GỬI TIN NHẮN'}
                 </button>
                 {sent && (
                   <p className="mt-4 font-label text-xs text-secondary uppercase tracking-widest">

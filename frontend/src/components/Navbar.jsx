@@ -56,7 +56,12 @@ export default function Navbar({ user, onLogout, variant }) {
 
   return (
     <nav className={`fixed top-0 w-full z-50 transition-all duration-500 flex justify-between items-center px-12 py-6 ${navBg} ${visible ? 'translate-y-0' : '-translate-y-full'}`}>
-      <div className="font-headline italic text-2xl tracking-tighter text-white uppercase font-bold">GOAT HOTEL</div>
+      <Link
+        to="/"
+        className="font-headline italic text-2xl tracking-tighter text-white uppercase font-bold no-underline hover:text-white"
+      >
+        GOAT HOTEL
+      </Link>
       <div className="hidden md:flex items-center gap-10">
         <Link className={`font-label font-bold uppercase tracking-widest text-[11px] transition-colors no-underline ${isActive('/') ? 'text-secondary' : 'text-slate-300 hover:text-white'}`} to="/">TRANG CHỦ</Link>
         <Link className={`font-label font-bold uppercase tracking-widest text-[11px] transition-colors no-underline ${isActive('/collections') ? 'text-secondary' : 'text-slate-300 hover:text-white'}`} to="/collections">ĐẶT PHÒNG</Link>
@@ -99,6 +104,19 @@ export default function Navbar({ user, onLogout, variant }) {
 
                 {/* Menu items */}
                 <div className="py-1" style={{ background: '#0f172a' }}>
+                  {user?.role?.toLowerCase() === 'admin' && (
+                    <Link
+                      to="/admin"
+                      onClick={() => setDropdownOpen(false)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', color: '#cbd5e1', fontSize: '12px', textDecoration: 'none', transition: 'all 0.15s' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#fff'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#cbd5e1'; }}
+                    >
+                      <span className="material-symbols-outlined text-base" style={{ fontSize: '16px', color: '#f59e0b', fontVariationSettings: "'FILL' 0, 'wght' 300" }}>admin_panel_settings</span>
+                      Trang quản trị
+                    </Link>
+                  )}
+
                   <Link
                     to="/profile"
                     onClick={() => setDropdownOpen(false)}

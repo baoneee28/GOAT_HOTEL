@@ -37,6 +37,8 @@ public interface RoomRepository extends JpaRepository<Room, Integer> {
     @Query("SELECT MAX(r.id) FROM Room r")
     Integer findMaxId();
 
+    java.util.Optional<Room> findByRoomNumber(String roomNumber);
+
 
     @Query("SELECT r FROM Room r LEFT JOIN r.roomType t WHERE " +
            "(:search IS NULL OR :search = '' OR r.roomNumber LIKE %:search%) AND " +

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import API_BASE from '../../config';
+import API_BASE, { iconUrl } from '../../config';
 
 export default function Items() {
   const [data, setData] = useState({ items: [], totalPages: 1, currentPage: 1 });
@@ -98,8 +98,8 @@ export default function Items() {
                       {data.items?.length > 0 ? data.items.map(i => (
                           <tr key={i.id}>
                               <td>
-                                  <img src={i.image?.startsWith('http') || i.image?.startsWith('/uploads') ? i.image : `${API_BASE}${i.image}`} 
-                                       className="item-icon-img" alt={i.name} onError={(e)=>{e.target.onerror=null; e.target.src='https://via.placeholder.com/40'}} />
+                                  <img src={iconUrl(i.image)} 
+                                       className="item-icon-img" alt={i.name} onError={(e)=>{e.target.onerror=null; e.target.src=iconUrl('/icons/tv.png')}} />
                               </td>
                               <td className="fw-bold">{i.name}</td>
                               <td className="text-muted small">{i.image}</td>
@@ -145,7 +145,7 @@ export default function Items() {
                               <div className="mb-4">
                                   <label className="form-label fw-bold">Đường dẫn Icon (URL)</label>
                                   <input type="text" className="form-control rounded-3" value={formData.image} onChange={e => setFormData({...formData, image: e.target.value})} placeholder="https://..." required />
-                                  <div className="form-text">Dán link ảnh từ Flaticon hoặc các nguồn mở khác.</div>
+                                  <div className="form-text">Có thể nhập link đầy đủ, `/icons/ten-file.png` hoặc chỉ `ten-file.png` nếu icon nằm trong thư mục icons.</div>
                               </div>
                               <button type="submit" className="btn btn-primary w-100 py-2 fw-bold" style={{ background: 'var(--primary-color)', border: 'none', borderRadius: '12px' }}>
                                   Lưu vật phẩm

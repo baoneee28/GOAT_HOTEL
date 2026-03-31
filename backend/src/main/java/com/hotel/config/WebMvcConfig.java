@@ -36,7 +36,18 @@ public class WebMvcConfig implements WebMvcConfigurer {
         // Đăng ký AdminInterceptor: Bảo vệ toàn bộ các trang quản trị bắt đầu bằng /admin
         // Áp dụng cho cả /admin và các trang con phía trong như /admin/rooms, /admin/users...
         registry.addInterceptor(adminInterceptor)
-                .addPathPatterns("/admin", "/admin/**");
+                .addPathPatterns(
+                        "/admin",
+                        "/admin/**",
+                        "/api/admin/**",
+                        "/api/rooms/admin",
+                        "/api/rooms/admin/**",
+                        "/api/room-types/admin",
+                        "/api/room-types/admin/**",
+                        "/api/news/admin",
+                        "/api/news/admin/**",
+                        "/api/upload"
+                );
     }
 
     @Override

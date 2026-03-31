@@ -133,7 +133,7 @@ public class BookingApiController {
 
         Page<Booking> historyPage = bookingService.getHistory(currentUser.getId(), status.isBlank() ? null : status, page);
         Map<String, Object> response = new HashMap<>();
-        response.put("bookings", historyPage.getContent());
+        response.put("bookings", bookingService.normalizeBookingFinancials(historyPage.getContent()));
         response.put("totalPages", historyPage.getTotalPages());
         return ResponseEntity.ok(response);
     }
@@ -161,7 +161,7 @@ public class BookingApiController {
         }
 
         response.put("success", true);
-        response.put("booking", booking);
+        response.put("booking", bookingService.normalizeBookingFinancials(booking));
         return ResponseEntity.ok(response);
     }
 
@@ -195,7 +195,7 @@ public class BookingApiController {
                 PageRequest.of(page - 1, 5));
 
         Map<String, Object> response = new HashMap<>();
-        response.put("bookings", bookingPage.getContent());
+        response.put("bookings", bookingService.normalizeBookingFinancials(bookingPage.getContent()));
         response.put("totalPages", bookingPage.getTotalPages());
         return ResponseEntity.ok(response);
     }
@@ -219,8 +219,8 @@ public class BookingApiController {
             }
 
             Room room = roomOpt.get();
-            double pricePerHour = room.getRoomType().getPricePerNight();
-            Map<String, Double> priceInfo = bookingService.calculateBookingPriceAdmin(checkIn, checkOut, pricePerHour);
+            double pricePerNight = room.getRoomType().getPricePerNight();
+            Map<String, Double> priceInfo = bookingService.calculateBookingPriceAdmin(checkIn, checkOut, pricePerNight);
             double totalHours = priceInfo.get("hours");
             double totalPrice = priceInfo.get("total");
 
@@ -279,7 +279,7 @@ public class BookingApiController {
                 BookingDetail detail = new BookingDetail();
                 detail.setBooking(booking);
                 detail.setRoom(room);
-                detail.setPriceAtBooking(pricePerHour);
+                detail.setPriceAtBooking(pricePerNight);
                 detail.setCheckIn(checkIn);
                 detail.setCheckOut(checkOut);
                 detail.setTotalHours(totalHours);
@@ -322,8 +322,8 @@ public class BookingApiController {
 
         if ("recalc".equals(checkoutType)) {
             LocalDateTime now = LocalDateTime.now();
-            double pricePerHour = detail.getPriceAtBooking();
-            Map<String, Double> priceInfo = bookingService.calculateBookingPriceAdmin(detail.getCheckIn(), now, pricePerHour);
+            double pricePerNight = detail.getPriceAtBooking();
+            Map<String, Double> priceInfo = bookingService.calculateBookingPriceAdmin(detail.getCheckIn(), now, pricePerNight);
 
             detail.setCheckOut(now);
             detail.setCheckOutActual(now);
@@ -372,13 +372,15 @@ public class BookingApiController {
     @DeleteMapping("/admin/bookings/{id}")
     public ResponseEntity<Map<String, Object>> deleteAdminBooking(@PathVariable("id") Integer id) {
         Map<String, Object> response = new HashMap<>();
-        try {
-            bookingRepository.deleteById(id);
-            response.put("success", true);
-        } catch (Exception e) {
+        Optional<Booking> bookingOpt = bookingRepository.findById(id);
+        if (bookingOpt.isEmpty()) {
             response.put("success", false);
-            response.put("message", "Không thể xóa đơn đặt phòng: " + e.getMessage());
+            response.put("message", "Không tìm thấy đơn đặt phòng.");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
         }
-        return ResponseEntity.ok(response);
+
+        response.put("success", false);
+        response.put("message", "GOAT HOTEL không hỗ trợ xóa cứng booking. Hãy giữ đơn ở trạng thái cancelled để lưu lịch sử.");
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
     }
 }

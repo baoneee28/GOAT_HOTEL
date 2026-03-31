@@ -3,6 +3,7 @@ package com.hotel.controller;
 import com.hotel.entity.User;
 import com.hotel.repository.FeaturedRoomTypeRepository;
 import com.hotel.repository.FeaturedNewsRepository;
+import com.hotel.service.AuthService;
 import com.hotel.service.BookingService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,13 +31,16 @@ public class HomeController {
     @Autowired
     private FeaturedNewsRepository featuredNewsRepository;
 
+    @Autowired
+    private AuthService authService;
+
     @GetMapping("/")
     public ResponseEntity<Map<String, Object>> index(HttpSession session) {
         Map<String, Object> response = new HashMap<>();
         if (session.getAttribute("user") != null) {
             User user = (User) session.getAttribute("user");
             response.put("active_booking", bookingService.getActiveBooking(user.getId()));
-            response.put("user_logged_in", user);
+            response.put("user_logged_in", authService.toClientUser(user));
         }
 
         response.put("featured_rooms", featuredRoomTypeRepository.findAllByOrderByDisplayOrderAsc());

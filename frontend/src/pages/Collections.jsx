@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
-import API_BASE from '../config';
-import bookingImage from '../assets/booking_images_1.jpg';
+import API_BASE, { uploadedImageUrl } from '../config';
+import bookingImage from '../assets/collections_2.jpg';
 import HeroHeader from '../components/HeroHeader';
 
 const getToday = () => new Date().toISOString().split('T')[0];
@@ -353,7 +353,7 @@ export default function Collections() {
                   <img
                     alt={room.typeName}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                    src={room.image || 'https://via.placeholder.com/600x400?text=No+Image'}
+                    src={uploadedImageUrl(room.image, '/images/rooms/standard-room.jpg')}
                   />
                   <div className="absolute inset-0 bg-primary/10 group-hover:bg-transparent transition-colors"></div>
                   {outOfRooms && (

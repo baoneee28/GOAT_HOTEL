@@ -60,6 +60,9 @@ public class RoomTypeApiController {
                     map.put("typeName", type.getTypeName());
                     map.put("pricePerNight", type.getPricePerNight());
                     map.put("capacity", type.getCapacity());
+                    map.put("size", type.getSize());
+                    map.put("beds", type.getBeds());
+                    map.put("view", type.getView());
                     map.put("image", type.getImage());
                     map.put("description", type.getDescription());
                     map.put("items", type.getItems());
@@ -94,6 +97,7 @@ public class RoomTypeApiController {
         Map<String, Object> response = new java.util.HashMap<>();
         response.put("roomTypes", typePage.getContent());
         response.put("totalPages", typePage.getTotalPages());
+        response.put("currentPage", page);
         return org.springframework.http.ResponseEntity.ok(response);
     }
 
@@ -115,6 +119,9 @@ public class RoomTypeApiController {
         roomType.setTypeName(payload.get("typeName").toString());
         roomType.setPricePerNight(Double.parseDouble(payload.get("pricePerNight").toString()));
         roomType.setCapacity(Integer.parseInt(payload.get("capacity").toString()));
+        roomType.setSize(payload.get("size") != null ? payload.get("size").toString() : "");
+        roomType.setBeds(payload.get("beds") != null ? payload.get("beds").toString() : "");
+        roomType.setView(payload.get("view") != null ? payload.get("view").toString() : "");
         roomType.setDescription(payload.get("description") != null ? payload.get("description").toString() : "");
         roomType.setImage(payload.get("image") != null ? payload.get("image").toString() : "");
 

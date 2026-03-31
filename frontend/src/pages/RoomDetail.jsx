@@ -1,16 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import API_BASE, { imageUrl } from '../config';
+import API_BASE, { imageUrl, uploadedImageUrl, iconUrl, resolveRoomTypeSpec } from '../config';
 import HeroHeader from '../components/HeroHeader';
 
-// Helper: lấy danh sách amenities từ API response (room.items[].item.name)
+// Helper: lấy danh sách amenities từ API response (room.items[].item)
 const getRoomAmenities = (room) => {
   if (room.items && room.items.length > 0) {
-    return room.items.map(ri => ri.item?.name).filter(Boolean);
+    return room.items
+      .map((ri) => ({
+        name: ri.item?.name,
+        image: ri.item?.image,
+      }))
+      .filter((item) => item.name);
   }
-  // Fallback khi API không trả items
-  return ['WiFi miễn phí', 'TV màn hình phẳng', 'Điều hòa', 'Phòng tắm riêng'];
+  return [];
 };
 
 const getAmenityIcon = (label) => {
@@ -110,10 +114,10 @@ export default function RoomDetail() {
   );
 
   const currentSpecs = {
-    size: room.size ?? '25m²',
+    size: resolveRoomTypeSpec(room.typeName || room.name, 'size', room.size),
     capacity: room.capacity ?? 2,
-    beds: room.beds ?? '1 Giường đôi',
-    view: room.view ?? 'Hướng vườn',
+    beds: resolveRoomTypeSpec(room.typeName || room.name, 'beds', room.beds),
+    view: resolveRoomTypeSpec(room.typeName || room.name, 'view', room.view),
     subtitle: `${room.typeName || 'Phòng nghỉ'} · Phù hợp ${room.capacity || 2} khách`
   };
 
@@ -123,7 +127,7 @@ export default function RoomDetail() {
     <div className="bg-surface text-on-surface font-body min-h-screen flex flex-col">
 
       {/* ── HERO IMAGE ──────────────────────────────────────────────── */}
-      <HeroHeader image={imageUrl(room.image)} altText={room.typeName || room.name}>
+      <HeroHeader image={uploadedImageUrl(room.image, '/images/rooms/standard-room.jpg')} altText={room.typeName || room.name}>
         {/* Thumbnail strip */}
         {room.images?.length > 1 && (
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-3 z-20">
@@ -262,8 +266,9 @@ export default function RoomDetail() {
               Tiện ích Độc quyền
             </p>
             <div className="grid grid-cols-2 gap-y-4 gap-x-6">
-              {roomAmenities.map((label) => {
-                const customIcon = getAmenityIcon(label);
+              {roomAmenities.length > 0 ? roomAmenities.map((amenity) => {
+                const label = amenity.name;
+                const customIcon = amenity.image ? iconUrl(amenity.image) : getAmenityIcon(label);
                 return (
                   <div key={label} className="flex items-center gap-3">
                     {customIcon ? (
@@ -279,7 +284,9 @@ export default function RoomDetail() {
                     <span className="font-body text-sm text-on-surface">{label}</span>
                   </div>
                 );
-              })}
+              }) : (
+                <p className="col-span-2 font-body text-sm text-on-surface-variant">Chưa cập nhật tiện ích cho hạng phòng này.</p>
+              )}
             </div>
           </div>
         </div>

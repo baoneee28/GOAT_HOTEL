@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import API_BASE from '../../config';
+import API_BASE, { calculateBookingDisplayTotal, calculateStayNights } from '../../config';
 const Swal = window.Swal;
 
 export default function Bookings() {
@@ -20,6 +20,28 @@ export default function Bookings() {
     id: '', userId: '', roomId: '', checkIn: '', checkOut: '', status: 'pending'
   });
 
+  const getErrorMessage = (error, fallback = 'Có lỗi xảy ra') => {
+    const payload = error?.response?.data;
+    if (typeof payload === 'string' && payload.trim()) return payload;
+    if (payload?.message) return payload.message;
+    return error?.message || fallback;
+  };
+
+  const toDateTimeLocalValue = (value) => {
+    if (!value) return '';
+
+    if (Array.isArray(value)) {
+      const [year, month, day, hour = 0, minute = 0] = value;
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    }
+
+    const raw = String(value).trim();
+    if (!raw) return '';
+
+    const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+    return normalized.substring(0, 16);
+  };
+
   const fetchData = useCallback(async () => {
     try {
       const res = await axios.get(`${API_BASE}/api/admin/bookings?status=${status}&page=${page}`, { withCredentials: true });
@@ -33,29 +55,11 @@ export default function Bookings() {
     axios.get(`${API_BASE}/api/rooms`, { withCredentials: true }).then(r => setRooms(r.data));
   }, [fetchData]);
 
-  const handleDelete = (id) => {
-    Swal.fire({
-      title: 'Cảnh báo xóa!', text: 'Đơn này sẽ bị xóa.', icon: 'warning',
-      showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Xóa ngay', cancelButtonText: 'Hủy'
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        try {
-          const res = await axios.delete(`${API_BASE}/api/admin/bookings/${id}`, { withCredentials: true });
-          if (res.data.success) {
-            Swal.fire({ icon: 'success', title: 'Thành công', timer: 1500, showConfirmButton: false });
-            fetchData();
-          } else {
-            Swal.fire({ icon: 'error', title: 'Lỗi', text: res.data.message });
-          }
-        } catch (err) { Swal.fire({ icon: 'error', title: 'Lỗi', text: 'Có lỗi xảy ra' }); }
-      }
-    });
-  };
-
   const handleCheckout = (b) => {
     const detail = b.details?.[0] || {};
     const checkOutDate = new Date(detail.checkOut || Date.now());
     const now = new Date();
+    const displayTotal = calculateBookingDisplayTotal(b);
     if (now < checkOutDate) {
       Swal.fire({
         title: 'Khách trả phòng sớm!',
@@ -65,12 +69,12 @@ export default function Bookings() {
                     <input class="form-check-input" type="radio" name="checkoutOpt" id="opt1" value="keep" checked>
                     <label class="form-check-label fw-bold" for="opt1">
                         Thanh toán theo giá đã đặt
-                        <div class="text-primary">${b.totalPrice.toLocaleString('vi-VN')}đ</div>
+                        <div class="text-primary">${displayTotal.toLocaleString('vi-VN')}đ</div>
                     </label>
                 </div>
                 <div class="form-check">
                     <input class="form-check-input" type="radio" name="checkoutOpt" id="opt2" value="recalc">
-                    <label class="form-check-label fw-bold" for="opt2">Tính lại theo thời gian thực (hệ thống)</label>
+                    <label class="form-check-label fw-bold" for="opt2">Tính lại theo số đêm thực tế</label>
                 </div>
             </div>
         `,
@@ -117,7 +121,7 @@ export default function Bookings() {
             fetchData();
           }
         } catch (e) {
-            Swal.fire({ icon: 'error', title: 'Lỗi', text: e.response?.data?.message || 'Có lỗi xảy ra' });
+            Swal.fire({ icon: 'error', title: 'Lỗi', text: getErrorMessage(e) });
         }
       }
     });
@@ -127,8 +131,8 @@ export default function Bookings() {
     const detail = b.details?.[0] || {};
     setFormData({
       id: b.id, userId: b.user?.id || '', roomId: detail.room?.id || '',
-      checkIn: detail.checkIn ? detail.checkIn.replace(' ', 'T').substring(0, 16) : '',
-      checkOut: detail.checkOut ? detail.checkOut.replace(' ', 'T').substring(0, 16) : '',
+      checkIn: toDateTimeLocalValue(detail.checkIn),
+      checkOut: toDateTimeLocalValue(detail.checkOut),
       status: b.status
     });
     setShowModal(true);
@@ -149,13 +153,17 @@ export default function Bookings() {
         fetchData();
       }
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Lỗi', text: err.response?.data?.message || 'Có lỗi xảy ra' });
+      Swal.fire({ icon: 'error', title: 'Lỗi', text: getErrorMessage(err) });
     }
   };
 
   const printInvoice = () => { window.print(); };
 
   const availableRooms = rooms.filter(r => r.status === 'available');
+  const getStayNightsLabel = (checkIn, checkOut) => {
+    const nights = calculateStayNights(checkIn, checkOut);
+    return nights > 0 ? `${nights} đêm` : 'Chưa cập nhật';
+  };
 
   return (
     <>
@@ -177,7 +185,7 @@ export default function Bookings() {
       <div className="d-flex justify-content-between align-items-center mb-4">
           <div>
               <h2 className="fw-bold mb-1">Quản lý đặt phòng</h2>
-              <p className="text-muted mb-0">Hệ thống tính tiền tự động theo giờ</p>
+              <p className="text-muted mb-0">Hệ thống tính tiền tự động theo đêm</p>
           </div>
           <button className="btn btn-primary px-4 py-2 rounded-3 fw-bold shadow-sm" style={{ background: 'var(--primary-color)', border: 'none' }} onClick={handleAddNew}>
               + Tạo đơn mới
@@ -208,6 +216,7 @@ export default function Bookings() {
                   <tbody>
                       {data.bookings && data.bookings.length > 0 ? data.bookings.map(b => {
                           const formatDate = (arr) => Array.isArray(arr) ? `${String(arr[2]).padStart(2,'0')}/${String(arr[1]).padStart(2,'0')}/${arr[0]} ${String(arr[3]).padStart(2,'0')}:${String(arr[4]||0).padStart(2,'0')}` : arr;
+                          const displayTotal = calculateBookingDisplayTotal(b);
                           return (
                           <tr key={b.id}>
                               <td className="fw-bold px-3 text-wrap text-break">{b.user?.fullName}</td>
@@ -215,7 +224,7 @@ export default function Bookings() {
                                   {b.details?.map((d, i) => (
                                     <div key={`rm-${i}`} className="mb-2">
                                       <div className="fw-bold text-primary">Phòng {d.room?.roomNumber}</div>
-                                      <small className="text-muted">{d.room?.roomType?.pricePerNight.toLocaleString('vi-VN')}đ/ngày</small>
+                                      <small className="text-muted">{d.room?.roomType?.pricePerNight.toLocaleString('vi-VN')}đ/đêm</small>
                                     </div>
                                   ))}
                               </td>
@@ -228,8 +237,10 @@ export default function Bookings() {
                                   ))}
                               </td>
                               <td className="fw-bold text-primary">
-                                  {b.totalPrice.toLocaleString('vi-VN')}đ<br />
-                                  <span className="badge bg-light text-dark fw-normal border">{b.totalHours}h thuê</span>
+                                  {displayTotal.toLocaleString('vi-VN')}đ<br />
+                                  <span className="badge bg-light text-dark fw-normal border">
+                                      {getStayNightsLabel(b.details?.[0]?.checkIn, b.details?.[0]?.checkOut)}
+                                  </span>
                               </td>
                               <td><span className={`st-badge st-${b.status}`}>{b.status}</span></td>
                               <td className="text-end px-3">
@@ -249,7 +260,6 @@ export default function Bookings() {
                                       {b.status !== 'completed' && (
                                           <button className="btn btn-sm btn-light text-primary border rounded-circle" style={{width:'32px', height:'32px'}} title="Sửa" onClick={() => handleEdit(b)}>✎</button>
                                       )}
-                                      <button className="btn btn-sm btn-light text-danger border rounded-circle" style={{width:'32px', height:'32px'}} title="Xóa" onClick={() => handleDelete(b.id)}>🗑</button>
                                   </div>
                               </td>
                           </tr>
@@ -343,16 +353,16 @@ export default function Bookings() {
                               {invoiceData.details?.map((d, i) => (
                                 <div key={i} className="mb-3 border rounded p-2 bg-light">
                                   <div className="invoice-row"><span className="text-muted">Phòng:</span> <span className="fw-bold">{d.room?.roomNumber} ({d.room?.roomType?.typeName})</span></div>
-                                  <div className="invoice-row"><span className="text-muted">Giờ vào:</span> <span>{d.checkIn}</span></div>
-                                  <div className="invoice-row"><span className="text-muted">Giờ ra:</span> <span>{d.checkOut}</span></div>
+                                  <div className="invoice-row"><span className="text-muted">Nhận phòng:</span> <span>{d.checkIn}</span></div>
+                                  <div className="invoice-row"><span className="text-muted">Trả phòng:</span> <span>{d.checkOut}</span></div>
                                   <div className="border-top mt-2 pt-2">
                                       <div className="invoice-row">
                                           <span>Đơn giá</span>
-                                          <span>{d.priceAtBooking.toLocaleString('vi-VN')}đ /ngày</span>
+                                          <span>{d.priceAtBooking.toLocaleString('vi-VN')}đ /đêm</span>
                                       </div>
                                       <div className="invoice-row mb-0">
-                                          <span>Thời gian sử dụng</span>
-                                          <span>{d.totalHours} giờ</span>
+                                          <span>Thời gian lưu trú</span>
+                                          <span>{getStayNightsLabel(d.checkIn, d.checkOut)}</span>
                                       </div>
                                   </div>
                                 </div>
@@ -360,7 +370,7 @@ export default function Bookings() {
 
                               <div className="invoice-total d-flex justify-content-between">
                                   <span>TỔNG CỘNG</span>
-                                  <span>{invoiceData.totalPrice.toLocaleString('vi-VN')} VNĐ</span>
+                                  <span>{calculateBookingDisplayTotal(invoiceData).toLocaleString('vi-VN')} VNĐ</span>
                               </div>
                               <div className="text-center mt-3 text-success fw-bold text-uppercase small border p-1 rounded bg-light">
                                   Đã thanh toán

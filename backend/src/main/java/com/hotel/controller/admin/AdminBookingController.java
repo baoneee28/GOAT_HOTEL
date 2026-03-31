@@ -78,9 +78,9 @@ public class AdminBookingController {
         if (roomOpt.isEmpty()) return "redirect:/admin/bookings";
 
         Room room = roomOpt.get();
-        double pricePerHour = room.getRoomType().getPricePerNight();
+        double pricePerNight = room.getRoomType().getPricePerNight();
 
-        Map<String, Double> priceInfo = bookingService.calculateBookingPriceAdmin(check_in, check_out, pricePerHour);
+        Map<String, Double> priceInfo = bookingService.calculateBookingPriceAdmin(check_in, check_out, pricePerNight);
         double totalHours = priceInfo.get("hours");
         double totalPrice = priceInfo.get("total");
 
@@ -124,7 +124,7 @@ public class AdminBookingController {
             BookingDetail detail = new BookingDetail();
             detail.setBooking(booking);
             detail.setRoom(room);
-            detail.setPriceAtBooking(pricePerHour);
+            detail.setPriceAtBooking(pricePerNight);
             detail.setCheckIn(check_in);
             detail.setCheckOut(check_out);
             detail.setTotalHours(totalHours);
@@ -150,8 +150,8 @@ public class AdminBookingController {
 
         if ("recalc".equals(checkout_type)) {
             LocalDateTime now = LocalDateTime.now();
-            double pricePerHour = detail.getPriceAtBooking();
-            Map<String, Double> priceInfo = bookingService.calculateBookingPriceAdmin(detail.getCheckIn(), now, pricePerHour);
+            double pricePerNight = detail.getPriceAtBooking();
+            Map<String, Double> priceInfo = bookingService.calculateBookingPriceAdmin(detail.getCheckIn(), now, pricePerNight);
 
             detail.setCheckOut(now);
             detail.setCheckOutActual(now);
@@ -176,7 +176,6 @@ public class AdminBookingController {
 
     @PostMapping(params = "action=delete")
     public String deleteBooking(@RequestParam @NonNull Integer booking_id) {
-        bookingRepository.deleteById(booking_id);
-        return "redirect:/admin/bookings";
+        return "redirect:/admin/bookings?error=delete-disabled";
     }
 }

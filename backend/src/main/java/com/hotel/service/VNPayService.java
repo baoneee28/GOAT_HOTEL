@@ -71,11 +71,19 @@ public class VNPayService {
         if (!"pending".equalsIgnoreCase(booking.getStatus())) {
             throw new IllegalArgumentException("Chỉ có thể thanh toán booking đang ở trạng thái chờ xử lý.");
         }
+        if ("paid".equalsIgnoreCase(booking.getPaymentStatus())) {
+            throw new IllegalArgumentException("Booking này đã được đánh dấu đã thanh toán.");
+        }
 
         bookingService.normalizeBookingFinancials(booking);
         double bookingTotal = booking.getTotalPrice() != null ? booking.getTotalPrice() : 0.0;
         if (bookingTotal <= 0) {
             throw new IllegalArgumentException("Đơn đặt phòng chưa có số tiền hợp lệ để thanh toán.");
+        }
+
+        if (!"pending_payment".equalsIgnoreCase(booking.getPaymentStatus())) {
+            booking.setPaymentStatus("pending_payment");
+            bookingRepository.save(booking);
         }
 
         long amount = Math.round(bookingTotal * 100L);
@@ -135,7 +143,7 @@ public class VNPayService {
     public String buildFrontendReturnUrl(Map<String, String> queryParams) {
         VNPayValidationResult validation = validateCallback(queryParams);
         if (validation.success() && validation.booking() != null) {
-            confirmBookingPayment(validation.booking());
+            confirmBookingPayment(validation.booking(), "VNPay");
         }
 
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(vnpFrontendReturnUrl.trim())
@@ -164,7 +172,7 @@ public class VNPayService {
         }
 
         if (validation.paymentSuccess()) {
-            confirmBookingPayment(validation.booking());
+            confirmBookingPayment(validation.booking(), "VNPay");
             return createIpnResponse("00", "Confirm Success");
         }
 
@@ -259,23 +267,57 @@ public class VNPayService {
         return response;
     }
 
-    private void confirmBookingPayment(Booking booking) {
+    @Transactional
+    public Booking confirmDemoPayment(Integer bookingId, Integer currentUserId) {
+        if (bookingId == null) {
+            throw new IllegalArgumentException("Thiếu booking để xác nhận thanh toán demo.");
+        }
+        if (currentUserId == null) {
+            throw new SecurityException("Phiên đăng nhập không hợp lệ.");
+        }
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn đặt phòng."));
+
+        if (booking.getUser() == null || !currentUserId.equals(booking.getUser().getId())) {
+            throw new SecurityException("Bạn không có quyền thao tác đơn đặt phòng này.");
+        }
+        if ("cancelled".equalsIgnoreCase(booking.getStatus())) {
+            throw new IllegalArgumentException("Booking đã bị hủy nên không thể mô phỏng thanh toán.");
+        }
+        if (!"pending".equalsIgnoreCase(booking.getStatus()) && !"confirmed".equalsIgnoreCase(booking.getStatus())) {
+            throw new IllegalArgumentException("Chỉ có thể mô phỏng thanh toán cho booking đang chờ hoặc đã xác nhận.");
+        }
+
+        confirmBookingPayment(booking, "VNPay Demo");
+        return booking;
+    }
+
+    private void confirmBookingPayment(Booking booking, String paymentMethod) {
         if (booking == null || "cancelled".equalsIgnoreCase(booking.getStatus())) {
             return;
         }
 
+        boolean changed = false;
         if ("pending".equalsIgnoreCase(booking.getStatus())) {
             booking.setStatus("confirmed");
+            changed = true;
+        }
+        if (!"paid".equalsIgnoreCase(booking.getPaymentStatus())) {
+            booking.setPaymentStatus("paid");
+            changed = true;
+        }
+        if (changed) {
             bookingRepository.save(booking);
         }
 
-        if (!paymentRepository.existsByBooking_IdAndPaymentMethodIgnoreCase(booking.getId(), "VNPay")) {
+        if (!paymentRepository.existsByBooking_Id(booking.getId())) {
             Payment payment = new Payment();
             payment.setBooking(booking);
             payment.setAmount(booking.getTotalPrice());
-            payment.setPaymentMethod("VNPay");
+            payment.setPaymentMethod(paymentMethod);
             payment.setPaymentDate(java.time.LocalDateTime.now());
-            payment.setStatus("completed");
+            payment.setStatus("paid");
             paymentRepository.save(payment);
         }
     }

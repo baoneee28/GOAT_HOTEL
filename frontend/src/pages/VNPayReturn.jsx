@@ -1,12 +1,52 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import axios from 'axios';
+import API_BASE from '../config';
 
 export default function VNPayReturn() {
   const [searchParams] = useSearchParams();
-  const status = searchParams.get('status') === 'success' ? 'success' : 'error';
-  const message = searchParams.get('message')
-    || (status === 'success' ? 'Thanh toán VNPay thành công.' : 'Thanh toán VNPay chưa thành công.');
+  const [demoSubmitting, setDemoSubmitting] = useState(false);
+  const [demoState, setDemoState] = useState(null);
+
   const bookingId = searchParams.get('bookingId');
+  const initialStatus = searchParams.get('status') === 'success' ? 'success' : 'error';
+  const status = demoState?.status || initialStatus;
+  const message = demoState?.message
+    || searchParams.get('message')
+    || (status === 'success' ? 'Thanh toán VNPay thành công.' : 'Thanh toán VNPay chưa hoàn tất.');
+
+  const handleDemoSuccess = async () => {
+    if (!bookingId) return;
+
+    try {
+      setDemoSubmitting(true);
+      const res = await axios.post(`${API_BASE}/api/vnpay/demo-success`, {
+        bookingId,
+      }, {
+        withCredentials: true,
+      });
+
+      if (res.data?.success) {
+        setDemoState({
+          status: 'success',
+          message: res.data?.message || 'Đã mô phỏng thanh toán thành công cho booking này.',
+        });
+        return;
+      }
+
+      setDemoState({
+        status: 'error',
+        message: res.data?.message || 'Không thể mô phỏng thanh toán thành công.',
+      });
+    } catch (error) {
+      setDemoState({
+        status: 'error',
+        message: error.response?.data?.message || 'Không thể xác nhận thanh toán demo lúc này.',
+      });
+    } finally {
+      setDemoSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f5efe5_0%,#fbf8f3_34%,#f9f5ee_100%)] px-6 py-24 text-on-surface">
@@ -24,12 +64,18 @@ export default function VNPayReturn() {
         <p className={`mt-8 font-label text-[0.68rem] uppercase tracking-[0.28em] ${
           status === 'success' ? 'text-emerald-600' : 'text-rose-600'
         }`}>
-          VNPay Result
+          VNPay Demo Result
         </p>
         <h1 className="mt-4 font-headline text-4xl text-primary">
           {status === 'success' ? 'Thanh toán thành công' : 'Thanh toán chưa hoàn tất'}
         </h1>
         <p className="mt-5 text-sm leading-7 text-on-surface-variant">{message}</p>
+
+        {status !== 'success' && bookingId && (
+          <div className="mt-6 rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 text-left text-sm leading-7 text-amber-900">
+            Booking này vẫn nên được giữ ở trạng thái chờ xử lý và chờ thanh toán. Nếu bạn cần demo case thành công để bảo vệ đồ án, hãy dùng nút mô phỏng bên dưới.
+          </div>
+        )}
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           {bookingId && (
@@ -39,6 +85,16 @@ export default function VNPayReturn() {
             >
               Xem chi tiết đơn
             </Link>
+          )}
+          {status !== 'success' && bookingId && (
+            <button
+              type="button"
+              onClick={handleDemoSuccess}
+              disabled={demoSubmitting}
+              className="inline-flex items-center justify-center rounded-full border border-emerald-500 bg-emerald-50 px-6 py-3 font-label text-[0.64rem] uppercase tracking-[0.22em] text-emerald-700 transition-all hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {demoSubmitting ? 'ĐANG XÁC NHẬN DEMO...' : 'THANH TOÁN THÀNH CÔNG (DEMO)'}
+            </button>
           )}
           <Link
             to="/history"

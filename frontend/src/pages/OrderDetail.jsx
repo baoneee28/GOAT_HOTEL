@@ -60,6 +60,29 @@ const STATUS_META = {
   },
 };
 
+const PAYMENT_META = {
+  unpaid: {
+    label: 'Chưa thanh toán',
+    summary: 'Booking mới được ghi nhận và chưa có giao dịch thanh toán.',
+    badgeClass: 'border border-amber-300/24 bg-amber-100/80 text-amber-800',
+  },
+  pending_payment: {
+    label: 'Chờ thanh toán',
+    summary: 'Bạn đã mở luồng VNPay demo nhưng giao dịch chưa được xác nhận thành công.',
+    badgeClass: 'border border-sky-300/24 bg-sky-100/80 text-sky-800',
+  },
+  paid: {
+    label: 'Đã thanh toán',
+    summary: 'Booking đã được đánh dấu thanh toán thành công.',
+    badgeClass: 'border border-emerald-300/24 bg-emerald-100/80 text-emerald-800',
+  },
+  failed: {
+    label: 'Thanh toán lỗi',
+    summary: 'Lần thanh toán gần nhất không hoàn tất, booking vẫn chưa được ghi nhận đã thanh toán.',
+    badgeClass: 'border border-rose-300/24 bg-rose-100/80 text-rose-800',
+  },
+};
+
 const TIMELINE_STEPS = [
   {
     key: 'pending',
@@ -116,6 +139,7 @@ export default function OrderDetail() {
   const { id } = useParams();
   const [booking, setBooking] = useState(location.state?.booking || null);
   const [cancelling, setCancelling] = useState(false);
+  const [confirmingDemoPayment, setConfirmingDemoPayment] = useState(false);
   const [loading, setLoading] = useState(!location.state?.booking);
 
   React.useEffect(() => {
@@ -173,7 +197,9 @@ export default function OrderDetail() {
   const detail = bookingDetails[0];
   const roomType = detail?.room?.roomType;
   const currentStatus = (booking.status || 'pending').toLowerCase();
+  const currentPaymentStatus = (booking.paymentStatus || 'unpaid').toLowerCase();
   const statusMeta = STATUS_META[currentStatus] || STATUS_META.pending;
+  const paymentMeta = PAYMENT_META[currentPaymentStatus] || PAYMENT_META.unpaid;
   const orderNumber = String(booking.id || 0).padStart(5, '0');
   const nights = Math.max(calculateStayNights(detail?.checkIn, detail?.checkOut) || 1, 1);
   const roomEntries = bookingDetails.map((entry, index) => {
@@ -216,6 +242,7 @@ export default function OrderDetail() {
   const subtotalLabel = roomCount > 1
     ? `Tạm tính lưu trú (${roomCount} phòng)`
     : `Giá phòng (${pricePerNight.toLocaleString('vi-VN')}đ x ${nights} đêm)`;
+  const canOpenVNPay = currentStatus === 'pending' && currentPaymentStatus !== 'paid';
 
   const handleShare = async () => {
     const shareUrl = window.location.href;
@@ -255,6 +282,53 @@ export default function OrderDetail() {
   const handleVNPaySubmit = () => {
     if (!booking?.id) return;
     navigate(`/vnpay-launch?bookingId=${booking.id}`);
+  };
+
+  const handleDemoSuccess = async () => {
+    if (!booking?.id) return;
+
+    try {
+      setConfirmingDemoPayment(true);
+      const res = await axios.post(`${API_BASE}/api/vnpay/demo-success`, {
+        bookingId: booking.id,
+      }, {
+        withCredentials: true,
+      });
+
+      if (res.data?.success) {
+        setBooking((prev) => ({
+          ...prev,
+          status: res.data?.bookingStatus || 'confirmed',
+          paymentStatus: res.data?.paymentStatus || 'paid',
+        }));
+        if (window.Swal) {
+          window.Swal.fire({
+            icon: 'success',
+            title: 'Đã xác nhận demo',
+            text: res.data?.message,
+          });
+        }
+        return;
+      }
+
+      if (window.Swal) {
+        window.Swal.fire({
+          icon: 'error',
+          title: 'Không thể xác nhận demo',
+          text: res.data?.message || 'Vui lòng thử lại.',
+        });
+      }
+    } catch (error) {
+      if (window.Swal) {
+        window.Swal.fire({
+          icon: 'error',
+          title: 'Không thể xác nhận demo',
+          text: error.response?.data?.message || 'Vui lòng thử lại sau.',
+        });
+      }
+    } finally {
+      setConfirmingDemoPayment(false);
+    }
   };
 
   const handleCancel = async () => {
@@ -428,6 +502,9 @@ export default function OrderDetail() {
                     <span className={`h-2 w-2 rounded-full ${statusMeta.accentClass}`}></span>
                     {statusMeta.label}
                   </span>
+                  <span className={`inline-flex items-center rounded-full px-4 py-2 font-label text-[0.64rem] uppercase tracking-[0.2em] shadow-[0_10px_30px_-20px_rgba(0,0,0,0.45)] ${paymentMeta.badgeClass}`}>
+                    {paymentMeta.label}
+                  </span>
                   <span className="booking-action-chip inline-flex items-center rounded-full px-4 py-2 font-label text-[0.64rem] uppercase tracking-[0.2em] text-white">
                     {roomEntries.length > 1 ? `${roomCount} phòng` : roomTypeName}
                   </span>
@@ -456,6 +533,10 @@ export default function OrderDetail() {
                   <div>
                     <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-white/44">Tổng cộng</p>
                     <p className="mt-2 text-sm text-secondary-fixed">{grandTotal.toLocaleString('vi-VN')}đ</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-white/44">Thanh toán</p>
+                    <p className="mt-2 text-sm text-white/82">{paymentMeta.label}</p>
                   </div>
                 </div>
 
@@ -726,7 +807,8 @@ export default function OrderDetail() {
                   <div className="mt-5 divide-y divide-outline-variant/12 rounded-[24px] border border-outline-variant/12 bg-white/76">
                     {[
                       ['Mã booking', `GH-${orderNumber}`],
-                      ['Trạng thái', statusMeta.label],
+                      ['Trạng thái booking', statusMeta.label],
+                      ['Trạng thái thanh toán', paymentMeta.label],
                       ['Ngày tạo', formatDate(booking.createdAt || detail?.checkIn)],
                       ['Loại phòng', roomSummaryLabel],
                     ].map(([label, value]) => (
@@ -756,12 +838,18 @@ export default function OrderDetail() {
                     <span className="max-w-[220px] leading-6 text-white/64">Thuế & phí dịch vụ</span>
                     <span className="font-headline text-xl text-white">{Math.round(totalFees).toLocaleString('vi-VN')}đ</span>
                   </div>
+                  <div className="flex items-start justify-between gap-5 text-sm">
+                    <span className="max-w-[220px] leading-6 text-white/64">Trạng thái thanh toán</span>
+                    <span className="font-label text-[0.64rem] uppercase tracking-[0.22em] text-secondary-fixed">
+                      {paymentMeta.label}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="mt-8 border-t border-white/10 pt-6">
                   <p className="font-label text-[0.58rem] uppercase tracking-[0.24em] text-secondary-fixed/90">Tổng cộng</p>
                   <div className="mt-3 flex items-end justify-between gap-4">
-                    <span className="text-sm leading-6 text-white/62">Đã lưu trong hồ sơ đơn đặt phòng của bạn</span>
+                    <span className="text-sm leading-6 text-white/62">{paymentMeta.summary}</span>
                     <span className="font-headline text-4xl text-secondary-fixed">{grandTotal.toLocaleString('vi-VN')}đ</span>
                   </div>
                 </div>
@@ -772,7 +860,7 @@ export default function OrderDetail() {
                   <p className="font-label text-[0.64rem] uppercase tracking-[0.28em] text-secondary">Thao tác dành cho bạn</p>
                   <h2 className="mt-3 font-headline text-[1.8rem] leading-tight text-primary">Thao tác nhanh</h2>
                   <p className="mt-3 text-sm leading-7 text-on-surface-variant">
-                    Các thao tác cần thiết cho đơn đặt này được gom lại để bạn xử lý nhanh hơn.
+                    Các thao tác được mở theo đúng trạng thái booking và trạng thái thanh toán của đơn này.
                   </p>
                 </div>
 
@@ -791,13 +879,23 @@ export default function OrderDetail() {
                   >
                     In chi tiết
                   </button>
-                  {currentStatus === 'pending' && (
+                  {canOpenVNPay && (
                     <button
                       type="button"
                       onClick={handleVNPaySubmit}
                       className="inline-flex items-center justify-center rounded-[20px] border border-emerald-500/28 bg-emerald-50 px-5 py-4 font-label text-[0.64rem] uppercase tracking-[0.22em] text-emerald-700 transition-all hover:border-emerald-500/40 hover:bg-emerald-100"
                     >
-                      Thanh toán VNPay
+                      {currentPaymentStatus === 'pending_payment' ? 'Mở lại VNPay Demo' : 'Thanh toán VNPay Demo'}
+                    </button>
+                  )}
+                  {currentStatus === 'pending' && currentPaymentStatus === 'pending_payment' && (
+                    <button
+                      type="button"
+                      onClick={handleDemoSuccess}
+                      disabled={confirmingDemoPayment}
+                      className="inline-flex items-center justify-center rounded-[20px] border border-sky-500/30 bg-sky-50 px-5 py-4 font-label text-[0.64rem] uppercase tracking-[0.22em] text-sky-700 transition-all hover:border-sky-500/45 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {confirmingDemoPayment ? 'Đang xác nhận demo...' : 'Thanh toán thành công (Demo)'}
                     </button>
                   )}
                   <Link
@@ -850,7 +948,8 @@ export default function OrderDetail() {
                 <div className="mt-3 space-y-1">
                   <p>Ngày tạo: <span className="font-medium text-slate-900">{formatDate(booking.createdAt || detail?.checkIn)}</span></p>
                   <p>Ngày in: <span className="font-medium text-slate-900">{printGeneratedAt}</span></p>
-                  <p>Trạng thái: <span className="font-medium text-slate-900">{statusMeta.label}</span></p>
+                  <p>Trạng thái booking: <span className="font-medium text-slate-900">{statusMeta.label}</span></p>
+                  <p>Trạng thái thanh toán: <span className="font-medium text-slate-900">{paymentMeta.label}</span></p>
                 </div>
               </div>
             </div>

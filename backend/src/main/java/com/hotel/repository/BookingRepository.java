@@ -37,6 +37,9 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT b FROM Booking b WHERE b.user.id = :userId AND b.status = :status ORDER BY b.id DESC")
     List<Booking> findAllByUserIdAndStatus(@Param("userId") Integer userId, @Param("status") String status);
 
+    @Query("SELECT b FROM Booking b WHERE b.user.id = :userId AND b.paymentStatus = :paymentStatus ORDER BY b.id DESC")
+    List<Booking> findAllByUserIdAndPaymentStatus(@Param("userId") Integer userId, @Param("paymentStatus") String paymentStatus);
+
 
     @Query("SELECT COUNT(b) FROM Booking b " +
            "WHERE b.user.id = :userId AND (:status IS NULL OR :status = 'all' OR b.status = :status)")

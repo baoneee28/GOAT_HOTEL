@@ -7,7 +7,7 @@ export default function VNPayLaunch() {
   const [searchParams] = useSearchParams();
   const launchedRef = useRef(false);
   const [status, setStatus] = useState('processing');
-  const [message, setMessage] = useState('Đang khởi tạo giao dịch và chuyển bạn tới cổng thanh toán VNPay...');
+  const [message, setMessage] = useState('Đang khởi tạo giao dịch demo và chuyển bạn tới cổng VNPay sandbox...');
 
   useEffect(() => {
     if (launchedRef.current) return;
@@ -53,7 +53,7 @@ export default function VNPayLaunch() {
           <>
             <div className="mx-auto h-14 w-14 rounded-full border-2 border-secondary border-t-transparent animate-spin"></div>
             <p className="mt-8 font-label text-[0.68rem] uppercase tracking-[0.28em] text-secondary">VNPay Gateway</p>
-            <h1 className="mt-4 font-headline text-4xl text-primary">Đang mở cổng thanh toán</h1>
+            <h1 className="mt-4 font-headline text-4xl text-primary">Đang mở VNPay sandbox</h1>
             <p className="mt-5 text-sm leading-7 text-on-surface-variant">{message}</p>
           </>
         ) : (
@@ -62,7 +62,7 @@ export default function VNPayLaunch() {
               <span className="material-symbols-outlined text-3xl">error</span>
             </div>
             <p className="mt-8 font-label text-[0.68rem] uppercase tracking-[0.28em] text-rose-600">VNPay Gateway</p>
-            <h1 className="mt-4 font-headline text-4xl text-primary">Không thể mở VNPay</h1>
+            <h1 className="mt-4 font-headline text-4xl text-primary">Không thể mở VNPay sandbox</h1>
             <p className="mt-5 text-sm leading-7 text-on-surface-variant">{message}</p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Link

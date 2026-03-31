@@ -2,6 +2,7 @@ package com.hotel.controller.api;
 
 import com.hotel.entity.Room;
 import com.hotel.repository.RoomRepository;
+import com.hotel.service.RoomStatusService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +15,9 @@ public class RoomApiController {
 
     @Autowired
     private RoomRepository roomRepository;
+
+    @Autowired
+    private RoomStatusService roomStatusService;
 
     // Trả về tất cả các phòng
     @GetMapping
@@ -72,18 +76,9 @@ public class RoomApiController {
             @RequestParam(defaultValue = "") String q,
             @RequestParam(defaultValue = "") String status,
             @RequestParam(defaultValue = "1") int page) {
-        int pageSize = 5;
-        org.springframework.data.domain.Page<Room> roomPage = roomRepository.findWithFilter(
-                q.isBlank() ? null : q,
-                status.isBlank() ? null : status,
-                org.springframework.data.domain.PageRequest.of(page - 1, pageSize, org.springframework.data.domain.Sort.by("id").descending())
+        return org.springframework.http.ResponseEntity.ok(
+                roomStatusService.buildAdminRoomPage(q, status, page, 5)
         );
-
-        java.util.Map<String, Object> response = new java.util.HashMap<>();
-        response.put("rooms", roomPage.getContent());
-        response.put("totalPages", roomPage.getTotalPages());
-        response.put("currentPage", page);
-        return org.springframework.http.ResponseEntity.ok(response);
     }
 
     @PostMapping("/admin")

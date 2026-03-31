@@ -100,6 +100,10 @@ public class BookingService {
             return null;
         }
 
+        if (booking.getPaymentStatus() == null || booking.getPaymentStatus().isBlank()) {
+            booking.setPaymentStatus(inferLegacyPaymentStatus(booking));
+        }
+
         if (booking.getDetails() != null) {
             for (BookingDetail detail : booking.getDetails()) {
                 if (detail == null || detail.getCheckIn() == null || detail.getCheckOut() == null) {
@@ -129,27 +133,69 @@ public class BookingService {
         return bookings;
     }
 
+    public String resolveInitialPaymentStatus(String paymentFlow) {
+        if ("vnpay".equalsIgnoreCase(paymentFlow) || "vnpay_demo".equalsIgnoreCase(paymentFlow)) {
+            return "pending_payment";
+        }
+        return "unpaid";
+    }
+
+    public String inferLegacyPaymentStatus(Booking booking) {
+        if (booking == null) {
+            return "unpaid";
+        }
+
+        if (booking.getPaymentStatus() != null && !booking.getPaymentStatus().isBlank()) {
+            return booking.getPaymentStatus().trim().toLowerCase();
+        }
+
+        boolean hasPaidPayment = booking.getPayments() != null
+                && booking.getPayments().stream().anyMatch(payment ->
+                payment != null && ("paid".equalsIgnoreCase(payment.getStatus())
+                        || "completed".equalsIgnoreCase(payment.getStatus())));
+
+        if (hasPaidPayment || "completed".equalsIgnoreCase(booking.getStatus())) {
+            return "paid";
+        }
+
+        return "unpaid";
+    }
+
     @Transactional
-    public String bookRoom(User user, Integer roomId, LocalDateTime checkIn, LocalDateTime checkOut) {
+    public Booking createBooking(User user, Integer roomId, LocalDateTime checkIn, LocalDateTime checkOut, String paymentFlow) {
+        if (user == null || user.getId() == null) {
+            throw new IllegalArgumentException("Phiên người dùng không hợp lệ.");
+        }
+
+        Booking activeBooking = getActiveBooking(user.getId());
+        if (activeBooking != null) {
+            String roomNum = "N/A";
+            if (activeBooking.getDetails() != null && !activeBooking.getDetails().isEmpty()) {
+                roomNum = activeBooking.getDetails().get(0).getRoom().getRoomNumber();
+            }
+            throw new IllegalArgumentException("Bạn đang giữ chỗ phòng " + roomNum + ". Vui lòng hoàn thành đơn cũ.");
+        }
+
         // Không cho phép đặt phòng với ngày nhận trong quá khứ
         if (checkIn.isBefore(LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0))) {
-            return "Ngày nhận phòng không thể ở trong quá khứ!";
+            throw new IllegalArgumentException("Ngày nhận phòng không thể ở trong quá khứ!");
         }
         if (!checkOut.isAfter(checkIn)) {
-            return "Thời gian ra phải lớn hơn thời gian vào!";
+            throw new IllegalArgumentException("Thời gian ra phải lớn hơn thời gian vào!");
         }
-        Optional<Room> roomOpt = roomRepository.findById(roomId);
-        if (roomOpt.isEmpty()) return "Phòng không tồn tại!";
 
-        // Check date overlap
+        Optional<Room> roomOpt = roomRepository.findById(roomId);
+        if (roomOpt.isEmpty()) {
+            throw new IllegalArgumentException("Phòng không tồn tại!");
+        }
+
         long overlapCount = bookingRepository.countOverlappingBookings(roomId, checkIn, checkOut);
         if (overlapCount > 0) {
-            return "Phòng đã có người đặt trong thời gian này!";
+            throw new IllegalArgumentException("Phòng đã có người đặt trong thời gian này!");
         }
 
         Room room = roomOpt.get();
         double pricePerNight = room.getRoomType().getPricePerNight();
-
         long totalPrice = calculatePriceIndex(checkIn, checkOut, pricePerNight);
         double totalHours = calculateHours(checkIn, checkOut);
 
@@ -157,8 +203,9 @@ public class BookingService {
         booking.setUser(user);
         booking.setTotalPrice((double) totalPrice);
         booking.setStatus("pending");
+        booking.setPaymentStatus(resolveInitialPaymentStatus(paymentFlow));
         booking = bookingRepository.save(booking);
-        
+
         BookingDetail detail = new BookingDetail();
         detail.setBooking(booking);
         detail.setRoom(room);
@@ -168,7 +215,17 @@ public class BookingService {
         detail.setTotalHours(totalHours);
         bookingDetailRepository.save(detail);
 
-        return null;
+        return booking;
+    }
+
+    @Transactional
+    public String bookRoom(User user, Integer roomId, LocalDateTime checkIn, LocalDateTime checkOut) {
+        try {
+            createBooking(user, roomId, checkIn, checkOut, "standard_request");
+            return null;
+        } catch (IllegalArgumentException ex) {
+            return ex.getMessage();
+        }
     }
 
     @Transactional
@@ -181,6 +238,9 @@ public class BookingService {
         if (!"pending".equals(booking.getStatus())) return false;
 
         booking.setStatus("cancelled");
+        if (!"paid".equalsIgnoreCase(booking.getPaymentStatus())) {
+            booking.setPaymentStatus("unpaid");
+        }
         bookingRepository.save(booking);
 
         return true;
@@ -193,9 +253,9 @@ public class BookingService {
     }
 
     public double getTotalSpent(Integer userId) {
-        List<Booking> completedBookings = bookingRepository.findAllByUserIdAndStatus(userId, "completed");
-        normalizeBookingFinancials(completedBookings);
-        return completedBookings.stream()
+        List<Booking> paidBookings = bookingRepository.findAllByUserIdAndPaymentStatus(userId, "paid");
+        normalizeBookingFinancials(paidBookings);
+        return paidBookings.stream()
                 .mapToDouble(booking -> booking.getTotalPrice() != null ? booking.getTotalPrice() : 0.0)
                 .sum();
     }

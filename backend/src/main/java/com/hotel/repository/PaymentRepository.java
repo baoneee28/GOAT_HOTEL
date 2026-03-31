@@ -6,5 +6,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Integer> {
     void deleteByBookingId(Integer bookingId);
+    boolean existsByBooking_Id(Integer bookingId);
     boolean existsByBooking_IdAndPaymentMethodIgnoreCase(Integer bookingId, String paymentMethod);
 }

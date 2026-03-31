@@ -18,6 +18,8 @@ public class Booking {
     private Double totalPrice;
     @Column(name = "status", length = 20)
     private String status = "pending";
+    @Column(name = "payment_status", length = 30)
+    private String paymentStatus = "unpaid";
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
     
@@ -35,6 +37,8 @@ public class Booking {
 
     @PrePersist
     protected void onCreate() {
+        if (status == null || status.isBlank()) status = "pending";
+        if (paymentStatus == null || paymentStatus.isBlank()) paymentStatus = "unpaid";
         if (createdAt == null) createdAt = LocalDateTime.now();
     }
 }

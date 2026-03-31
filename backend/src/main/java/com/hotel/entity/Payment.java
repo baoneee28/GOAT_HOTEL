@@ -20,5 +20,5 @@ public class Payment {
     @Column(name = "payment_date", nullable = false)
     private LocalDateTime paymentDate;
     @Column(name = "status", nullable = false, length = 20)
-    private String status = "completed";
+    private String status = "paid";
 }

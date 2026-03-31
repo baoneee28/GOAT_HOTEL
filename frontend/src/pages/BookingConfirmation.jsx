@@ -145,14 +145,17 @@ export default function BookingConfirmation() {
     };
   };
 
-  const createBooking = async () => {
+  const createBooking = async (paymentFlow = 'standard_request') => {
     const payload = validateBookingInput();
     if (!payload) {
       return null;
     }
 
     try {
-      const res = await axios.post(`${API_BASE}/api/bookings`, payload, { withCredentials: true });
+      const res = await axios.post(`${API_BASE}/api/bookings`, {
+        ...payload,
+        paymentFlow,
+      }, { withCredentials: true });
       if (res.data?.success) {
         return res.data;
       }
@@ -183,7 +186,7 @@ export default function BookingConfirmation() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const result = await createBooking();
+      const result = await createBooking('standard_request');
       if (!result?.success) return;
 
       if (window.Swal) {
@@ -200,7 +203,7 @@ export default function BookingConfirmation() {
   const handleVNPaySubmit = async () => {
     setPreparingVNPay(true);
     try {
-      const result = await createBooking();
+      const result = await createBooking('vnpay_demo');
       if (!result?.success) return;
 
       if (!result.bookingId) {
@@ -271,7 +274,7 @@ export default function BookingConfirmation() {
               PHÒNG {booking.physicalRoomNumber}
             </p>
             <p className="text-on-surface-variant font-body text-base">
-              Vui lòng hoàn thiện lịch trình và thông tin liên hệ để nhận mã xác nhận đặt phòng.
+              Vui lòng hoàn thiện lịch trình và thông tin liên hệ để gửi yêu cầu đặt phòng hoặc mở luồng thanh toán demo.
             </p>
           </div>
 
@@ -491,7 +494,7 @@ export default function BookingConfirmation() {
                 disabled={nights <= 0 || submitting || preparingVNPay}
                 className={`w-full font-label uppercase tracking-widest text-xs py-5 transition-all shadow-xl active:scale-95 ${(nights > 0 && !submitting && !preparingVNPay) ? 'bg-primary text-on-primary hover:bg-primary-container shadow-primary/10' : 'bg-surface-variant text-on-surface-variant cursor-not-allowed opacity-70'}`}
               >
-                {submitting ? 'ĐANG XỬ LÝ...' : 'THANH TOÁN NGAY'}
+                {submitting ? 'ĐANG XỬ LÝ...' : 'GỬI YÊU CẦU ĐẶT PHÒNG'}
               </button>
               <button
                 type="button"
@@ -499,12 +502,12 @@ export default function BookingConfirmation() {
                 disabled={nights <= 0 || submitting || preparingVNPay}
                 className={`w-full font-label uppercase tracking-widest text-xs py-5 transition-all border active:scale-95 ${(nights > 0 && !submitting && !preparingVNPay) ? 'border-emerald-500 text-emerald-600 hover:bg-emerald-500/10' : 'border-outline-variant/30 text-on-surface-variant cursor-not-allowed opacity-70'}`}
               >
-                {preparingVNPay ? 'ĐANG MỞ VNPAY...' : 'THANH TOÁN BẰNG VNPAY'}
+                {preparingVNPay ? 'ĐANG MỞ VNPAY...' : 'MỞ VNPAY DEMO'}
               </button>
             </div>
             <p className="text-center mt-4">
               <span className="font-body text-[10px] text-on-surface-variant">
-                Bằng việc thanh toán, bạn đồng ý với Điều khoản của GOAT Hotel.
+                Gửi yêu cầu đặt phòng sẽ tạo booking chờ duyệt. Mở VNPay demo sẽ tạo booking chờ thanh toán, chưa tự động xác nhận thành công.
               </span>
             </p>
 

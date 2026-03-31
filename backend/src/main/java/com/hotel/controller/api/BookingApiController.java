@@ -72,6 +72,16 @@ public class BookingApiController {
         return value.trim();
     }
 
+    private String normalizeAdminPaymentStatus(String currentPaymentStatus, String bookingStatus) {
+        if ("completed".equalsIgnoreCase(bookingStatus)) {
+            return "paid";
+        }
+        if (currentPaymentStatus != null && !currentPaymentStatus.isBlank()) {
+            return currentPaymentStatus.trim().toLowerCase();
+        }
+        return "unpaid";
+    }
+
     @PostMapping("/bookings")
     public ResponseEntity<Map<String, Object>> bookRoom(@RequestBody Map<String, String> payload, HttpSession session) {
         Map<String, Object> response = new HashMap<>();
@@ -84,35 +94,24 @@ public class BookingApiController {
             String roomIdRaw = requirePayloadField(payload, "roomId", "Phòng");
             String checkInRaw = requirePayloadField(payload, "checkIn", "Ngày nhận phòng");
             String checkOutRaw = requirePayloadField(payload, "checkOut", "Ngày trả phòng");
+            String paymentFlow = payload.get("paymentFlow");
 
             Integer roomId = Integer.parseInt(roomIdRaw);
             LocalDateTime checkIn = parseDate(checkInRaw);
             LocalDateTime checkOut = parseDate(checkOutRaw);
 
-            Booking activeBooking = bookingService.getActiveBooking(currentUser.getId());
-            if (activeBooking != null) {
-                String roomNum = "N/A";
-                if(activeBooking.getDetails() != null && !activeBooking.getDetails().isEmpty()){
-                    roomNum = activeBooking.getDetails().get(0).getRoom().getRoomNumber();
-                }
-                response.put("success", false);
-                response.put("message", "Bạn đang giữ chỗ phòng " + roomNum + ". Vui lòng hoàn thành đơn cũ.");
-                return ResponseEntity.badRequest().body(response);
-            }
+            Booking createdBooking = bookingService.createBooking(currentUser, roomId, checkIn, checkOut, paymentFlow);
 
-            String error = bookingService.bookRoom(currentUser, roomId, checkIn, checkOut);
-            if (error != null) {
-                response.put("success", false);
-                response.put("message", error);
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            Booking createdBooking = bookingService.getActiveBooking(currentUser.getId());
             response.put("success", true);
-            response.put("message", "Đặt phòng thành công!");
-            if (createdBooking != null) {
-                response.put("bookingId", createdBooking.getId());
-            }
+            response.put(
+                    "message",
+                    "vnpay".equalsIgnoreCase(paymentFlow) || "vnpay_demo".equalsIgnoreCase(paymentFlow)
+                            ? "Đã tạo booking chờ thanh toán VNPay demo."
+                            : "Đã gửi yêu cầu đặt phòng và chờ khách sạn duyệt."
+            );
+            response.put("bookingId", createdBooking.getId());
+            response.put("bookingStatus", createdBooking.getStatus());
+            response.put("paymentStatus", createdBooking.getPaymentStatus());
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             response.put("success", false);
@@ -246,6 +245,7 @@ public class BookingApiController {
                 Booking existing = existingOpt.get();
                 existing.setTotalPrice(totalPrice);
                 existing.setStatus(status);
+                existing.setPaymentStatus(normalizeAdminPaymentStatus(existing.getPaymentStatus(), status));
                 bookingRepository.save(existing);
                 
                 if (existing.getDetails() != null && !existing.getDetails().isEmpty()) {
@@ -277,6 +277,7 @@ public class BookingApiController {
                 Booking booking = new Booking();
                 booking.setUser(user);
                 booking.setStatus(status);
+                booking.setPaymentStatus(normalizeAdminPaymentStatus(null, status));
                 booking.setTotalPrice(totalPrice);
                 booking = bookingRepository.save(booking);
                 
@@ -323,21 +324,40 @@ public class BookingApiController {
         
         BookingDetail detail = booking.getDetails().get(0);
         Room room = detail.getRoom();
+        if (!"confirmed".equalsIgnoreCase(booking.getStatus())) {
+            response.put("success", false);
+            response.put("message", "Chỉ có thể trả phòng cho đơn đã xác nhận.");
+            return ResponseEntity.badRequest().body(response);
+        }
+        if (detail.getCheckInActual() == null) {
+            response.put("success", false);
+            response.put("message", "Khách chưa nhận phòng. Hãy check-in trước khi checkout.");
+            return ResponseEntity.badRequest().body(response);
+        }
+        if (detail.getCheckOutActual() != null) {
+            response.put("success", false);
+            response.put("message", "Đơn này đã được checkout trước đó.");
+            return ResponseEntity.badRequest().body(response);
+        }
 
         if ("recalc".equals(checkoutType)) {
             LocalDateTime now = LocalDateTime.now();
             double pricePerNight = detail.getPriceAtBooking();
-            Map<String, Double> priceInfo = bookingService.calculateBookingPriceAdmin(detail.getCheckIn(), now, pricePerNight);
+            LocalDateTime actualStayStart = detail.getCheckInActual() != null ? detail.getCheckInActual() : detail.getCheckIn();
+            Map<String, Double> priceInfo = bookingService.calculateBookingPriceAdmin(actualStayStart, now, pricePerNight);
 
-            detail.setCheckOut(now);
             detail.setCheckOutActual(now);
             detail.setTotalHours(priceInfo.get("hours"));
             bookingDetailRepository.save(detail);
             
             booking.setTotalPrice(priceInfo.get("total"));
             booking.setStatus("completed");
+            booking.setPaymentStatus("paid");
         } else {
+            detail.setCheckOutActual(LocalDateTime.now());
+            bookingDetailRepository.save(detail);
             booking.setStatus("completed");
+            booking.setPaymentStatus("paid");
         }
 
         bookingRepository.save(booking);
@@ -348,6 +368,57 @@ public class BookingApiController {
 
         response.put("success", true);
         response.put("message", "Thanh toán (Checkout) Đơn đặt phòng thành công.");
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/admin/bookings/{id}/checkin")
+    public ResponseEntity<Map<String, Object>> checkInAdmin(@PathVariable("id") Integer id) {
+        Optional<Booking> bookingOpt = bookingRepository.findById(id);
+        Map<String, Object> response = new HashMap<>();
+        if (bookingOpt.isEmpty()) {
+            response.put("success", false);
+            response.put("message", "Đơn không tồn tại.");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        Booking booking = bookingOpt.get();
+        if (!"confirmed".equalsIgnoreCase(booking.getStatus())) {
+            response.put("success", false);
+            response.put("message", "Chỉ có thể nhận phòng cho đơn đã xác nhận.");
+            return ResponseEntity.badRequest().body(response);
+        }
+        if (booking.getDetails() == null || booking.getDetails().isEmpty()) {
+            response.put("success", false);
+            response.put("message", "Đơn lưu trú không có phòng.");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        BookingDetail detail = booking.getDetails().get(0);
+        if (detail.getCheckInActual() != null && detail.getCheckOutActual() == null) {
+            response.put("success", false);
+            response.put("message", "Khách đã nhận phòng rồi.");
+            return ResponseEntity.badRequest().body(response);
+        }
+        if (detail.getCheckOutActual() != null) {
+            response.put("success", false);
+            response.put("message", "Đơn này đã checkout, không thể check-in lại.");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        if (detail.getRoom() != null && "maintenance".equalsIgnoreCase(detail.getRoom().getStatus())) {
+            response.put("success", false);
+            response.put("message", "Phòng đang ở trạng thái bảo trì, không thể check-in.");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        detail.setCheckInActual(now);
+        detail.setCheckOutActual(null);
+        bookingDetailRepository.save(detail);
+
+        response.put("success", true);
+        response.put("message", "Đã nhận phòng thành công.");
         return ResponseEntity.ok(response);
     }
 

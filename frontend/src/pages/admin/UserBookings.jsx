@@ -42,6 +42,18 @@ export default function UserBookings() {
     }
     return new Date(value).toLocaleString('vi-VN');
   };
+  const getBookingStatusLabel = (value) => ({
+    pending: 'Chờ duyệt',
+    confirmed: 'Đã xác nhận',
+    completed: 'Hoàn thành',
+    cancelled: 'Đã hủy',
+  }[String(value || '').toLowerCase()] || value || 'pending');
+  const getPaymentStatusLabel = (value) => ({
+    unpaid: 'Chưa thanh toán',
+    pending_payment: 'Chờ thanh toán',
+    paid: 'Đã thanh toán',
+    failed: 'Thanh toán lỗi',
+  }[String(value || '').toLowerCase()] || value || 'unpaid');
 
   if (loading) {
     return <div className="text-center mt-5"><div className="spinner-border text-primary"></div></div>;
@@ -100,7 +112,8 @@ export default function UserBookings() {
                 <th>Phòng</th>
                 <th>Thời gian</th>
                 <th>Tổng tiền</th>
-                <th>Trạng thái</th>
+                <th>Booking</th>
+                <th>Thanh toán</th>
               </tr>
             </thead>
             <tbody>
@@ -119,11 +132,12 @@ export default function UserBookings() {
                       <div>Out: <b>{formatDate(detail?.checkOut)}</b></div>
                     </td>
                     <td className="fw-bold">{displayTotal.toLocaleString('vi-VN')}đ</td>
-                    <td><span className={`badge rounded-pill bg-light text-dark border text-uppercase`}>{booking.status}</span></td>
+                    <td><span className={`badge rounded-pill bg-light text-dark border text-uppercase`}>{getBookingStatusLabel(booking.status)}</span></td>
+                    <td><span className={`badge rounded-pill bg-light text-dark border text-uppercase`}>{getPaymentStatusLabel(booking.paymentStatus)}</span></td>
                   </tr>
                 );
               }) : (
-                <tr><td colSpan="5" className="text-center py-5 text-muted">User này chưa có booking nào.</td></tr>
+                <tr><td colSpan="6" className="text-center py-5 text-muted">User này chưa có booking nào.</td></tr>
               )}
             </tbody>
           </table>

@@ -4,6 +4,7 @@ import com.hotel.repository.BookingRepository;
 import com.hotel.repository.ContactMessageRepository;
 import com.hotel.repository.RoomRepository;
 import com.hotel.repository.UserRepository;
+import com.hotel.service.RoomStatusService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,6 +34,9 @@ public class AdminDashboardApiController {
     @Autowired
     private ContactMessageRepository contactMessageRepository;
 
+    @Autowired
+    private RoomStatusService roomStatusService;
+
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getDashboardStats() {
         Map<String, Object> response = new HashMap<>();
@@ -43,19 +47,14 @@ public class AdminDashboardApiController {
 
             response.put("total_customers", userRepository.countByRole("customer"));
 
-            List<Object[]> statusCounts = roomRepository.countByStatusGroup();
-            long available = 0, booked = 0, maintenance = 0;
-            for (Object[] row : statusCounts) {
-                String st = String.valueOf(row[0]);
-                long cnt = ((Number) row[1]).longValue();
-                switch (st) {
-                    case "available" -> available = cnt;
-                    case "booked" -> booked = cnt;
-                    case "maintenance" -> maintenance = cnt;
-                }
-            }
+            Map<String, Long> roomStatusCounts = roomStatusService.countEffectiveStatuses();
+            long available = roomStatusCounts.getOrDefault("available", 0L);
+            long reserved = roomStatusCounts.getOrDefault("reserved", 0L);
+            long booked = roomStatusCounts.getOrDefault("booked", 0L);
+            long maintenance = roomStatusCounts.getOrDefault("maintenance", 0L);
 
             response.put("rooms_available", available);
+            response.put("rooms_reserved", reserved);
             response.put("rooms_booked", booked);
             response.put("rooms_maintenance", maintenance);
             response.put("total_rooms", roomRepository.count());

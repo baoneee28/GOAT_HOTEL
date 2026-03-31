@@ -14,6 +14,9 @@ export default function Rooms() {
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ id: '', roomNumber: '', typeId: '', status: 'available' });
 
+  const getRoomStatus = (room) => room?.effectiveStatus || room?.status || 'available';
+  const getRoomAmenityCount = (room) => room?.roomType?.itemCount ?? room?.roomType?.items?.length ?? 0;
+
   const fetchData = useCallback(async () => {
     try {
       const res = await axios.get(`${API_BASE}/api/rooms/admin?q=${q}&status=${status}&page=${page}`, { withCredentials: true });
@@ -98,6 +101,7 @@ export default function Rooms() {
               <select className="form-select" style={{ borderRadius: '12px', maxWidth: '200px' }} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
                   <option value="">Tất cả trạng thái</option>
                   <option value="available">Phòng trống</option>
+                  <option value="reserved">Có lịch đặt</option>
                   <option value="booked">Đang thuê</option>
                   <option value="maintenance">Bảo trì</option>
               </select>
@@ -117,24 +121,27 @@ export default function Rooms() {
                       </tr>
                   </thead>
                   <tbody>
-                      {data.rooms && data.rooms.length > 0 ? data.rooms.map(r => (
+                      {data.rooms && data.rooms.length > 0 ? data.rooms.map(r => {
+                          const roomStatus = getRoomStatus(r);
+                          return (
                           <tr key={r.id}>
                               <td>{r.id}</td>
                               <td className="fw-bold text-primary">{r.roomNumber}</td>
                               <td>{r.roomType?.typeName}</td>
                               <td>{r.roomType?.pricePerNight?.toLocaleString('vi-VN')}đ</td>
-                              <td><span className="badge bg-light text-dark border">{r.roomType?.items?.length || 0} món</span></td>
+                              <td><span className="badge bg-light text-dark border">{getRoomAmenityCount(r)} món</span></td>
                               <td>
-                                  {r.status === 'available' && <span className="badge-status status-available">Sẵn sàng</span>}
-                                  {r.status === 'booked' && <span className="badge-status status-booked">Đang có khách</span>}
-                                  {r.status === 'maintenance' && <span className="badge-status status-maintenance">Đang sửa</span>}
+                                  {roomStatus === 'available' && <span className="badge-status status-available">Sẵn sàng</span>}
+                                  {roomStatus === 'reserved' && <span className="badge-status status-reserved">Có lịch đặt</span>}
+                                  {roomStatus === 'booked' && <span className="badge-status status-booked">Đang thuê</span>}
+                                  {roomStatus === 'maintenance' && <span className="badge-status status-maintenance">Đang sửa</span>}
                               </td>
                               <td className="text-end">
                                   <button className="btn-action btn-edit me-1" onClick={() => handleEdit(r)}>✎</button>
                                   <button className="btn-action btn-delete" onClick={() => handleDelete(r.id)}>🗑</button>
                               </td>
                           </tr>
-                      )) : (
+                      )}) : (
                           <tr><td colSpan="7" className="text-center py-5 text-muted">Chưa có dữ liệu.</td></tr>
                       )}
                   </tbody>
@@ -194,7 +201,6 @@ export default function Rooms() {
                                       <label className="form-label fw-bold">Trạng thái</label>
                                       <select className="form-select rounded-3 p-2" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
                                           <option value="available">Sẵn sàng</option>
-                                          <option value="booked">Đang có khách</option>
                                           <option value="maintenance">Đang bảo trì</option>
                                       </select>
                                   </div>

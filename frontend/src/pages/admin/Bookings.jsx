@@ -102,10 +102,34 @@ export default function Bookings() {
     try {
       const res = await axios.post(`${API_BASE}/api/admin/bookings/${id}/checkout`, { checkoutType: type }, { withCredentials: true });
       if (res.data.success) {
-        Swal.fire({ icon: 'success', title: 'Đã thanh toán', timer: 1500, showConfirmButton: false });
+        Swal.fire({ icon: 'success', title: 'Đã hoàn tất checkout', timer: 1500, showConfirmButton: false });
         fetchData();
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      Swal.fire({ icon: 'error', title: 'Lỗi', text: getErrorMessage(e) });
+    }
+  };
+
+  const handleCheckIn = (booking) => {
+    Swal.fire({
+      title: 'Xác nhận nhận phòng?',
+      text: 'Demo admin: có thể check-in thủ công để chuyển phòng sang trạng thái Đang thuê.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Nhận phòng',
+      confirmButtonColor: '#2563eb'
+    }).then(async (res) => {
+      if (!res.isConfirmed) return;
+      try {
+        const result = await axios.post(`${API_BASE}/api/admin/bookings/${booking.id}/checkin`, {}, { withCredentials: true });
+        if (result.data.success) {
+          Swal.fire({ icon: 'success', title: 'Đã nhận phòng', timer: 1500, showConfirmButton: false });
+          fetchData();
+        }
+      } catch (error) {
+        Swal.fire({ icon: 'error', title: 'Lỗi', text: getErrorMessage(error) });
+      }
+    });
   };
 
   const handleApprove = (id) => {
@@ -160,19 +184,55 @@ export default function Bookings() {
   const printInvoice = () => { window.print(); };
 
   const availableRooms = rooms.filter(r => r.status === 'available');
+  const getPrimaryDetail = (booking) => booking?.details?.[0] || {};
+  const formatBookingDate = (value) => {
+    if (Array.isArray(value)) {
+      const [year, month, day, hour = 0, minute = 0] = value;
+      return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    }
+
+    if (!value) return 'Chưa cập nhật';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleString('vi-VN', { hour12: false });
+  };
+  const hasCheckedIn = (booking) => {
+    const detail = getPrimaryDetail(booking);
+    return Boolean(detail?.checkInActual) && !detail?.checkOutActual;
+  };
+  const hasCheckedOut = (booking) => {
+    const detail = getPrimaryDetail(booking);
+    return Boolean(detail?.checkOutActual);
+  };
   const getStayNightsLabel = (checkIn, checkOut) => {
     const nights = calculateStayNights(checkIn, checkOut);
     return nights > 0 ? `${nights} đêm` : 'Chưa cập nhật';
   };
+  const getBookingStatusLabel = (value) => ({
+    pending: 'Chờ duyệt',
+    confirmed: 'Đã xác nhận',
+    completed: 'Hoàn thành',
+    cancelled: 'Đã hủy',
+  }[String(value || '').toLowerCase()] || value || 'pending');
+  const getPaymentStatusLabel = (value) => ({
+    unpaid: 'Chưa thanh toán',
+    pending_payment: 'Chờ thanh toán',
+    paid: 'Đã thanh toán',
+    failed: 'Thanh toán lỗi',
+  }[String(value || '').toLowerCase()] || value || 'unpaid');
 
   return (
     <>
       <style>{`
-        .st-badge { padding: 5px 12px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+        .st-badge { padding: 5px 10px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; white-space: nowrap; display: inline-block; }
         .st-confirmed { background: #e0f2fe; color: #0369a1; }
         .st-pending { background: #fef3c7; color: #92400e; }
         .st-completed { background: #dcfce7; color: #166534; }
         .st-cancelled { background: #fee2e2; color: #991b1b; }
+        .st-pay-unpaid { background: #fef3c7; color: #92400e; }
+        .st-pay-pending_payment { background: #e0f2fe; color: #075985; }
+        .st-pay-paid { background: #dcfce7; color: #166534; }
+        .st-pay-failed { background: #fee2e2; color: #991b1b; }
         .btn-check-action { width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; border: none; transition: 0.2s; }
         .btn-check-early { background: #fff7ed; color: #ea580c; border: 1px solid #fed7aa; }
         .btn-check-early:hover { background: #ea580c; color: white; }
@@ -196,7 +256,7 @@ export default function Bookings() {
           <div className="p-4 border-bottom d-flex gap-2">
               <button className={`btn btn-sm ${!status ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => { setStatus(''); setPage(1); }}>Tất cả</button>
               <button className={`btn btn-sm ${status === 'pending' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => { setStatus('pending'); setPage(1); }}>Chờ duyệt</button>
-              <button className={`btn btn-sm ${status === 'confirmed' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => { setStatus('confirmed'); setPage(1); }}>Đã đặt</button>
+              <button className={`btn btn-sm ${status === 'confirmed' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => { setStatus('confirmed'); setPage(1); }}>Đã xác nhận</button>
               <button className={`btn btn-sm ${status === 'completed' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => { setStatus('completed'); setPage(1); }}>Hoàn thành</button>
               <button className={`btn btn-sm ${status === 'cancelled' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => { setStatus('cancelled'); setPage(1); }}>Đã hủy</button>
           </div>
@@ -205,17 +265,19 @@ export default function Bookings() {
               <table className="table mb-0 align-middle table-hover" style={{ tableLayout: 'fixed', width: '100%' }}>
                   <thead className="table-light">
                       <tr>
-                          <th className="px-3" style={{width: '20%'}}>Khách hàng</th>
-                          <th style={{width: '15%'}}>Phòng & Giá</th>
-                          <th style={{width: '20%'}}>Thời gian</th>
-                          <th style={{width: '15%'}}>Tổng tiền</th>
-                          <th style={{width: '10%'}}>Trạng thái</th>
-                          <th className="text-end px-3" style={{width: '20%'}}>Hành động</th>
+                          <th className="px-3" style={{ width: '19%' }}>Khách hàng</th>
+                          <th style={{ width: '13%' }}>Phòng & Giá</th>
+                          <th style={{ width: '19%' }}>Thời gian</th>
+                          <th style={{ width: '14%' }}>Tổng tiền</th>
+                          <th className="text-nowrap" style={{ width: '11%' }}>Booking</th>
+                          <th className="text-nowrap" style={{ width: '12%' }}>Thanh toán</th>
+                          <th className="text-end px-3" style={{ width: '12%' }}>Hành động</th>
                       </tr>
                   </thead>
                   <tbody>
                       {data.bookings && data.bookings.length > 0 ? data.bookings.map(b => {
-                          const formatDate = (arr) => Array.isArray(arr) ? `${String(arr[2]).padStart(2,'0')}/${String(arr[1]).padStart(2,'0')}/${arr[0]} ${String(arr[3]).padStart(2,'0')}:${String(arr[4]||0).padStart(2,'0')}` : arr;
+                          const checkedIn = hasCheckedIn(b);
+                          const checkedOut = hasCheckedOut(b);
                           const displayTotal = calculateBookingDisplayTotal(b);
                           return (
                           <tr key={b.id}>
@@ -231,8 +293,11 @@ export default function Bookings() {
                               <td className="small">
                                   {b.details?.map((d, i) => (
                                     <div key={`time-${i}`} className="mb-1 text-wrap">
-                                      <div className="text-muted">In: <b className="text-dark">{formatDate(d.checkIn)}</b></div>
-                                      <div className="text-muted">Out: <b className="text-dark">{formatDate(d.checkOut)}</b></div>
+                                      <div className="text-muted">In: <b className="text-dark">{formatBookingDate(d.checkIn)}</b></div>
+                                      <div className="text-muted">Out: <b className="text-dark">{formatBookingDate(d.checkOut)}</b></div>
+                                      {d.checkInActual && <div className="text-success">Nhận phòng: <b>{formatBookingDate(d.checkInActual)}</b></div>}
+                                      {d.checkOutActual && <div className="text-secondary">Trả phòng: <b>{formatBookingDate(d.checkOutActual)}</b></div>}
+                                      {!d.checkInActual && b.status === 'confirmed' && <div className="text-warning">Chưa nhận phòng</div>}
                                     </div>
                                   ))}
                               </td>
@@ -242,13 +307,17 @@ export default function Bookings() {
                                       {getStayNightsLabel(b.details?.[0]?.checkIn, b.details?.[0]?.checkOut)}
                                   </span>
                               </td>
-                              <td><span className={`st-badge st-${b.status}`}>{b.status}</span></td>
+                              <td className="text-nowrap"><span className={`st-badge st-${b.status}`}>{getBookingStatusLabel(b.status)}</span></td>
+                              <td className="text-nowrap"><span className={`st-badge st-pay-${b.paymentStatus || 'unpaid'}`}>{getPaymentStatusLabel(b.paymentStatus)}</span></td>
                               <td className="text-end px-3">
                                   <div className="d-flex flex-wrap justify-content-end gap-1">
                                       {b.status === 'pending' && (
                                           <button className="btn btn-sm btn-light text-success border rounded-circle" style={{width:'32px', height:'32px'}} title="Duyệt đơn" onClick={() => handleApprove(b.id)}>✓</button>
                                       )}
-                                      {(b.status === 'confirmed' || b.status === 'pending') && (
+                                      {b.status === 'confirmed' && !checkedIn && !checkedOut && (
+                                          <button className="btn btn-sm btn-light text-primary border rounded-circle" style={{width:'32px', height:'32px'}} title="Nhận phòng" onClick={() => handleCheckIn(b)}>⇢</button>
+                                      )}
+                                      {b.status === 'confirmed' && checkedIn && (
                                           <button className="btn btn-sm btn-light text-warning border rounded-circle" style={{width:'32px', height:'32px'}} title="Chấm trả phòng" onClick={() => handleCheckout(b)}>⚡</button>
                                       )}
                                       {b.status === 'completed' && (
@@ -263,7 +332,7 @@ export default function Bookings() {
                                   </div>
                               </td>
                           </tr>
-                      )}) : (<tr><td colSpan="6" className="text-center py-5 text-muted">Không có đơn đặt phòng nào.</td></tr>)}
+                      )}) : (<tr><td colSpan="7" className="text-center py-5 text-muted">Không có đơn đặt phòng nào.</td></tr>)}
                   </tbody>
               </table>
           </div>
@@ -372,8 +441,8 @@ export default function Bookings() {
                                   <span>TỔNG CỘNG</span>
                                   <span>{calculateBookingDisplayTotal(invoiceData).toLocaleString('vi-VN')} VNĐ</span>
                               </div>
-                              <div className="text-center mt-3 text-success fw-bold text-uppercase small border p-1 rounded bg-light">
-                                  Đã thanh toán
+                              <div className="text-center mt-3 fw-bold text-uppercase small border p-1 rounded bg-light">
+                                  Thanh toán: {getPaymentStatusLabel(invoiceData.paymentStatus)}
                               </div>
                           </div>
                           <button className="btn btn-dark w-100 mt-3 rounded-pill" onClick={printInvoice}>🖨 In hóa đơn</button>

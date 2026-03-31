@@ -32,6 +32,29 @@ const STATUS_STYLES = {
   },
 };
 
+const PAYMENT_STYLES = {
+  unpaid: {
+    badge: 'border border-amber-300/24 bg-amber-100/80 text-amber-800',
+    pill: 'border border-amber-300/24 bg-amber-100/80 text-amber-800',
+    label: 'Chưa thanh toán',
+  },
+  pending_payment: {
+    badge: 'border border-sky-300/24 bg-sky-100/80 text-sky-800',
+    pill: 'border border-sky-300/24 bg-sky-100/80 text-sky-800',
+    label: 'Chờ thanh toán',
+  },
+  paid: {
+    badge: 'border border-emerald-300/24 bg-emerald-100/80 text-emerald-800',
+    pill: 'border border-emerald-300/24 bg-emerald-100/80 text-emerald-800',
+    label: 'Đã thanh toán',
+  },
+  failed: {
+    badge: 'border border-rose-300/24 bg-rose-100/80 text-rose-800',
+    pill: 'border border-rose-300/24 bg-rose-100/80 text-rose-800',
+    label: 'Thanh toán lỗi',
+  },
+};
+
 function formatDate(dateValue) {
   if (!dateValue) return 'Chưa cập nhật';
   let d;
@@ -220,7 +243,9 @@ export default function History() {
               {bookings.map((booking) => {
                 const detail = booking.details?.[0];
                 const status = booking.status?.toLowerCase() || 'pending';
+                const paymentStatus = booking.paymentStatus?.toLowerCase() || 'unpaid';
                 const statusMeta = STATUS_STYLES[status] || STATUS_STYLES.pending;
+                const paymentMeta = PAYMENT_STYLES[paymentStatus] || PAYMENT_STYLES.unpaid;
                 const roomTypeName = detail?.room?.roomType?.typeName || 'Phòng tiêu chuẩn';
                 const roomNumber = detail?.room?.roomNumber || 'N/A';
                 const stayNights = calculateStayNights(detail?.checkIn, detail?.checkOut);
@@ -253,6 +278,9 @@ export default function History() {
                               <span className={`rounded-full px-4 py-2 font-label text-[0.62rem] uppercase tracking-[0.24em] ${statusMeta.badge}`}>
                                 {statusMeta.label}
                               </span>
+                              <span className={`rounded-full px-4 py-2 font-label text-[0.62rem] uppercase tracking-[0.24em] ${paymentMeta.badge}`}>
+                                {paymentMeta.label}
+                              </span>
                               <span className="rounded-full border border-outline-variant/16 bg-white/65 px-3 py-2 font-label text-[0.58rem] uppercase tracking-[0.24em] text-primary/45">
                                 Phòng {roomNumber}
                               </span>
@@ -272,7 +300,7 @@ export default function History() {
                           </div>
                         </div>
 
-                        <div className="mt-8 grid gap-4 rounded-[28px] border border-outline-variant/12 bg-white/62 p-5 sm:grid-cols-2 2xl:grid-cols-4">
+                        <div className="mt-8 grid gap-4 rounded-[28px] border border-outline-variant/12 bg-white/62 p-5 sm:grid-cols-2 2xl:grid-cols-5">
                           <div>
                             <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-primary/42">Nhận phòng</p>
                             <p className="mt-3 font-headline text-xl text-primary">{formatDate(detail?.checkIn)}</p>
@@ -286,9 +314,15 @@ export default function History() {
                             <p className="mt-3 font-headline text-xl text-primary">{formatDate(booking.createdAt || detail?.checkIn)}</p>
                           </div>
                           <div>
-                            <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-primary/42">Trạng thái</p>
+                            <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-primary/42">Booking</p>
                             <div className={`mt-3 inline-flex rounded-full px-4 py-2 font-label text-[0.62rem] uppercase tracking-[0.22em] ${statusMeta.pill}`}>
                               {statusMeta.label}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-primary/42">Thanh toán</p>
+                            <div className={`mt-3 inline-flex rounded-full px-4 py-2 font-label text-[0.62rem] uppercase tracking-[0.22em] ${paymentMeta.pill}`}>
+                              {paymentMeta.label}
                             </div>
                           </div>
                         </div>

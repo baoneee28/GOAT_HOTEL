@@ -50,6 +50,31 @@ function getStatusMeta(status) {
   }
 }
 
+function getPaymentMeta(paymentStatus) {
+  switch ((paymentStatus || '').toLowerCase()) {
+    case 'paid':
+      return {
+        label: 'Đã thanh toán',
+        className: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+      };
+    case 'pending_payment':
+      return {
+        label: 'Chờ thanh toán',
+        className: 'bg-sky-50 text-sky-700 border border-sky-200',
+      };
+    case 'failed':
+      return {
+        label: 'Thanh toán lỗi',
+        className: 'bg-rose-50 text-rose-700 border border-rose-200',
+      };
+    default:
+      return {
+        label: 'Chưa thanh toán',
+        className: 'bg-amber-50 text-amber-700 border border-amber-200',
+      };
+  }
+}
+
 function getBookingCode(id) {
   return `GH-${String(id || 0).padStart(5, '0')}`;
 }
@@ -123,7 +148,7 @@ export default function Profile() {
     const completedCount = recentBookings.filter((booking) => (booking.status || '').toLowerCase() === 'completed').length;
     const pendingCount = recentBookings.filter((booking) => ['pending', 'confirmed'].includes((booking.status || '').toLowerCase())).length;
     const totalSpent = recentBookings
-      .filter((booking) => (booking.status || '').toLowerCase() === 'completed')
+      .filter((booking) => (booking.paymentStatus || '').toLowerCase() === 'paid')
       .reduce((sum, booking) => sum + calculateBookingDisplayTotal(booking), 0);
 
     return { completedCount, pendingCount, totalSpent };
@@ -387,6 +412,7 @@ export default function Profile() {
               {recentBookings.length > 0 ? recentBookings.map((booking) => {
                 const detail = booking.details?.[0];
                 const statusMeta = getStatusMeta(booking.status);
+                const paymentMeta = getPaymentMeta(booking.paymentStatus);
                 const roomTypeName = detail?.room?.roomType?.typeName || 'Phòng tiêu chuẩn';
                 const roomNumber = detail?.room?.roomNumber || 'N/A';
                 const imageSrc = uploadedImageUrl(detail?.room?.roomType?.image, '/images/rooms/standard-room.jpg');
@@ -414,9 +440,14 @@ export default function Profile() {
                             <p className="mt-1 text-sm text-on-surface-variant">Phòng {roomNumber}</p>
                           </div>
 
-                          <span className={`inline-flex rounded-full px-3.5 py-1.5 font-label text-[0.58rem] uppercase tracking-[0.22em] ${statusMeta.className}`}>
-                            {statusMeta.label}
-                          </span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`inline-flex rounded-full px-3.5 py-1.5 font-label text-[0.58rem] uppercase tracking-[0.22em] ${statusMeta.className}`}>
+                              {statusMeta.label}
+                            </span>
+                            <span className={`inline-flex rounded-full px-3.5 py-1.5 font-label text-[0.58rem] uppercase tracking-[0.22em] ${paymentMeta.className}`}>
+                              {paymentMeta.label}
+                            </span>
+                          </div>
                         </div>
 
                         <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 rounded-[20px] border border-outline-variant/10 bg-[linear-gradient(180deg,rgba(248,244,238,0.82)_0%,rgba(255,255,255,0.94)_100%)] p-4 xl:grid-cols-4">

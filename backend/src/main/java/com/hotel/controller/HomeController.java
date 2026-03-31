@@ -82,7 +82,7 @@ public class HomeController {
         }
 
         response.put("success", true);
-        response.put("message", "Đặt phòng thành công!");
+        response.put("message", "Đã gửi yêu cầu đặt phòng!");
         return ResponseEntity.ok(response);
     }
 }

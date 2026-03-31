@@ -179,6 +179,7 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg-
 
 .badge-status { padding: 8px 12px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; }
 .status-available { background: #d1e7dd; color: #0f5132; }
+.status-reserved { background: #fef3c7; color: #92400e; }
 .status-booked { background: #f8d7da; color: #842029; }
 .status-maintenance { background: #e2e3e5; color: #41464b; }
 

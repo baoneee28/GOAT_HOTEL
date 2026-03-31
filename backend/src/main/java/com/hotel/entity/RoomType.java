@@ -29,4 +29,7 @@ public class RoomType {
     @OneToMany(mappedBy = "roomType", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @com.fasterxml.jackson.annotation.JsonIgnoreProperties("roomType")
     private List<RoomTypeItem> items;
+
+    @Transient
+    private Integer itemCount;
 }

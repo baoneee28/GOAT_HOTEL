@@ -11,13 +11,16 @@ export default function Inbox() {
   const [page, setPage] = useState(1);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   const fetchData = useCallback(async () => {
     try {
+      setLoadError('');
       const res = await axios.get(`${API_BASE}/api/admin/contact-messages?q=${q}&status=${status}&page=${page}`, { withCredentials: true });
       setData(res.data);
     } catch (error) {
       console.error(error);
+      setLoadError(error.response?.data?.message || 'Không thể tải danh sách liên hệ.');
     }
   }, [page, q, status]);
 
@@ -85,7 +88,13 @@ export default function Inbox() {
 
   const formatDate = (value) => {
     if (!value) return 'N/A';
-    return new Date(value).toLocaleString('vi-VN');
+    if (Array.isArray(value)) {
+      const [year, month, day, hour = 0, minute = 0, second = 0] = value;
+      const parsed = new Date(year, (month || 1) - 1, day || 1, hour, minute, second);
+      return Number.isNaN(parsed.getTime()) ? 'N/A' : parsed.toLocaleString('vi-VN');
+    }
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? 'N/A' : parsed.toLocaleString('vi-VN');
   };
 
   const badgeClass = (value) => ({
@@ -102,6 +111,12 @@ export default function Inbox() {
           <p className="text-muted mb-0">Tin nhắn từ form contact của khách đang đổ về đây. Mới: <b>{data.newCount || 0}</b></p>
         </div>
       </div>
+
+      {loadError && (
+        <div className="alert alert-warning mb-4">
+          {loadError}
+        </div>
+      )}
 
       <div className="card-table mb-4">
         <div className="p-4 border-bottom d-flex flex-wrap gap-3">

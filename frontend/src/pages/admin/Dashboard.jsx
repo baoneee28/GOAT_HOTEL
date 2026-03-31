@@ -82,10 +82,10 @@ export default function Dashboard() {
         pieChartInstance.current = new Chart(pieChartRef.current, {
             type: 'doughnut',
             data: {
-                labels: ['Phòng trống', 'Đang có khách', 'Bảo trì'],
+                labels: ['Phòng trống', 'Có lịch đặt', 'Đang thuê', 'Bảo trì'],
                 datasets: [{
-                    data: [stats.rooms_available, stats.rooms_booked, stats.rooms_maintenance],
-                    backgroundColor: ['#22c55e', '#ef4444', '#94a3b8'],
+                    data: [stats.rooms_available, stats.rooms_reserved || 0, stats.rooms_booked, stats.rooms_maintenance],
+                    backgroundColor: ['#22c55e', '#f59e0b', '#ef4444', '#94a3b8'],
                     borderWidth: 0,
                     hoverOffset: 10
                 }]
@@ -141,7 +141,7 @@ export default function Dashboard() {
                   <div className="small text-muted mb-1 text-uppercase fw-bold">Tổng số phòng</div>
                   <h3 className="fw-bold mb-0"><span>{stats.total_rooms}</span> Phòng</h3>
                   <div className="small text-muted mt-2">
-                    Trống: {stats.rooms_available} · Có khách: {stats.rooms_booked} · Bảo trì: {stats.rooms_maintenance}
+                    Trống: {stats.rooms_available} · Có lịch: {stats.rooms_reserved || 0} · Đang thuê: {stats.rooms_booked} · Bảo trì: {stats.rooms_maintenance}
                   </div>
               </div>
           </div>
@@ -175,7 +175,8 @@ export default function Dashboard() {
                   
                   <div className="mt-2 text-center small text-muted">
                       <span className="mx-2">● Trống: <span>{stats.rooms_available}</span></span>
-                      <span className="mx-2">● Có khách: <span>{stats.rooms_booked}</span></span>
+                      <span className="mx-2">● Có lịch: <span>{stats.rooms_reserved || 0}</span></span>
+                      <span className="mx-2">● Đang thuê: <span>{stats.rooms_booked}</span></span>
                       <span className="mx-2">● Bảo trì: <span>{stats.rooms_maintenance}</span></span>
                   </div>
               </div>

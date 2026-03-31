@@ -11,13 +11,21 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ContactMessageRepository extends JpaRepository<ContactMessage, Integer> {
 
-    @Query("SELECT c FROM ContactMessage c WHERE " +
+    @Query(value = "SELECT c.* FROM contact_messages c WHERE " +
            "(:search IS NULL OR :search = '' OR " +
-           "LOWER(c.firstName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "LOWER(c.lastName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(c.first_name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(c.last_name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
            "LOWER(c.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "LOWER(c.message) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
-           "(:status IS NULL OR :status = '' OR c.status = :status)")
+           "LOWER(CAST(c.message AS NVARCHAR(MAX))) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "(:status IS NULL OR :status = '' OR c.status = :status)",
+           countQuery = "SELECT COUNT(*) FROM contact_messages c WHERE " +
+                   "(:search IS NULL OR :search = '' OR " +
+                   "LOWER(c.first_name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                   "LOWER(c.last_name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                   "LOWER(c.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                   "LOWER(CAST(c.message AS NVARCHAR(MAX))) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+                   "(:status IS NULL OR :status = '' OR c.status = :status)",
+           nativeQuery = true)
     Page<ContactMessage> findWithFilters(@Param("search") String search,
                                          @Param("status") String status,
                                          Pageable pageable);

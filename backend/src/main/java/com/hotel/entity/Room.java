@@ -16,4 +16,6 @@ public class Room {
     private RoomType roomType;
     @Column(name = "status", length = 20)
     private String status = "available";
+    @Transient
+    private String effectiveStatus;
 }

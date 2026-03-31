@@ -61,6 +61,11 @@ public class BookingPriceBackfillRunner implements CommandLineRunner {
                 changed = true;
             }
 
+            if (booking.getPaymentStatus() == null || booking.getPaymentStatus().isBlank()) {
+                booking.setPaymentStatus(bookingService.inferLegacyPaymentStatus(booking));
+                changed = true;
+            }
+
             if (changed) {
                 changedBookings.add(booking);
             }

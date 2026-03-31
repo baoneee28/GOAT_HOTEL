@@ -17,6 +17,10 @@ public interface RoomRepository extends JpaRepository<Room, Integer> {
 
     List<Room> findByRoomTypeIdAndStatusOrderByRoomNumberAsc(Integer typeId, String status);
 
+    List<Room> findAllByOrderByIdDesc();
+
+    List<Room> findByRoomNumberContainingOrderByIdDesc(String roomNumber);
+
     @Query("SELECT r FROM Room r WHERE r.roomType.id = :typeId AND r.status != 'maintenance' AND r.id NOT IN " +
            "(SELECT bd.room.id FROM BookingDetail bd JOIN bd.booking b " +
            "WHERE b.status IN ('pending', 'confirmed') AND (bd.checkIn < :checkOut AND bd.checkOut > :checkIn))")
@@ -38,6 +42,8 @@ public interface RoomRepository extends JpaRepository<Room, Integer> {
     Integer findMaxId();
 
     java.util.Optional<Room> findByRoomNumber(String roomNumber);
+
+    boolean existsByRoomType_IdAndStatusIgnoreCase(Integer roomTypeId, String status);
 
 
     @Query("SELECT r FROM Room r LEFT JOIN r.roomType t WHERE " +

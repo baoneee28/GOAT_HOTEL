@@ -107,8 +107,12 @@ public class BookingApiController {
                 return ResponseEntity.badRequest().body(response);
             }
 
+            Booking createdBooking = bookingService.getActiveBooking(currentUser.getId());
             response.put("success", true);
             response.put("message", "Đặt phòng thành công!");
+            if (createdBooking != null) {
+                response.put("bookingId", createdBooking.getId());
+            }
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             response.put("success", false);

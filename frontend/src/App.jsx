@@ -18,6 +18,8 @@ import ContactPage from './pages/ContactPage';
 import RoomDetail from './pages/RoomDetail';
 import AvailableRooms from './pages/AvailableRooms';
 import BookingConfirmation from './pages/BookingConfirmation';
+import VNPayLaunch from './pages/VNPayLaunch';
+import VNPayReturn from './pages/VNPayReturn';
 import AdminLayout from './pages/admin/AdminLayout';
 import Dashboard from './pages/admin/Dashboard';
 import Rooms from './pages/admin/Rooms';
@@ -49,11 +51,13 @@ function App() {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/rooms/:id" element={<RoomDetail />} />
             <Route path="/rooms/:id/available" element={<AvailableRooms />} />
+            <Route path="/vnpay-return" element={<VNPayReturn />} />
           </Route>
 
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
               <Route path="/booking/confirmation" element={<BookingConfirmation />} />
+              <Route path="/vnpay-launch" element={<VNPayLaunch />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/history" element={<History />} />
               <Route path="/booking/:id" element={<OrderDetail />} />

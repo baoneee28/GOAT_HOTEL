@@ -59,6 +59,7 @@ export default function BookingConfirmation() {
   };
 
   const [submitting, setSubmitting] = useState(false);
+  const [preparingVNPay, setPreparingVNPay] = useState(false);
 
   useEffect(() => {
     if (!sessionUser) return;
@@ -103,32 +104,30 @@ export default function BookingConfirmation() {
     return () => window.clearTimeout(scrollTimer);
   }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const validateBookingInput = () => {
     if (!hasBookingContext) {
       if (window.Swal) window.Swal.fire('Thiếu dữ liệu', 'Vui lòng chọn phòng từ danh sách trước khi xác nhận lưu trú.', 'warning');
       else alert('Vui lòng chọn phòng từ danh sách trước khi xác nhận lưu trú.');
       navigate('/collections');
-      return;
+      return null;
     }
     if(nights <= 0) {
       if (window.Swal) window.Swal.fire('Lỗi', 'Ngày trả phòng phải sau ngày nhận phòng.', 'warning');
       else alert('Ngày trả phòng phải sau ngày nhận phòng.');
-      return;
+      return null;
     }
     
-    // Nếu chưa đăng nhập thì không thể map userId cho backend
     if (!sessionUser?.id) {
        if (window.Swal) window.Swal.fire('Chú ý', 'Bạn cần đăng nhập để đặt phòng.', 'warning');
        else alert('Bạn cần đăng nhập để đặt phòng.');
        navigate('/login', { state: { from: location } });
-       return;
+       return null;
     }
 
     if(!formData.fullName || !formData.phone || !formData.email) {
       if (window.Swal) window.Swal.fire('Thiếu thông tin', 'Vui lòng điền đầy đủ các thông tin cá nhân bắt buộc', 'warning');
       else alert('Vui lòng điền đầy đủ thông tin bắt buộc.');
-      return;
+      return null;
     }
 
     const effectiveRoomId = booking.roomId || roomId;
@@ -136,30 +135,30 @@ export default function BookingConfirmation() {
       if (window.Swal) window.Swal.fire('Thiếu dữ liệu', 'Không xác định được phòng cần đặt. Vui lòng chọn lại phòng.', 'warning');
       else alert('Không xác định được phòng cần đặt. Vui lòng chọn lại phòng.');
       navigate(-1);
-      return;
+      return null;
     }
 
-    setSubmitting(true);
-    try {
-      const payload = {
-        roomId: String(effectiveRoomId),
-        checkIn: formData.checkIn,
-        checkOut: formData.checkOut
-      };
+    return {
+      roomId: String(effectiveRoomId),
+      checkIn: formData.checkIn,
+      checkOut: formData.checkOut,
+    };
+  };
 
+  const createBooking = async () => {
+    const payload = validateBookingInput();
+    if (!payload) {
+      return null;
+    }
+
+    try {
       const res = await axios.post(`${API_BASE}/api/bookings`, payload, { withCredentials: true });
-      
       if (res.data?.success) {
-        if (window.Swal) {
-          window.Swal.fire('Thành công', 'Đã lưu yêu cầu đặt phòng!', 'success').then(() => navigate('/history'));
-        } else {
-          alert('Thanh toán thành công!');
-          navigate('/history');
-        }
-      } else {
-        if (window.Swal) window.Swal.fire('Lỗi', res.data?.message || 'Có lỗi khi đặt phòng.', 'error');
-        else alert(res.data?.message || 'Có lỗi khi đặt phòng.');
+        return res.data;
       }
+
+      if (window.Swal) window.Swal.fire('Lỗi', res.data?.message || 'Có lỗi khi đặt phòng.', 'error');
+      else alert(res.data?.message || 'Có lỗi khi đặt phòng.');
     } catch (err) {
       console.error(err);
       if (err.response?.status === 401) {
@@ -175,8 +174,49 @@ export default function BookingConfirmation() {
       }
       if (window.Swal) window.Swal.fire('Lỗi', err.response?.data?.message || 'Không thể kết nối với máy chủ.', 'error');
       else alert('Không thể kết nối với máy chủ.');
+    }
+
+    return null;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const result = await createBooking();
+      if (!result?.success) return;
+
+      if (window.Swal) {
+        window.Swal.fire('Thành công', 'Đã lưu yêu cầu đặt phòng!', 'success').then(() => navigate('/history'));
+      } else {
+        alert('Đặt phòng thành công!');
+        navigate('/history');
+      }
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleVNPaySubmit = async () => {
+    setPreparingVNPay(true);
+    try {
+      const result = await createBooking();
+      if (!result?.success) return;
+
+      if (!result.bookingId) {
+        if (window.Swal) {
+          window.Swal.fire('Thiếu dữ liệu', 'Đơn đã được tạo nhưng chưa lấy được mã booking để mở VNPay. Bạn có thể vào lịch sử để thanh toán lại.', 'warning')
+            .then(() => navigate('/history'));
+        } else {
+          alert('Đơn đã được tạo nhưng chưa lấy được mã booking để mở VNPay.');
+          navigate('/history');
+        }
+        return;
+      }
+
+      navigate(`/vnpay-launch?bookingId=${result.bookingId}`);
+    } finally {
+      setPreparingVNPay(false);
     }
   };
 
@@ -444,14 +484,24 @@ export default function BookingConfirmation() {
             </div>
 
             {/* CTA */}
-            <button
-              type="submit"
-              form="checkout-form"
-              disabled={nights <= 0 || submitting}
-              className={`w-full font-label uppercase tracking-widest text-xs py-5 transition-all shadow-xl active:scale-95 ${(nights > 0 && !submitting) ? 'bg-primary text-on-primary hover:bg-primary-container shadow-primary/10' : 'bg-surface-variant text-on-surface-variant cursor-not-allowed opacity-70'}`}
-            >
-              {submitting ? 'ĐANG XỬ LÝ...' : 'THANH TOÁN NGAY'}
-            </button>
+            <div className="space-y-3">
+              <button
+                type="submit"
+                form="checkout-form"
+                disabled={nights <= 0 || submitting || preparingVNPay}
+                className={`w-full font-label uppercase tracking-widest text-xs py-5 transition-all shadow-xl active:scale-95 ${(nights > 0 && !submitting && !preparingVNPay) ? 'bg-primary text-on-primary hover:bg-primary-container shadow-primary/10' : 'bg-surface-variant text-on-surface-variant cursor-not-allowed opacity-70'}`}
+              >
+                {submitting ? 'ĐANG XỬ LÝ...' : 'THANH TOÁN NGAY'}
+              </button>
+              <button
+                type="button"
+                onClick={handleVNPaySubmit}
+                disabled={nights <= 0 || submitting || preparingVNPay}
+                className={`w-full font-label uppercase tracking-widest text-xs py-5 transition-all border active:scale-95 ${(nights > 0 && !submitting && !preparingVNPay) ? 'border-emerald-500 text-emerald-600 hover:bg-emerald-500/10' : 'border-outline-variant/30 text-on-surface-variant cursor-not-allowed opacity-70'}`}
+              >
+                {preparingVNPay ? 'ĐANG MỞ VNPAY...' : 'THANH TOÁN BẰNG VNPAY'}
+              </button>
+            </div>
             <p className="text-center mt-4">
               <span className="font-body text-[10px] text-on-surface-variant">
                 Bằng việc thanh toán, bạn đồng ý với Điều khoản của GOAT Hotel.

@@ -198,10 +198,6 @@ export default function Profile() {
             <div className="max-w-3xl">
               <p className="font-label text-[0.72rem] uppercase tracking-[0.34em] text-secondary/90">GOAT HOTEL Privilege</p>
               <h1 className="mt-4 max-w-2xl font-headline text-4xl leading-tight text-white sm:text-5xl lg:text-[3.6rem]">Hồ sơ của bạn</h1>
-              <p className="mt-5 max-w-2xl text-sm leading-7 text-white/78 sm:text-base">
-                Quản lý thông tin tài khoản, theo dõi những kỳ lưu trú gần đây và duy trì trải nghiệm thành viên
-                được cá nhân hóa theo chuẩn nghỉ dưỡng cao cấp của GOAT HOTEL.
-              </p>
             </div>
           </div>
         </div>

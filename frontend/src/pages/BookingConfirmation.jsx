@@ -39,10 +39,6 @@ export default function BookingConfirmation() {
     checkIn: state?.checkIn ?? searchParams.get('checkIn') ?? new Date().toISOString().split('T')[0],
     checkOut: state?.checkOut ?? searchParams.get('checkOut') ?? new Date(Date.now() + 86400000).toISOString().split('T')[0],
     guests: Number(state?.guests ?? searchParams.get('guests') ?? 2),
-    fullName: '',
-    phone: '',
-    email: '',
-    notes: ''
   });
 
   const nights = formData.checkIn && formData.checkOut
@@ -52,6 +48,9 @@ export default function BookingConfirmation() {
   const displaySize = resolveRoomTypeSpec(booking.room, 'size', booking.size);
   const displayBeds = resolveRoomTypeSpec(booking.room, 'beds', booking.beds);
   const displayView = resolveRoomTypeSpec(booking.room, 'view', booking.view);
+  const accountName = sessionUser?.fullName?.trim() || 'Chưa cập nhật trong hồ sơ';
+  const accountPhone = sessionUser?.phone?.trim() || 'Chưa cập nhật trong hồ sơ';
+  const accountEmail = sessionUser?.email?.trim() || 'Chưa cập nhật trong hồ sơ';
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -60,16 +59,6 @@ export default function BookingConfirmation() {
 
   const [submitting, setSubmitting] = useState(false);
   const [preparingVNPay, setPreparingVNPay] = useState(false);
-
-  useEffect(() => {
-    if (!sessionUser) return;
-    setFormData((prev) => ({
-      ...prev,
-      fullName: prev.fullName || sessionUser.fullName || '',
-      phone: prev.phone || sessionUser.phone || '',
-      email: prev.email || sessionUser.email || '',
-    }));
-  }, [sessionUser]);
 
   useEffect(() => {
     const needsRoomRefresh = !state?.room || !state?.size || !state?.beds || !state?.view || !state?.capacity;
@@ -122,12 +111,6 @@ export default function BookingConfirmation() {
        else alert('Bạn cần đăng nhập để đặt phòng.');
        navigate('/login', { state: { from: location } });
        return null;
-    }
-
-    if(!formData.fullName || !formData.phone || !formData.email) {
-      if (window.Swal) window.Swal.fire('Thiếu thông tin', 'Vui lòng điền đầy đủ các thông tin cá nhân bắt buộc', 'warning');
-      else alert('Vui lòng điền đầy đủ thông tin bắt buộc.');
-      return null;
     }
 
     const effectiveRoomId = booking.roomId || roomId;
@@ -274,7 +257,7 @@ export default function BookingConfirmation() {
               PHÒNG {booking.physicalRoomNumber}
             </p>
             <p className="text-on-surface-variant font-body text-base">
-              Vui lòng hoàn thiện lịch trình và thông tin liên hệ để gửi yêu cầu đặt phòng hoặc mở luồng thanh toán demo.
+              Vui lòng kiểm tra lại lịch trình đã chọn. Booking này dùng thông tin từ tài khoản đang đăng nhập và cả hai luồng demo đều giữ chỗ tối đa 3 phút.
             </p>
           </div>
 
@@ -329,77 +312,51 @@ export default function BookingConfirmation() {
                   </select>
                 </div>
               </div>
+              <p className="font-body text-xs text-on-surface-variant">
+                Ngày lưu trú và số khách đang hiển thị theo lựa chọn ở bước trước để bạn đối chiếu lại trước khi tạo booking.
+              </p>
             </div>
 
-            {/* THÔNG TIN KHÁCH */}
+            {/* THÔNG TIN TÀI KHOẢN */}
             <div className="space-y-6">
               <h2 className="font-label uppercase tracking-widest text-xs text-secondary border-b border-outline-variant/30 pb-2">
-                2. Thông tin cá nhân
+                2. Tài khoản áp dụng cho booking
               </h2>
-              
+              <p className="font-body text-xs text-on-surface-variant">
+                Hệ thống hiện gắn booking với thông tin của tài khoản đang đăng nhập. Nếu cần cập nhật số điện thoại hoặc email, vui lòng chỉnh ở hồ sơ trước khi đặt.
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                  <label className="font-label uppercase tracking-widest text-[10px] text-on-surface-variant mb-2 block">
-                    Họ và tên <span className="text-error">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="fullName"
-                    value={formData.fullName}
-                    onChange={handleInputChange}
-                    placeholder="Nguyễn Văn A"
-                    className="w-full border-0 border-b border-outline-variant/40 focus:border-secondary bg-transparent py-2 px-0 focus:ring-0 font-body text-base text-on-surface transition-colors placeholder:text-outline-variant focus:outline-none"
-                    required
-                  />
+                <div className="border border-outline-variant/30 rounded-sm px-4 py-4 bg-surface-container-low/30">
+                  <p className="font-label uppercase tracking-widest text-[10px] text-on-surface-variant mb-2">
+                    Họ và tên
+                  </p>
+                  <p className="font-body text-base text-on-surface">{accountName}</p>
                 </div>
-                <div>
-                  <label className="font-label uppercase tracking-widest text-[10px] text-on-surface-variant mb-2 block">
-                    Số điện thoại <span className="text-error">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder="090 123 4567"
-                    className="w-full border-0 border-b border-outline-variant/40 focus:border-secondary bg-transparent py-2 px-0 focus:ring-0 font-body text-base text-on-surface transition-colors placeholder:text-outline-variant focus:outline-none"
-                    required
-                  />
+                <div className="border border-outline-variant/30 rounded-sm px-4 py-4 bg-surface-container-low/30">
+                  <p className="font-label uppercase tracking-widest text-[10px] text-on-surface-variant mb-2">
+                    Số điện thoại
+                  </p>
+                  <p className="font-body text-base text-on-surface">{accountPhone}</p>
                 </div>
-                <div className="md:col-span-2">
-                  <label className="font-label uppercase tracking-widest text-[10px] text-on-surface-variant mb-2 block">
-                    Địa chỉ Email <span className="text-error">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    placeholder="nguyen.a@email.com"
-                    className="w-full border-0 border-b border-outline-variant/40 focus:border-secondary bg-transparent py-2 px-0 focus:ring-0 font-body text-base text-on-surface transition-colors placeholder:text-outline-variant focus:outline-none"
-                    required
-                  />
+                <div className="md:col-span-2 border border-outline-variant/30 rounded-sm px-4 py-4 bg-surface-container-low/30">
+                  <p className="font-label uppercase tracking-widest text-[10px] text-on-surface-variant mb-2">
+                    Địa chỉ email
+                  </p>
+                  <p className="font-body text-base text-on-surface break-all">{accountEmail}</p>
                 </div>
               </div>
             </div>
 
-            {/* YÊU CẦU ĐẶC BIỆT */}
+            {/* LƯU Ý BẢN DEMO */}
             <div className="space-y-6">
               <h2 className="font-label uppercase tracking-widest text-xs text-secondary border-b border-outline-variant/30 pb-2">
-                3. Yêu cầu đặc biệt (Tùy chọn)
+                3. Lưu ý cho bước xác nhận hiện tại
               </h2>
-              <p className="font-body text-xs text-on-surface-variant">
-                Mọi yêu cầu của bạn sẽ được gửi trực tiếp tới khách sạn để chúng tôi chuẩn bị tốt nhất.
-              </p>
-              <div>
-                <textarea
-                  name="notes"
-                  value={formData.notes}
-                  onChange={handleInputChange}
-                  placeholder="Ví dụ: Cần xe đưa rước sân bay, chuẩn bị nôi em bé..."
-                  rows="3"
-                  className="w-full border border-outline-variant/40 focus:border-secondary bg-transparent p-4 focus:ring-0 font-body text-sm text-on-surface transition-colors placeholder:text-outline-variant rounded-sm resize-none focus:outline-none"
-                ></textarea>
+              <div className="border border-outline-variant/30 rounded-sm px-4 py-4 bg-secondary/5">
+                <p className="font-body text-sm text-on-surface leading-7">
+                  Bản demo hiện tại chỉ tạo booking theo <strong>phòng</strong>, <strong>ngày lưu trú</strong> và <strong>hình thức xử lý</strong>.
+                  Yêu cầu đặc biệt theo từng booking chưa được lưu riêng ở bước này để tránh hiển thị nhiều hơn phần backend đang xử lý thật.
+                </p>
               </div>
             </div>
 
@@ -507,7 +464,7 @@ export default function BookingConfirmation() {
             </div>
             <p className="text-center mt-4">
               <span className="font-body text-[10px] text-on-surface-variant">
-                Gửi yêu cầu đặt phòng hoặc mở VNPay demo đều tạo booking giữ chỗ tạm thời. Trang chi tiết booking sẽ hiển thị rõ thời điểm hết hạn để bạn demo dễ hơn.
+                Gửi yêu cầu đặt phòng hoặc mở VNPay demo đều tạo booking giữ chỗ tối đa 3 phút. Nếu chưa xử lý tiếp trong thời gian này, booking sẽ tự hết hiệu lực.
               </span>
             </p>
 

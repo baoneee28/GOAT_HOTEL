@@ -326,12 +326,16 @@ public class BookingService {
             throw new IllegalArgumentException("Phòng không tồn tại!");
         }
 
+        Room room = roomOpt.get();
+        if ("maintenance".equalsIgnoreCase(room.getStatus())) {
+            throw new IllegalArgumentException("Phòng này đang được bảo trì nên chưa thể nhận booking mới.");
+        }
+
         long overlapCount = bookingRepository.countOverlappingBookings(roomId, checkIn, checkOut, LocalDateTime.now());
         if (overlapCount > 0) {
             throw new IllegalArgumentException("Phòng đã có người đặt trong thời gian này!");
         }
 
-        Room room = roomOpt.get();
         double pricePerNight = room.getRoomType().getPricePerNight();
         long totalPrice = calculatePriceIndex(checkIn, checkOut, pricePerNight);
         double totalHours = calculateHours(checkIn, checkOut);

@@ -145,6 +145,7 @@ export default function Bookings() {
             fetchData();
           }
         } catch (e) {
+            await fetchData();
             Swal.fire({ icon: 'error', title: 'Lỗi', text: getErrorMessage(e) });
         }
       }

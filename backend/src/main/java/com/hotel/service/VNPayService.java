@@ -42,6 +42,9 @@ public class VNPayService {
     @Value("${vnp.frontendReturnUrl:http://localhost:5173/vnpay-return}")
     private String vnpFrontendReturnUrl;
 
+    @Value("${booking.pending-hold-seconds:180}")
+    private long pendingHoldSeconds;
+
     @Autowired
     private BookingRepository bookingRepository;
 
@@ -108,7 +111,7 @@ public class VNPayService {
         formatter.setTimeZone(timeZone);
         params.put("vnp_CreateDate", formatter.format(calendar.getTime()));
 
-        calendar.add(Calendar.MINUTE, 3);
+        calendar.add(Calendar.SECOND, (int) Math.max(0L, pendingHoldSeconds));
         params.put("vnp_ExpireDate", formatter.format(calendar.getTime()));
 
         List<String> fieldNames = new ArrayList<>(params.keySet());

@@ -535,11 +535,27 @@ export default function OrderDetail() {
             max-width: none !important;
             margin: 0 !important;
             padding: 0 !important;
+            min-height: calc(297mm - 16mm);
+            display: flex;
+            flex-direction: column;
             font-size: 12px;
+          }
+          .print-body {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
           }
           .print-card {
             break-inside: avoid;
             page-break-inside: avoid;
+          }
+          .print-details-card {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+          }
+          .print-footer {
+            margin-top: auto;
           }
           .print-room-table {
             width: 100%;
@@ -1063,86 +1079,106 @@ export default function OrderDetail() {
             </div>
           </header>
 
-          <section className="print-card mt-4 rounded-[18px] border border-slate-300 p-4">
-            <p className="font-label text-[0.56rem] uppercase tracking-[0.22em] text-slate-500">Thông tin nhanh</p>
-            <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-2 text-xs leading-5 text-slate-700">
-              <p>Tên khách: <span className="font-medium text-slate-950">{bookingOwner}</span></p>
-              <p>Email: <span className="font-medium text-slate-950">{booking.user?.email || 'Chưa cập nhật'}</span></p>
-              <p>Số điện thoại: <span className="font-medium text-slate-950">{booking.user?.phone || 'Chưa cập nhật'}</span></p>
-              <p>Số khách: <span className="font-medium text-slate-950">{guestCount ? `${guestCount} khách` : 'Chưa cập nhật'}</span></p>
-              <p>Số phòng: <span className="font-medium text-slate-950">{roomCount}</span></p>
-              <p>Loại hiển thị: <span className="font-medium text-slate-950">{roomSummaryLabel}</span></p>
-            </div>
-          </section>
-
-          <section className="print-card mt-4 rounded-[20px] border border-slate-300 p-4">
-            <div className="flex items-end justify-between gap-4 border-b border-slate-200 pb-3">
-              <div>
-                <p className="font-label text-[0.58rem] uppercase tracking-[0.24em] text-slate-500">Danh sách phòng</p>
-                <h2 className="mt-1.5 font-headline text-[1.6rem] text-slate-950">Chi tiết lưu trú</h2>
+          <div className="print-body">
+            <section className="print-card mt-4 rounded-[18px] border border-slate-300 p-4">
+              <p className="font-label text-[0.56rem] uppercase tracking-[0.22em] text-slate-500">Thông tin nhanh</p>
+              <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-2 text-xs leading-5 text-slate-700">
+                <p>Tên khách: <span className="font-medium text-slate-950">{bookingOwner}</span></p>
+                <p>Email: <span className="font-medium text-slate-950">{booking.user?.email || 'Chưa cập nhật'}</span></p>
+                <p>Số điện thoại: <span className="font-medium text-slate-950">{booking.user?.phone || 'Chưa cập nhật'}</span></p>
+                <p>Số khách: <span className="font-medium text-slate-950">{guestCount ? `${guestCount} khách` : 'Chưa cập nhật'}</span></p>
+                <p>Số phòng: <span className="font-medium text-slate-950">{roomCount}</span></p>
+                <p>Loại hiển thị: <span className="font-medium text-slate-950">{roomSummaryLabel}</span></p>
               </div>
-              <p className="text-xs text-slate-500">{roomCount} phòng trong đơn đặt này</p>
-            </div>
+            </section>
 
-            <div className="mt-3 overflow-hidden rounded-[16px] border border-slate-200">
-              <table className="print-room-table">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th>Phòng</th>
-                    <th>Loại phòng</th>
-                    <th>Nhận phòng</th>
-                    <th>Trả phòng</th>
-                    <th>Số đêm</th>
-                    <th>Đơn giá</th>
-                    <th>Thành tiền</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {roomEntries.map((room) => (
-                    <tr key={`print-${room.id}`}>
-                      <td>Phòng {room.roomNumber}</td>
-                      <td className="font-medium text-slate-950">{room.roomTypeName}</td>
-                      <td>{room.checkIn}</td>
-                      <td>{room.checkOut}</td>
-                      <td>{room.nights} đêm</td>
-                      <td>{room.pricePerNight.toLocaleString('vi-VN')}đ</td>
-                      <td className="font-medium text-slate-950">{room.total.toLocaleString('vi-VN')}đ</td>
+            <section className="print-card print-details-card mt-4 rounded-[20px] border border-slate-300 p-4">
+              <div className="flex items-end justify-between gap-4 border-b border-slate-200 pb-3">
+                <div>
+                  <p className="font-label text-[0.58rem] uppercase tracking-[0.24em] text-slate-500">Danh sách phòng</p>
+                  <h2 className="mt-1.5 font-headline text-[1.6rem] text-slate-950">Chi tiết lưu trú</h2>
+                </div>
+                <p className="text-xs text-slate-500">{roomCount} phòng trong đơn đặt này</p>
+              </div>
+
+              <div className="mt-3 overflow-hidden rounded-[16px] border border-slate-200">
+                <table className="print-room-table">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th>Phòng</th>
+                      <th>Loại phòng</th>
+                      <th>Nhận phòng</th>
+                      <th>Trả phòng</th>
+                      <th>Số đêm</th>
+                      <th>Đơn giá</th>
+                      <th>Thành tiền</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mt-3 grid gap-4 md:grid-cols-[minmax(0,1fr)_280px]">
-              <div className="rounded-[16px] border border-slate-300 p-3.5">
-                <p className="font-label text-[0.56rem] uppercase tracking-[0.22em] text-slate-500">Ghi chú ngắn</p>
-                <p className="mt-2 text-xs leading-5 text-slate-600">
-                  Hóa đơn này được in trực tiếp từ trang chi tiết booking của GOAT HOTEL.
-                </p>
+                  </thead>
+                  <tbody>
+                    {roomEntries.map((room) => (
+                      <tr key={`print-${room.id}`}>
+                        <td>Phòng {room.roomNumber}</td>
+                        <td className="font-medium text-slate-950">{room.roomTypeName}</td>
+                        <td>{room.checkIn}</td>
+                        <td>{room.checkOut}</td>
+                        <td>{room.nights} đêm</td>
+                        <td>{room.pricePerNight.toLocaleString('vi-VN')}đ</td>
+                        <td className="font-medium text-slate-950">{room.total.toLocaleString('vi-VN')}đ</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
 
-              <div className="rounded-[16px] border border-slate-300 p-3.5">
-                <p className="font-label text-[0.56rem] uppercase tracking-[0.22em] text-slate-500">Tổng thanh toán</p>
-                <div className="mt-3 space-y-2 text-xs text-slate-700">
-                  <div className="flex items-start justify-between gap-4">
-                    <span>{subtotalLabel}</span>
-                    <span className="font-medium text-slate-950">{baseTotal.toLocaleString('vi-VN')}đ</span>
-                  </div>
-                  <div className="flex items-start justify-between gap-4">
-                    <span>Thuế & phí dịch vụ</span>
-                    <span className="font-medium text-slate-950">{Math.round(totalFees).toLocaleString('vi-VN')}đ</span>
-                  </div>
+              <div className="mt-3 grid gap-4 md:grid-cols-[minmax(0,1fr)_280px]">
+                <div className="rounded-[16px] border border-slate-300 p-3.5">
+                  <p className="font-label text-[0.56rem] uppercase tracking-[0.22em] text-slate-500">Ghi chú ngắn</p>
+                  <p className="mt-2 text-xs leading-5 text-slate-600">
+                    Hóa đơn này được in trực tiếp từ trang chi tiết booking của GOAT HOTEL.
+                  </p>
                 </div>
 
-                <div className="mt-3 border-t border-slate-300 pt-3">
-                  <div className="flex items-end justify-between gap-4">
-                    <span className="font-label text-[0.56rem] uppercase tracking-[0.22em] text-slate-500">Tổng cộng</span>
-                    <span className="font-headline text-[2rem] text-slate-950">{grandTotal.toLocaleString('vi-VN')}đ</span>
+                <div className="rounded-[16px] border border-slate-300 p-3.5">
+                  <p className="font-label text-[0.56rem] uppercase tracking-[0.22em] text-slate-500">Tổng thanh toán</p>
+                  <div className="mt-3 space-y-2 text-xs text-slate-700">
+                    <div className="flex items-start justify-between gap-4">
+                      <span>{subtotalLabel}</span>
+                      <span className="font-medium text-slate-950">{baseTotal.toLocaleString('vi-VN')}đ</span>
+                    </div>
+                    <div className="flex items-start justify-between gap-4">
+                      <span>Thuế & phí dịch vụ</span>
+                      <span className="font-medium text-slate-950">{Math.round(totalFees).toLocaleString('vi-VN')}đ</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 border-t border-slate-300 pt-3">
+                    <div className="flex items-end justify-between gap-4">
+                      <span className="font-label text-[0.56rem] uppercase tracking-[0.22em] text-slate-500">Tổng cộng</span>
+                      <span className="font-headline text-[2rem] text-slate-950">{grandTotal.toLocaleString('vi-VN')}đ</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </section>
+            </section>
+
+            <footer className="print-footer mt-4 grid gap-4 md:grid-cols-2">
+              <div className="print-card rounded-[18px] border border-dashed border-slate-300 p-4 text-center">
+                <p className="font-label text-[0.56rem] uppercase tracking-[0.22em] text-slate-500">Khách lưu trú</p>
+                <p className="mt-2 text-xs text-slate-600">{bookingOwner}</p>
+                <div className="mt-12 border-t border-slate-300 pt-2 text-[11px] text-slate-500">
+                  Ký và ghi rõ họ tên
+                </div>
+              </div>
+
+              <div className="print-card rounded-[18px] border border-dashed border-slate-300 p-4 text-center">
+                <p className="font-label text-[0.56rem] uppercase tracking-[0.22em] text-slate-500">GOAT HOTEL</p>
+                <p className="mt-2 text-xs text-slate-600">Bản in tóm tắt phục vụ đối chiếu booking và demo báo cáo.</p>
+                <div className="mt-12 border-t border-slate-300 pt-2 text-[11px] text-slate-500">
+                  Xác nhận từ hệ thống
+                </div>
+              </div>
+            </footer>
+          </div>
         </div>
       </section>
     </div>

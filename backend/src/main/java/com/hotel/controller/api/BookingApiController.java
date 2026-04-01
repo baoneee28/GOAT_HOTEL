@@ -76,6 +76,9 @@ public class BookingApiController {
         if ("completed".equalsIgnoreCase(bookingStatus)) {
             return "paid";
         }
+        if ("cancelled".equalsIgnoreCase(bookingStatus)) {
+            return "paid".equalsIgnoreCase(currentPaymentStatus) ? "paid" : "unpaid";
+        }
         if ("expired".equalsIgnoreCase(bookingStatus)) {
             if ("pending_payment".equalsIgnoreCase(currentPaymentStatus)) {
                 return "failed";
@@ -457,7 +460,17 @@ public class BookingApiController {
         bookingService.normalizeBookingFinancials(booking);
         if (!"pending".equals(booking.getStatus())) {
             response.put("success", false);
-            response.put("message", "Chỉ có thể duyệt đơn đang chờ.");
+            if ("expired".equalsIgnoreCase(booking.getStatus())) {
+                response.put("message", "Đơn này đã hết hạn giữ chỗ nên không thể duyệt nữa.");
+            } else if ("cancelled".equalsIgnoreCase(booking.getStatus())) {
+                response.put("message", "Đơn này đã bị hủy nên không thể duyệt.");
+            } else if ("confirmed".equalsIgnoreCase(booking.getStatus())) {
+                response.put("message", "Đơn này đã được duyệt trước đó.");
+            } else if ("completed".equalsIgnoreCase(booking.getStatus())) {
+                response.put("message", "Đơn này đã hoàn thành nên không thể duyệt lại.");
+            } else {
+                response.put("message", "Chỉ có thể duyệt đơn đang chờ.");
+            }
             return ResponseEntity.badRequest().body(response);
         }
         booking.setStatus("confirmed");

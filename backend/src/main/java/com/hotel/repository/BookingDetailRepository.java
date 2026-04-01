@@ -19,6 +19,7 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, In
 
     @Query("SELECT DISTINCT bd.room.id FROM BookingDetail bd JOIN bd.booking b " +
            "WHERE bd.room.id IS NOT NULL AND bd.checkOut > :atTime " +
-           "AND (b.status = 'pending' OR (b.status = 'confirmed' AND bd.checkInActual IS NULL))")
+           "AND ((b.status = 'pending' AND b.expiresAt > :atTime) " +
+           "OR (b.status = 'confirmed' AND bd.checkInActual IS NULL))")
     List<Integer> findReservedRoomIdsAfter(@Param("atTime") LocalDateTime atTime);
 }

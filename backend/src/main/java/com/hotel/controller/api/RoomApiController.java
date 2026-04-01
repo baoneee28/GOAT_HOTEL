@@ -54,8 +54,15 @@ public class RoomApiController {
                 
                 java.time.LocalDateTime start = java.time.LocalDateTime.parse(startStr, formatter);
                 java.time.LocalDateTime end = java.time.LocalDateTime.parse(endStr, formatter);
-                
-                return roomRepository.findAvailableRoomsByDate(typeId, start, end);
+
+                List<Room> availableRooms = roomRepository.findAvailableRoomsByDate(
+                        typeId,
+                        start,
+                        end,
+                        java.time.LocalDateTime.now()
+                );
+                availableRooms.forEach(room -> room.setEffectiveStatus("available"));
+                return availableRooms;
             } catch (Exception e) {
                 // Ignore parse error, fallback to normal status check
                 e.printStackTrace();

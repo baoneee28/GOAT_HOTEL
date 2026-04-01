@@ -47,7 +47,7 @@ public class RoomTypeApiController {
                 java.time.LocalDateTime start = java.time.LocalDateTime.parse(startStr, formatter);
                 java.time.LocalDateTime end = java.time.LocalDateTime.parse(endStr, formatter);
                 
-                List<Object[]> counts = roomTypeRepository.countAvailableRoomsByDate(start, end);
+                List<Object[]> counts = roomTypeRepository.countAvailableRoomsByDate(start, end, java.time.LocalDateTime.now());
                 Map<Integer, Long> countMap = counts.stream()
                         .collect(Collectors.toMap(
                                 row -> (Integer) row[0],

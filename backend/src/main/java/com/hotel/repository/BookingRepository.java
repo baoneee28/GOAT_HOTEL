@@ -13,15 +13,11 @@ import java.util.List;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Integer> {
-
-
-
-
-
     @Query("SELECT b FROM Booking b " +
-           "WHERE b.user.id = :userId AND b.status IN ('pending', 'confirmed') " +
-           "ORDER BY b.id DESC")
-    List<Booking> findActiveBookingByUserId(@Param("userId") Integer userId);
+           "WHERE b.user.id = :userId AND b.status = 'pending' AND b.expiresAt > :now " +
+           "ORDER BY b.expiresAt DESC, b.id DESC")
+    List<Booking> findActivePendingBookingByUserId(@Param("userId") Integer userId,
+                                                   @Param("now") LocalDateTime now);
 
 
 
@@ -55,6 +51,10 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT SUM(b.totalPrice) FROM Booking b WHERE b.status = 'completed'")
     Double sumTotalRevenue();
 
+    List<Booking> findByStatusAndExpiresAtLessThanEqual(String status, LocalDateTime expiresAt);
+
+    List<Booking> findByStatusAndExpiresAtIsNull(String status);
+
     List<Booking> findByStatusAndCreatedAtBetweenOrderByCreatedAtAsc(String status,
                                                                      LocalDateTime start,
                                                                      LocalDateTime end);
@@ -82,17 +82,20 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     long countAdminBookings(@Param("status") String status);
 
     @Query("SELECT COUNT(b) FROM BookingDetail bd JOIN bd.booking b " +
-           "WHERE bd.room.id = :roomId AND b.status IN ('pending', 'confirmed') " +
+           "WHERE bd.room.id = :roomId AND (b.status = 'confirmed' OR (b.status = 'pending' AND b.expiresAt > :now)) " +
            "AND bd.checkIn < :checkOut AND bd.checkOut > :checkIn")
     long countOverlappingBookings(@Param("roomId") Integer roomId, 
                                   @Param("checkIn") java.time.LocalDateTime checkIn, 
-                                  @Param("checkOut") java.time.LocalDateTime checkOut);
+                                  @Param("checkOut") java.time.LocalDateTime checkOut,
+                                  @Param("now") java.time.LocalDateTime now);
 
     @Query("SELECT COUNT(b) FROM BookingDetail bd JOIN bd.booking b " +
-           "WHERE bd.room.id = :roomId AND b.id != :excludeBookingId AND b.status IN ('pending', 'confirmed') " +
+           "WHERE bd.room.id = :roomId AND b.id != :excludeBookingId " +
+           "AND (b.status = 'confirmed' OR (b.status = 'pending' AND b.expiresAt > :now)) " +
            "AND bd.checkIn < :checkOut AND bd.checkOut > :checkIn")
     long countOverlappingBookingsExcept(@Param("roomId") Integer roomId, 
                                         @Param("checkIn") java.time.LocalDateTime checkIn, 
                                         @Param("checkOut") java.time.LocalDateTime checkOut,
-                                        @Param("excludeBookingId") Integer excludeBookingId);
+                                        @Param("excludeBookingId") Integer excludeBookingId,
+                                        @Param("now") java.time.LocalDateTime now);
 }

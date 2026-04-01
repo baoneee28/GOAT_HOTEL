@@ -22,6 +22,8 @@ public class Booking {
     private String paymentStatus = "unpaid";
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
     
     @OneToMany(mappedBy = "booking", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @com.fasterxml.jackson.annotation.JsonIgnoreProperties("booking")

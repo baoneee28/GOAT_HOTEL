@@ -8,13 +8,17 @@ import com.hotel.repository.BookingRepository;
 import com.hotel.repository.BookingDetailRepository;
 import com.hotel.repository.RoomRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +27,11 @@ import java.util.Optional;
 @Service
 @SuppressWarnings("null")
 public class BookingService {
+
+    private static final DateTimeFormatter HOLD_UNTIL_FORMATTER = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
+
+    @Value("${booking.pending-hold-seconds:180}")
+    private long pendingHoldSeconds;
 
     @Autowired
     private BookingRepository bookingRepository;
@@ -72,9 +81,134 @@ public class BookingService {
         return result;
     }
 
+    public LocalDateTime createPendingExpiry() {
+        return LocalDateTime.now().plusSeconds(pendingHoldSeconds);
+    }
+
+    public String getPendingHoldDisplayText() {
+        if (pendingHoldSeconds <= 0) {
+            return "ngay lập tức";
+        }
+        if (pendingHoldSeconds < 60) {
+            return pendingHoldSeconds + " giây";
+        }
+        if (pendingHoldSeconds % 60 == 0) {
+            return (pendingHoldSeconds / 60) + " phút";
+        }
+
+        long minutes = pendingHoldSeconds / 60;
+        long seconds = pendingHoldSeconds % 60;
+        return minutes + " phút " + seconds + " giây";
+    }
+
+    public void preparePendingBooking(Booking booking, String previousStatus) {
+        if (booking == null || !"pending".equalsIgnoreCase(booking.getStatus())) {
+            return;
+        }
+
+        if (booking.getExpiresAt() == null || !"pending".equalsIgnoreCase(previousStatus)) {
+            booking.setExpiresAt(createPendingExpiry());
+        }
+    }
+
+    private LocalDateTime resolvePendingExpiry(Booking booking, LocalDateTime now) {
+        if (booking == null) {
+            return now;
+        }
+        if (booking.getExpiresAt() != null) {
+            return booking.getExpiresAt();
+        }
+        if (booking.getCreatedAt() == null) {
+            return now;
+        }
+        return booking.getCreatedAt().plusSeconds(pendingHoldSeconds);
+    }
+
+    public boolean synchronizeBookingState(Booking booking) {
+        return synchronizeBookingState(booking, LocalDateTime.now());
+    }
+
+    public boolean synchronizeBookingState(Booking booking, LocalDateTime now) {
+        if (booking == null) {
+            return false;
+        }
+
+        boolean changed = false;
+        if (booking.getPaymentStatus() == null || booking.getPaymentStatus().isBlank()) {
+            booking.setPaymentStatus(inferLegacyPaymentStatus(booking));
+            changed = true;
+        }
+
+        if ("pending".equalsIgnoreCase(booking.getStatus())) {
+            LocalDateTime effectiveExpiry = resolvePendingExpiry(booking, now);
+            if (booking.getExpiresAt() == null || !effectiveExpiry.equals(booking.getExpiresAt())) {
+                booking.setExpiresAt(effectiveExpiry);
+                changed = true;
+            }
+
+            if (!effectiveExpiry.isAfter(now)) {
+                booking.setStatus("expired");
+                if ("pending_payment".equalsIgnoreCase(booking.getPaymentStatus())) {
+                    booking.setPaymentStatus("failed");
+                } else if (!"paid".equalsIgnoreCase(booking.getPaymentStatus())) {
+                    booking.setPaymentStatus("unpaid");
+                }
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
+
+    private int synchronizeAndPersist(List<Booking> bookings, LocalDateTime now) {
+        if (bookings == null || bookings.isEmpty()) {
+            return 0;
+        }
+
+        List<Booking> changedBookings = new ArrayList<>();
+        for (Booking booking : bookings) {
+            if (synchronizeBookingState(booking, now)) {
+                changedBookings.add(booking);
+            }
+        }
+
+        if (!changedBookings.isEmpty()) {
+            bookingRepository.saveAll(changedBookings);
+        }
+
+        return changedBookings.size();
+    }
+
+    @Transactional
+    public int expirePendingBookings() {
+        LocalDateTime now = LocalDateTime.now();
+        int changedCount = synchronizeAndPersist(bookingRepository.findByStatusAndExpiresAtIsNull("pending"), now);
+        changedCount += synchronizeAndPersist(bookingRepository.findByStatusAndExpiresAtLessThanEqual("pending", now), now);
+        return changedCount;
+    }
+
+    @Transactional
+    public int expirePendingBookingsForUser(Integer userId) {
+        if (userId == null) {
+            return 0;
+        }
+        return synchronizeAndPersist(bookingRepository.findAllByUserIdAndStatus(userId, "pending"), LocalDateTime.now());
+    }
+
+    @Scheduled(fixedDelay = 30000)
+    @Transactional
+    public void expirePendingBookingsOnSchedule() {
+        expirePendingBookings();
+    }
+
     public Booking getActiveBooking(Integer userId) {
-        List<Booking> list = bookingRepository.findActiveBookingByUserId(userId);
-        return list.isEmpty() ? null : list.get(0);
+        if (userId == null) {
+            return null;
+        }
+
+        expirePendingBookingsForUser(userId);
+        List<Booking> list = bookingRepository.findActivePendingBookingByUserId(userId, LocalDateTime.now());
+        return list.isEmpty() ? null : normalizeBookingFinancials(list.get(0));
     }
 
     public double calculateBookingTotal(Booking booking) {
@@ -100,8 +234,8 @@ public class BookingService {
             return null;
         }
 
-        if (booking.getPaymentStatus() == null || booking.getPaymentStatus().isBlank()) {
-            booking.setPaymentStatus(inferLegacyPaymentStatus(booking));
+        if (synchronizeBookingState(booking)) {
+            bookingRepository.save(booking);
         }
 
         if (booking.getDetails() != null) {
@@ -169,11 +303,14 @@ public class BookingService {
 
         Booking activeBooking = getActiveBooking(user.getId());
         if (activeBooking != null) {
-            String roomNum = "N/A";
-            if (activeBooking.getDetails() != null && !activeBooking.getDetails().isEmpty()) {
-                roomNum = activeBooking.getDetails().get(0).getRoom().getRoomNumber();
-            }
-            throw new IllegalArgumentException("Bạn đang giữ chỗ phòng " + roomNum + ". Vui lòng hoàn thành đơn cũ.");
+            String holdUntil = activeBooking.getExpiresAt() != null
+                    ? activeBooking.getExpiresAt().format(HOLD_UNTIL_FORMATTER)
+                    : null;
+            throw new IllegalArgumentException(
+                    "Bạn đang có một yêu cầu đặt phòng đang chờ xử lý"
+                            + (holdUntil != null ? " đến " + holdUntil : "")
+                            + ". Vui lòng hoàn tất hoặc chờ yêu cầu hiện tại hết hiệu lực trước khi tạo booking mới."
+            );
         }
 
         // Không cho phép đặt phòng với ngày nhận trong quá khứ
@@ -189,7 +326,7 @@ public class BookingService {
             throw new IllegalArgumentException("Phòng không tồn tại!");
         }
 
-        long overlapCount = bookingRepository.countOverlappingBookings(roomId, checkIn, checkOut);
+        long overlapCount = bookingRepository.countOverlappingBookings(roomId, checkIn, checkOut, LocalDateTime.now());
         if (overlapCount > 0) {
             throw new IllegalArgumentException("Phòng đã có người đặt trong thời gian này!");
         }
@@ -204,6 +341,7 @@ public class BookingService {
         booking.setTotalPrice((double) totalPrice);
         booking.setStatus("pending");
         booking.setPaymentStatus(resolveInitialPaymentStatus(paymentFlow));
+        booking.setExpiresAt(createPendingExpiry());
         booking = bookingRepository.save(booking);
 
         BookingDetail detail = new BookingDetail();
@@ -234,6 +372,9 @@ public class BookingService {
         if (bookingOpt.isEmpty()) return false;
 
         Booking booking = bookingOpt.get();
+        if (synchronizeBookingState(booking)) {
+            bookingRepository.save(booking);
+        }
         if (!booking.getUser().getId().equals(userId)) return false;
         if (!"pending".equals(booking.getStatus())) return false;
 
@@ -247,6 +388,7 @@ public class BookingService {
     }
 
     public Page<Booking> getHistory(Integer userId, String status, int page) {
+        expirePendingBookingsForUser(userId);
         Page<Booking> historyPage = bookingRepository.findByUserIdAndStatus(userId, status, PageRequest.of(page - 1, 5));
         normalizeBookingFinancials(historyPage.getContent());
         return historyPage;

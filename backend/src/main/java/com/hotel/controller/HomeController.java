@@ -82,7 +82,7 @@ public class HomeController {
         }
 
         response.put("success", true);
-        response.put("message", "Đã gửi yêu cầu đặt phòng!");
+        response.put("message", "Đã gửi yêu cầu đặt phòng. Hệ thống sẽ giữ chỗ trong " + bookingService.getPendingHoldDisplayText() + " để chờ xử lý.");
         return ResponseEntity.ok(response);
     }
 }

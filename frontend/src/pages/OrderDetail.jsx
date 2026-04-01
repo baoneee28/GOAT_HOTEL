@@ -29,6 +29,46 @@ function formatDate(dateValue) {
   });
 }
 
+function parseDateValue(dateValue) {
+  if (!dateValue) return null;
+
+  let parsed;
+  if (Array.isArray(dateValue)) {
+    const [year, month, day, hour = 0, minute = 0, second = 0] = dateValue;
+    parsed = new Date(year, month - 1, day, hour, minute, second);
+  } else {
+    parsed = new Date(dateValue);
+  }
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatDateTime(dateValue) {
+  const parsed = parseDateValue(dateValue);
+  if (!parsed) return 'Chưa cập nhật';
+  return parsed.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+function getRemainingSeconds(dateValue, referenceTime = Date.now()) {
+  const parsed = parseDateValue(dateValue);
+  if (!parsed) return null;
+  return Math.max(0, Math.ceil((parsed.getTime() - referenceTime) / 1000));
+}
+
+function formatCountdown(totalSeconds) {
+  if (totalSeconds == null) return 'Chưa cập nhật';
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 const STATUS_META = {
   pending: {
     label: 'Chờ xử lý',
@@ -57,6 +97,13 @@ const STATUS_META = {
     badgeClass: 'border border-rose-400/22 bg-rose-500/10 text-rose-100',
     chipClass: 'border border-rose-400/22 bg-rose-500/8 text-rose-100',
     accentClass: 'bg-rose-400',
+  },
+  expired: {
+    label: 'Hết hạn giữ chỗ',
+    summary: 'Booking giữ chỗ tạm thời đã hết hiệu lực vì không được xử lý tiếp trong thời gian cho phép.',
+    badgeClass: 'border border-slate-300/18 bg-slate-200/12 text-slate-100',
+    chipClass: 'border border-slate-300/18 bg-slate-200/10 text-slate-100',
+    accentClass: 'bg-slate-300',
   },
 };
 
@@ -104,6 +151,11 @@ const TIMELINE_STEPS = [
     label: 'Đã hủy',
     description: 'Đơn không còn hiệu lực',
   },
+  {
+    key: 'expired',
+    label: 'Hết hạn giữ chỗ',
+    description: 'Booking giữ chỗ tạm thời đã hết hiệu lực',
+  },
 ];
 
 const FLOW_INDEX = {
@@ -113,13 +165,13 @@ const FLOW_INDEX = {
 };
 
 function getTimelineState(stepKey, currentStatus) {
-  if (currentStatus === 'cancelled') {
+  if (currentStatus === 'cancelled' || currentStatus === 'expired') {
     if (stepKey === 'pending') return 'complete';
-    if (stepKey === 'cancelled') return 'current';
+    if (stepKey === currentStatus) return 'current';
     return 'muted';
   }
 
-  if (stepKey === 'cancelled') return 'muted';
+  if (stepKey === 'cancelled' || stepKey === 'expired') return 'muted';
 
   const currentIndex = FLOW_INDEX[currentStatus] ?? 0;
   const stepIndex = FLOW_INDEX[stepKey] ?? 0;
@@ -141,9 +193,13 @@ export default function OrderDetail() {
   const [cancelling, setCancelling] = useState(false);
   const [confirmingDemoPayment, setConfirmingDemoPayment] = useState(false);
   const [loading, setLoading] = useState(!location.state?.booking);
+  const [hasSyncedExpiredState, setHasSyncedExpiredState] = useState(false);
+  const [clockTick, setClockTick] = useState(Date.now());
 
-  React.useEffect(() => {
-    if (!booking && id) {
+  const fetchBookingDetail = React.useCallback(async (showSpinner = false) => {
+    if (!id) return;
+    if (showSpinner) setLoading(true);
+    try {
       axios.get(`${API_BASE}/api/bookings/${id}`, { withCredentials: true })
         .then(res => {
           if (res.data?.booking) setBooking(res.data.booking);
@@ -157,9 +213,18 @@ export default function OrderDetail() {
               if (matched) setBooking(matched);
             }).catch(() => {});
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (showSpinner) setLoading(false);
+        });
+    } catch (_) {
+      if (showSpinner) setLoading(false);
     }
-  }, [id, booking]);
+  }, [id]);
+
+  React.useEffect(() => {
+    if (!id) return;
+    fetchBookingDetail(!location.state?.booking);
+  }, [id, location.state?.booking, fetchBookingDetail]);
 
   if (loading) {
     return (
@@ -198,6 +263,7 @@ export default function OrderDetail() {
   const roomType = detail?.room?.roomType;
   const currentStatus = (booking.status || 'pending').toLowerCase();
   const currentPaymentStatus = (booking.paymentStatus || 'unpaid').toLowerCase();
+  const remainingHoldSeconds = currentStatus === 'pending' ? getRemainingSeconds(booking.expiresAt, clockTick) : null;
   const statusMeta = STATUS_META[currentStatus] || STATUS_META.pending;
   const paymentMeta = PAYMENT_META[currentPaymentStatus] || PAYMENT_META.unpaid;
   const orderNumber = String(booking.id || 0).padStart(5, '0');
@@ -243,6 +309,26 @@ export default function OrderDetail() {
     ? `Tạm tính lưu trú (${roomCount} phòng)`
     : `Giá phòng (${pricePerNight.toLocaleString('vi-VN')}đ x ${nights} đêm)`;
   const canOpenVNPay = currentStatus === 'pending' && currentPaymentStatus !== 'paid';
+
+  React.useEffect(() => {
+    setHasSyncedExpiredState(false);
+  }, [booking?.id, booking?.expiresAt, currentStatus]);
+
+  React.useEffect(() => {
+    if (currentStatus !== 'pending' || !booking?.expiresAt) return undefined;
+    setClockTick(Date.now());
+    const timerId = window.setInterval(() => {
+      setClockTick(Date.now());
+    }, 1000);
+    return () => window.clearInterval(timerId);
+  }, [currentStatus, booking?.expiresAt]);
+
+  React.useEffect(() => {
+    if (!booking?.id || currentStatus !== 'pending' || remainingHoldSeconds == null) return;
+    if (remainingHoldSeconds > 0 || hasSyncedExpiredState) return;
+    setHasSyncedExpiredState(true);
+    fetchBookingDetail(false);
+  }, [booking?.id, currentStatus, remainingHoldSeconds, hasSyncedExpiredState, fetchBookingDetail]);
 
   const handleShare = async () => {
     const shareUrl = window.location.href;
@@ -564,6 +650,28 @@ export default function OrderDetail() {
 
       <main className="relative z-10 mx-auto -mt-10 max-w-7xl px-6 pb-24 sm:px-8 lg:px-10">
         <section className="booking-surface rounded-[32px] p-6 sm:p-8 lg:p-10">
+          {currentStatus === 'pending' && booking.expiresAt && (
+            <section className="booking-panel mb-8 rounded-[28px] border border-amber-200/70 bg-[linear-gradient(180deg,rgba(255,251,235,0.95)_0%,rgba(255,247,217,0.98)_100%)] p-6 sm:p-7">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="font-label text-[0.64rem] uppercase tracking-[0.28em] text-amber-700">Giữ chỗ tạm thời</p>
+                  <h2 className="mt-3 font-headline text-[1.8rem] leading-tight text-primary">Booking này đang được giữ chỗ theo chế độ demo</h2>
+                  <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">
+                    Hệ thống sẽ chỉ chặn booking mới của bạn cho đến khi thời gian giữ chỗ này kết thúc hoặc booking được xử lý tiếp.
+                  </p>
+                </div>
+                <div className="rounded-[24px] border border-amber-300/70 bg-white/80 px-5 py-4 text-left lg:min-w-[240px] lg:text-right">
+                  <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-primary/42">Giữ chỗ đến</p>
+                  <p className="mt-2 font-headline text-xl text-primary">{formatDateTime(booking.expiresAt)}</p>
+                  <p className="mt-4 font-label text-[0.58rem] uppercase tracking-[0.22em] text-primary/42">Đếm ngược</p>
+                  <p className="mt-2 font-headline text-3xl text-amber-700">
+                    {remainingHoldSeconds === 0 ? '00:00' : formatCountdown(remainingHoldSeconds)}
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+
           <section className="booking-panel rounded-[28px] p-6 sm:p-7">
             <div className="flex flex-col gap-3 border-b border-outline-variant/12 pb-6 md:flex-row md:items-end md:justify-between">
               <div>
@@ -912,7 +1020,7 @@ export default function OrderDetail() {
                   </Link>
                 </div>
 
-                {(currentStatus === 'pending' || currentStatus === 'confirmed') && (
+                {currentStatus === 'pending' && (
                   <div className="mt-6 border-t border-outline-variant/12 pt-6">
                     <button
                       type="button"

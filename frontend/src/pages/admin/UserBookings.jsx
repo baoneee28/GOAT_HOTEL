@@ -47,6 +47,7 @@ export default function UserBookings() {
     confirmed: 'Đã xác nhận',
     completed: 'Hoàn thành',
     cancelled: 'Đã hủy',
+    expired: 'Hết hạn giữ chỗ',
   }[String(value || '').toLowerCase()] || value || 'pending');
   const getPaymentStatusLabel = (value) => ({
     unpaid: 'Chưa thanh toán',
@@ -98,6 +99,7 @@ export default function UserBookings() {
               <option value="confirmed">Đã xác nhận</option>
               <option value="completed">Hoàn thành</option>
               <option value="cancelled">Đã hủy</option>
+              <option value="expired">Hết hạn giữ chỗ</option>
             </select>
           </div>
         </div>

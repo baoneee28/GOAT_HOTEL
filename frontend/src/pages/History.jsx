@@ -3,7 +3,7 @@ import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE, { calculateBookingDisplayTotal, calculateStayNights, imageUrl, uploadedImageUrl } from '../config';
 
-const FILTERS = ['all', 'pending', 'confirmed', 'completed', 'cancelled'];
+const FILTERS = ['all', 'pending', 'confirmed', 'completed', 'cancelled', 'expired'];
 
 const STATUS_STYLES = {
   pending: {
@@ -29,6 +29,12 @@ const STATUS_STYLES = {
     pill: 'border border-rose-400/22 bg-rose-500/8 text-rose-200',
     label: 'Đã hủy',
     summary: 'Đơn lưu trú đã hủy',
+  },
+  expired: {
+    badge: 'border border-slate-400/22 bg-slate-500/10 text-slate-200',
+    pill: 'border border-slate-400/22 bg-slate-500/8 text-slate-200',
+    label: 'Hết hạn giữ chỗ',
+    summary: 'Giữ chỗ tạm thời đã hết hiệu lực',
   },
 };
 
@@ -68,6 +74,26 @@ function formatDate(dateValue) {
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function formatDateTime(dateValue) {
+  if (!dateValue) return 'Chưa cập nhật';
+  let d;
+  if (Array.isArray(dateValue)) {
+    const [year, month, day, hour = 0, minute = 0, second = 0] = dateValue;
+    d = new Date(year, month - 1, day, hour, minute, second);
+  } else {
+    d = new Date(dateValue);
+  }
+  if (Number.isNaN(d.getTime())) return 'Chưa cập nhật';
+  return d.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('vi-VN');
 }
@@ -91,9 +117,9 @@ export default function History() {
 
   const currentUserId = sessionUser?.id;
 
-  const fetchHistory = async (filter, pg) => {
+  const fetchHistory = async (filter, pg, silent = false) => {
     if (!currentUserId) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const params = new URLSearchParams({ page: pg });
       if (filter !== 'all') params.append('status', filter);
@@ -103,7 +129,7 @@ export default function History() {
     } catch (err) {
       console.error('History fetch error:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -111,8 +137,19 @@ export default function History() {
     fetchHistory(activeFilter, page);
   }, [activeFilter, page, currentUserId]);
 
+  useEffect(() => {
+    const hasPendingBooking = bookings.some((booking) => (booking.status || '').toLowerCase() === 'pending');
+    if (!hasPendingBooking) return undefined;
+
+    const refreshTimer = window.setInterval(() => {
+      fetchHistory(activeFilter, page, true);
+    }, 5000);
+
+    return () => window.clearInterval(refreshTimer);
+  }, [bookings, activeFilter, page, currentUserId]);
+
   const filterCounts = useMemo(() => {
-    const counts = { all: bookings.length, pending: 0, confirmed: 0, completed: 0, cancelled: 0 };
+    const counts = { all: bookings.length, pending: 0, confirmed: 0, completed: 0, cancelled: 0, expired: 0 };
     bookings.forEach((booking) => {
       const status = (booking.status || 'pending').toLowerCase();
       if (counts[status] !== undefined) counts[status] += 1;
@@ -291,6 +328,11 @@ export default function History() {
                             <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">
                               {statusMeta.summary}
                             </p>
+                            {status === 'pending' && booking.expiresAt ? (
+                              <p className="mt-2 text-xs uppercase tracking-[0.18em] text-amber-700">
+                                Giữ chỗ đến {formatDateTime(booking.expiresAt)}
+                              </p>
+                            ) : null}
                           </div>
 
                           <div className="rounded-[24px] border border-outline-variant/12 bg-white/65 px-5 py-4 text-left xl:min-w-[220px] xl:text-right">

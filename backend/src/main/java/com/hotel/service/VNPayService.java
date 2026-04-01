@@ -68,14 +68,16 @@ public class VNPayService {
             throw new SecurityException("Bạn không có quyền thanh toán đơn đặt phòng này.");
         }
 
+        bookingService.normalizeBookingFinancials(booking);
+        if ("expired".equalsIgnoreCase(booking.getStatus())) {
+            throw new IllegalArgumentException("Booking này đã hết thời gian giữ chỗ. Vui lòng tạo yêu cầu đặt phòng mới.");
+        }
         if (!"pending".equalsIgnoreCase(booking.getStatus())) {
             throw new IllegalArgumentException("Chỉ có thể thanh toán booking đang ở trạng thái chờ xử lý.");
         }
         if ("paid".equalsIgnoreCase(booking.getPaymentStatus())) {
             throw new IllegalArgumentException("Booking này đã được đánh dấu đã thanh toán.");
         }
-
-        bookingService.normalizeBookingFinancials(booking);
         double bookingTotal = booking.getTotalPrice() != null ? booking.getTotalPrice() : 0.0;
         if (bookingTotal <= 0) {
             throw new IllegalArgumentException("Đơn đặt phòng chưa có số tiền hợp lệ để thanh toán.");
@@ -106,7 +108,7 @@ public class VNPayService {
         formatter.setTimeZone(timeZone);
         params.put("vnp_CreateDate", formatter.format(calendar.getTime()));
 
-        calendar.add(Calendar.MINUTE, 15);
+        calendar.add(Calendar.MINUTE, 3);
         params.put("vnp_ExpireDate", formatter.format(calendar.getTime()));
 
         List<String> fieldNames = new ArrayList<>(params.keySet());
@@ -225,6 +227,12 @@ public class VNPayService {
         }
 
         bookingService.normalizeBookingFinancials(booking);
+        if ("expired".equalsIgnoreCase(booking.getStatus())) {
+            return new VNPayValidationResult(true, false, true, bookingId, booking, "Booking đã hết thời gian giữ chỗ nên không thể xác nhận thanh toán.");
+        }
+        if ("cancelled".equalsIgnoreCase(booking.getStatus())) {
+            return new VNPayValidationResult(true, false, true, bookingId, booking, "Booking đã bị hủy nên không thể xác nhận thanh toán.");
+        }
         long expectedAmount = Math.round((booking.getTotalPrice() != null ? booking.getTotalPrice() : 0.0) * 100L);
         boolean amountValid = String.valueOf(expectedAmount).equals(fields.get("vnp_Amount"));
         if (!amountValid) {
@@ -282,6 +290,10 @@ public class VNPayService {
         if (booking.getUser() == null || !currentUserId.equals(booking.getUser().getId())) {
             throw new SecurityException("Bạn không có quyền thao tác đơn đặt phòng này.");
         }
+        bookingService.normalizeBookingFinancials(booking);
+        if ("expired".equalsIgnoreCase(booking.getStatus())) {
+            throw new IllegalArgumentException("Booking này đã hết thời gian giữ chỗ nên không thể mô phỏng thanh toán.");
+        }
         if ("cancelled".equalsIgnoreCase(booking.getStatus())) {
             throw new IllegalArgumentException("Booking đã bị hủy nên không thể mô phỏng thanh toán.");
         }
@@ -294,7 +306,9 @@ public class VNPayService {
     }
 
     private void confirmBookingPayment(Booking booking, String paymentMethod) {
-        if (booking == null || "cancelled".equalsIgnoreCase(booking.getStatus())) {
+        if (booking == null
+                || "cancelled".equalsIgnoreCase(booking.getStatus())
+                || "expired".equalsIgnoreCase(booking.getStatus())) {
             return;
         }
 

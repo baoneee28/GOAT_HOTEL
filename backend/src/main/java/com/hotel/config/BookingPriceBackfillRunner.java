@@ -26,37 +26,41 @@ public class BookingPriceBackfillRunner implements CommandLineRunner {
     @Transactional
     public void run(String... args) {
         List<Booking> changedBookings = new ArrayList<>();
+        var now = java.time.LocalDateTime.now();
 
         for (Booking booking : bookingRepository.findAll()) {
-            if (booking.getDetails() == null || booking.getDetails().isEmpty()) {
-                continue;
-            }
-
             boolean changed = false;
             double recalculatedTotal = 0.0;
+            boolean hasBookingDetails = booking.getDetails() != null && !booking.getDetails().isEmpty();
 
-            for (BookingDetail detail : booking.getDetails()) {
-                if (detail == null
-                        || detail.getPriceAtBooking() == null
-                        || detail.getCheckIn() == null
-                        || detail.getCheckOut() == null) {
-                    continue;
-                }
+            if (bookingService.synchronizeBookingState(booking, now)) {
+                changed = true;
+            }
 
-                recalculatedTotal += bookingService.calculatePriceIndex(
-                        detail.getCheckIn(),
-                        detail.getCheckOut(),
-                        detail.getPriceAtBooking()
-                );
+            if (hasBookingDetails) {
+                for (BookingDetail detail : booking.getDetails()) {
+                    if (detail == null
+                            || detail.getPriceAtBooking() == null
+                            || detail.getCheckIn() == null
+                            || detail.getCheckOut() == null) {
+                        continue;
+                    }
 
-                double recalculatedHours = bookingService.calculateHours(detail.getCheckIn(), detail.getCheckOut());
-                if (detail.getTotalHours() == null || Math.abs(detail.getTotalHours() - recalculatedHours) > 0.01) {
-                    detail.setTotalHours(recalculatedHours);
-                    changed = true;
+                    recalculatedTotal += bookingService.calculatePriceIndex(
+                            detail.getCheckIn(),
+                            detail.getCheckOut(),
+                            detail.getPriceAtBooking()
+                    );
+
+                    double recalculatedHours = bookingService.calculateHours(detail.getCheckIn(), detail.getCheckOut());
+                    if (detail.getTotalHours() == null || Math.abs(detail.getTotalHours() - recalculatedHours) > 0.01) {
+                        detail.setTotalHours(recalculatedHours);
+                        changed = true;
+                    }
                 }
             }
 
-            if (booking.getTotalPrice() == null || Math.abs(booking.getTotalPrice() - recalculatedTotal) > 0.01) {
+            if (hasBookingDetails && (booking.getTotalPrice() == null || Math.abs(booking.getTotalPrice() - recalculatedTotal) > 0.01)) {
                 booking.setTotalPrice(recalculatedTotal);
                 changed = true;
             }

@@ -213,6 +213,7 @@ export default function Bookings() {
     confirmed: 'Đã xác nhận',
     completed: 'Hoàn thành',
     cancelled: 'Đã hủy',
+    expired: 'Hết hạn giữ chỗ',
   }[String(value || '').toLowerCase()] || value || 'pending');
   const getPaymentStatusLabel = (value) => ({
     unpaid: 'Chưa thanh toán',
@@ -229,6 +230,7 @@ export default function Bookings() {
         .st-pending { background: #fef3c7; color: #92400e; }
         .st-completed { background: #dcfce7; color: #166534; }
         .st-cancelled { background: #fee2e2; color: #991b1b; }
+        .st-expired { background: #e5e7eb; color: #334155; }
         .st-pay-unpaid { background: #fef3c7; color: #92400e; }
         .st-pay-pending_payment { background: #e0f2fe; color: #075985; }
         .st-pay-paid { background: #dcfce7; color: #166534; }
@@ -259,6 +261,7 @@ export default function Bookings() {
               <button className={`btn btn-sm ${status === 'confirmed' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => { setStatus('confirmed'); setPage(1); }}>Đã xác nhận</button>
               <button className={`btn btn-sm ${status === 'completed' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => { setStatus('completed'); setPage(1); }}>Hoàn thành</button>
               <button className={`btn btn-sm ${status === 'cancelled' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => { setStatus('cancelled'); setPage(1); }}>Đã hủy</button>
+              <button className={`btn btn-sm ${status === 'expired' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => { setStatus('expired'); setPage(1); }}>Hết hạn</button>
           </div>
 
           <div className="p-0" style={{ width: '100%', overflowX: 'hidden' }}>
@@ -394,6 +397,7 @@ export default function Bookings() {
                                       <option value="confirmed">Đã xác nhận</option>
                                       <option value="completed">Đã hoàn thành</option>
                                       <option value="cancelled">Đã hủy</option>
+                                      <option value="expired">Hết hạn giữ chỗ</option>
                                   </select>
                               </div>
                               <button type="submit" className="btn btn-primary w-100 py-3 fw-bold" style={{ background: 'var(--primary-color)', border: 'none', borderRadius: '12px' }}>Lưu thông tin</button>

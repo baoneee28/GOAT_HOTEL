@@ -4,10 +4,21 @@ import axios from 'axios';
 import API_BASE, { calculateStayNights, uploadedImageUrl, resolveRoomTypeSpec } from '../config';
 import HeroHeader from '../components/HeroHeader';
 
+const AVAILABILITY_REFRESH_MS = 5000;
+
 function fmtDate(d) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('vi-VN', {
     day: '2-digit', month: '2-digit', year: 'numeric',
+  });
+}
+
+function fmtTime(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
   });
 }
 
@@ -27,55 +38,91 @@ export default function AvailableRooms() {
   const [guests] = useState(location.state?.guests || searchParams.get('guests') || 2);
   const [availableRooms, setAvailableRooms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const resultsRef = React.useRef(null);
   const hasAutoScrolledRef = React.useRef(false);
 
   const nights = calcNights(checkIn, checkOut);
 
   useEffect(() => {
-    const fetchRoomsAndType = async () => {
+    if (!id || roomData) return undefined;
+
+    let ignore = false;
+    axios.get(`${API_BASE}/api/room-types/${id}`, { withCredentials: true })
+      .then((typeRes) => {
+        if (!ignore) setRoomData(typeRes.data);
+      })
+      .catch((err) => {
+        console.error('Lỗi khi tải thông tin loại phòng:', err);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [id, roomData]);
+
+  useEffect(() => {
+    if (!id || !roomData) return undefined;
+
+    let ignore = false;
+
+    const fetchAvailableRooms = async (isBackgroundSync = false) => {
+      if (!isBackgroundSync) {
+        setLoading(true);
+      }
+
       try {
-        let currentRoomData = roomData;
-        if (!currentRoomData) {
-          const typeRes = await axios.get(`${API_BASE}/api/room-types/${id}`, { withCredentials: true });
-          currentRoomData = typeRes.data;
-          setRoomData(typeRes.data);
-        }
+        const res = await axios.get(
+          `${API_BASE}/api/rooms/type/${id}?checkIn=${checkIn}&checkOut=${checkOut}`,
+          { withCredentials: true }
+        );
 
-        // Cập nhật lấy phòng available theo ngày đã chọn
-        const res = await axios.get(`${API_BASE}/api/rooms/type/${id}?checkIn=${checkIn}&checkOut=${checkOut}`, { withCredentials: true });
+        if (ignore) return;
 
-        const baseCapacity = currentRoomData?.capacity || 2;
-        const requestedGuests = parseInt(guests) || 1;
+        const baseCapacity = roomData?.capacity || 2;
+        const requestedGuests = parseInt(guests, 10) || 1;
         if (requestedGuests > baseCapacity) {
           setAvailableRooms([]);
+          setLastSyncedAt(new Date());
           return;
         }
 
-        const actualRoomName = currentRoomData?.typeName || currentRoomData?.name || 'Standard Room';
-        const actualBeds = resolveRoomTypeSpec(actualRoomName, 'beds', currentRoomData?.beds);
-        const actualPrice = currentRoomData?.pricePerNight || currentRoomData?.price || 350000;
+        const actualRoomName = roomData?.typeName || roomData?.name || 'Standard Room';
+        const actualBeds = resolveRoomTypeSpec(actualRoomName, 'beds', roomData?.beds);
+        const actualPrice = roomData?.pricePerNight || roomData?.price || 350000;
 
         const mapped = res.data.map(r => ({
           id: r.id,
           roomNumber: r.roomNumber,
-          status: (r.status || 'available').toLowerCase().trim(),
+          status: (r.effectiveStatus || 'available').toLowerCase().trim(),
           price: actualPrice,
           capacity: baseCapacity,
           beds: actualBeds,
           name: actualRoomName,
         }));
 
-        // Chỉ giữ phòng available (defensive – backend đã filter nhưng đảm bảo FE sạch)
-        setAvailableRooms(mapped.filter(r => r.status === 'available'));
+        setAvailableRooms(mapped);
+        setLastSyncedAt(new Date());
       } catch (err) {
-        console.error('Lỗi khi tải danh sách phòng:', err);
+        if (!ignore) {
+          console.error('Lỗi khi tải danh sách phòng:', err);
+          setAvailableRooms([]);
+        }
       } finally {
-        setLoading(false);
+        if (!ignore) {
+          setLoading(false);
+        }
       }
     };
-    if (id) fetchRoomsAndType();
-  }, [id, checkIn, checkOut, guests]);
+
+    fetchAvailableRooms();
+    const refreshTimer = window.setInterval(() => fetchAvailableRooms(true), AVAILABILITY_REFRESH_MS);
+
+    return () => {
+      ignore = true;
+      window.clearInterval(refreshTimer);
+    };
+  }, [id, checkIn, checkOut, guests, roomData]);
 
   useEffect(() => {
     if (loading || hasAutoScrolledRef.current || !resultsRef.current) return;
@@ -163,6 +210,12 @@ export default function AvailableRooms() {
             {!loading && availableRooms.length > 0 && (
               <p className="text-on-surface-variant text-sm mt-1 font-body">
                 {availableRooms.length} phòng có thể đặt cho thời gian bạn chọn
+              </p>
+            )}
+            {!loading && (
+              <p className="text-on-surface-variant text-xs mt-2 font-body">
+                Danh sách tự đồng bộ mỗi 5 giây để phản ánh booking giữ chỗ còn hiệu lực.
+                {lastSyncedAt ? ` Cập nhật lúc ${fmtTime(lastSyncedAt)}.` : ''}
               </p>
             )}
           </div>

@@ -17,8 +17,10 @@ public interface RoomTypeRepository extends JpaRepository<RoomType, Integer> {
 
     @Query("SELECT r.roomType.id, COUNT(r) FROM Room r WHERE r.status != 'maintenance' AND r.id NOT IN " +
            "(SELECT bd.room.id FROM BookingDetail bd JOIN bd.booking b " +
-           "WHERE b.status IN ('pending', 'confirmed') AND (bd.checkIn < :checkOut AND bd.checkOut > :checkIn)) " +
+           "WHERE (b.status = 'confirmed' OR (b.status = 'pending' AND b.expiresAt > :now)) " +
+           "AND (bd.checkIn < :checkOut AND bd.checkOut > :checkIn)) " +
            "GROUP BY r.roomType.id")
     java.util.List<Object[]> countAvailableRoomsByDate(@Param("checkIn") java.time.LocalDateTime checkIn, 
-                                             @Param("checkOut") java.time.LocalDateTime checkOut);
+                                             @Param("checkOut") java.time.LocalDateTime checkOut,
+                                             @Param("now") java.time.LocalDateTime now);
 }

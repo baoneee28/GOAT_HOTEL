@@ -4,6 +4,7 @@ import com.hotel.repository.BookingRepository;
 import com.hotel.repository.ContactMessageRepository;
 import com.hotel.repository.RoomRepository;
 import com.hotel.repository.UserRepository;
+import com.hotel.service.BookingService;
 import com.hotel.service.RoomStatusService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -37,11 +38,15 @@ public class AdminDashboardApiController {
     @Autowired
     private RoomStatusService roomStatusService;
 
+    @Autowired
+    private BookingService bookingService;
+
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getDashboardStats() {
         Map<String, Object> response = new HashMap<>();
 
         try {
+            bookingService.expirePendingBookings();
             Double revenue = bookingRepository.sumTotalRevenue();
             response.put("total_revenue", revenue != null ? revenue : 0);
 

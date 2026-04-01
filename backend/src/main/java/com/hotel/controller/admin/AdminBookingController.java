@@ -49,6 +49,7 @@ public class AdminBookingController {
     public String listBookings(@RequestParam(defaultValue = "") String status,
                                @RequestParam(defaultValue = "1") int page,
                                Model model) {
+        bookingService.expirePendingBookings();
         Page<Booking> bookingPage = bookingRepository.findAdminBookings(
                 status.isBlank() ? null : status,
                 PageRequest.of(page - 1, PAGE_SIZE));
@@ -88,14 +89,20 @@ public class AdminBookingController {
             Optional<Booking> existingOpt = bookingRepository.findById(booking_id);
             if (existingOpt.isEmpty()) return "redirect:/admin/bookings";
             
-            long overlapCount = bookingRepository.countOverlappingBookingsExcept(room_id, check_in, check_out, booking_id);
-            if (overlapCount > 0 && !"cancelled".equalsIgnoreCase(status) && !"refused".equalsIgnoreCase(status)) {
+            long overlapCount = bookingRepository.countOverlappingBookingsExcept(room_id, check_in, check_out, booking_id, LocalDateTime.now());
+            if (overlapCount > 0
+                    && !"cancelled".equalsIgnoreCase(status)
+                    && !"expired".equalsIgnoreCase(status)
+                    && !"refused".equalsIgnoreCase(status)) {
                 return "redirect:/admin/bookings?error=overlap";
             }
             
             Booking existing = existingOpt.get();
+            bookingService.normalizeBookingFinancials(existing);
+            String previousStatus = existing.getStatus();
             existing.setTotalPrice(totalPrice);
             existing.setStatus(status);
+            bookingService.preparePendingBooking(existing, previousStatus);
             bookingRepository.save(existing);
             
             if (existing.getDetails() != null && !existing.getDetails().isEmpty()) {
@@ -110,8 +117,11 @@ public class AdminBookingController {
             User user = userRepository.findById(user_id).orElse(null);
             if (user == null) return "redirect:/admin/bookings";
             
-            long overlapCount = bookingRepository.countOverlappingBookings(room_id, check_in, check_out);
-            if (overlapCount > 0 && !"cancelled".equalsIgnoreCase(status) && !"refused".equalsIgnoreCase(status)) {
+            long overlapCount = bookingRepository.countOverlappingBookings(room_id, check_in, check_out, LocalDateTime.now());
+            if (overlapCount > 0
+                    && !"cancelled".equalsIgnoreCase(status)
+                    && !"expired".equalsIgnoreCase(status)
+                    && !"refused".equalsIgnoreCase(status)) {
                 return "redirect:/admin/bookings?error=overlap";
             }
 
@@ -119,6 +129,7 @@ public class AdminBookingController {
             booking.setUser(user);
             booking.setStatus(status);
             booking.setTotalPrice(totalPrice);
+            bookingService.preparePendingBooking(booking, null);
             booking = bookingRepository.save(booking);
             
             BookingDetail detail = new BookingDetail();

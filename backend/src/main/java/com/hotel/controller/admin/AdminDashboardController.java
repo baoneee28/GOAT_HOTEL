@@ -3,6 +3,7 @@ package com.hotel.controller.admin;
 import com.hotel.repository.BookingRepository;
 import com.hotel.repository.RoomRepository;
 import com.hotel.repository.UserRepository;
+import com.hotel.service.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -27,9 +28,13 @@ public class AdminDashboardController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private BookingService bookingService;
+
     // Bắt nhiều đường link cùng về 1 trang Dashboard (/admin, /admin/, /admin/index)
     @GetMapping({"", "/", "/index"})
     public String dashboard(Model model) {
+        bookingService.expirePendingBookings();
 
         // 1. Tính TỔNG DOANH THU từ bảng bookings (Chỉ cộng những đơn có status = 'completed')
         Double revenue = bookingRepository.sumTotalRevenue();

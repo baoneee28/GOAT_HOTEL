@@ -76,6 +76,15 @@ public class BookingApiController {
         if ("completed".equalsIgnoreCase(bookingStatus)) {
             return "paid";
         }
+        if ("expired".equalsIgnoreCase(bookingStatus)) {
+            if ("pending_payment".equalsIgnoreCase(currentPaymentStatus)) {
+                return "failed";
+            }
+            if ("paid".equalsIgnoreCase(currentPaymentStatus)) {
+                return "paid";
+            }
+            return "unpaid";
+        }
         if (currentPaymentStatus != null && !currentPaymentStatus.isBlank()) {
             return currentPaymentStatus.trim().toLowerCase();
         }
@@ -106,12 +115,13 @@ public class BookingApiController {
             response.put(
                     "message",
                     "vnpay".equalsIgnoreCase(paymentFlow) || "vnpay_demo".equalsIgnoreCase(paymentFlow)
-                            ? "Đã tạo booking chờ thanh toán VNPay demo."
-                            : "Đã gửi yêu cầu đặt phòng và chờ khách sạn duyệt."
+                            ? "Đã tạo booking chờ thanh toán VNPay demo. Giữ chỗ có hiệu lực trong " + bookingService.getPendingHoldDisplayText() + "."
+                            : "Đã gửi yêu cầu đặt phòng. Hệ thống sẽ giữ chỗ trong " + bookingService.getPendingHoldDisplayText() + " để chờ xử lý."
             );
             response.put("bookingId", createdBooking.getId());
             response.put("bookingStatus", createdBooking.getStatus());
             response.put("paymentStatus", createdBooking.getPaymentStatus());
+            response.put("expiresAt", createdBooking.getExpiresAt());
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             response.put("success", false);
@@ -192,6 +202,7 @@ public class BookingApiController {
     public ResponseEntity<Map<String, Object>> listAdminBookings(
             @RequestParam(value = "status", defaultValue = "") String status,
             @RequestParam(value = "page", defaultValue = "1") int page) {
+        bookingService.expirePendingBookings();
         
         Page<Booking> bookingPage = bookingRepository.findAdminBookings(
                 status.isBlank() ? null : status,
@@ -226,6 +237,7 @@ public class BookingApiController {
             Map<String, Double> priceInfo = bookingService.calculateBookingPriceAdmin(checkIn, checkOut, pricePerNight);
             double totalHours = priceInfo.get("hours");
             double totalPrice = priceInfo.get("total");
+            LocalDateTime now = LocalDateTime.now();
 
             if (bookingIdStr != null && !bookingIdStr.isBlank()) {
                 Integer existingBookingId = Integer.parseInt(bookingIdStr);
@@ -235,17 +247,23 @@ public class BookingApiController {
                     return ResponseEntity.badRequest().body(response);
                 }
                 
-                long overlapCount = bookingRepository.countOverlappingBookingsExcept(roomId, checkIn, checkOut, existingBookingId);
-                if (overlapCount > 0 && !"cancelled".equalsIgnoreCase(status) && !"refused".equalsIgnoreCase(status)) {
+                long overlapCount = bookingRepository.countOverlappingBookingsExcept(roomId, checkIn, checkOut, existingBookingId, now);
+                if (overlapCount > 0
+                        && !"cancelled".equalsIgnoreCase(status)
+                        && !"expired".equalsIgnoreCase(status)
+                        && !"refused".equalsIgnoreCase(status)) {
                     response.put("success", false);
                     response.put("message", "Xung đột lịch! Đã có đơn đặt phòng khác được duyệt trong thời gian này.");
                     return ResponseEntity.badRequest().body(response);
                 }
 
                 Booking existing = existingOpt.get();
+                bookingService.normalizeBookingFinancials(existing);
+                String previousStatus = existing.getStatus();
                 existing.setTotalPrice(totalPrice);
                 existing.setStatus(status);
                 existing.setPaymentStatus(normalizeAdminPaymentStatus(existing.getPaymentStatus(), status));
+                bookingService.preparePendingBooking(existing, previousStatus);
                 bookingRepository.save(existing);
                 
                 if (existing.getDetails() != null && !existing.getDetails().isEmpty()) {
@@ -267,8 +285,11 @@ public class BookingApiController {
                 }
 
                 // Check overlap cho Admin
-                long overlapCount = bookingRepository.countOverlappingBookings(roomId, checkIn, checkOut);
-                if (overlapCount > 0 && !"cancelled".equalsIgnoreCase(status) && !"refused".equalsIgnoreCase(status)) {
+                long overlapCount = bookingRepository.countOverlappingBookings(roomId, checkIn, checkOut, now);
+                if (overlapCount > 0
+                        && !"cancelled".equalsIgnoreCase(status)
+                        && !"expired".equalsIgnoreCase(status)
+                        && !"refused".equalsIgnoreCase(status)) {
                     response.put("success", false);
                     response.put("message", "Xung đột lịch! Đã có đơn đặt phòng khác được duyệt trong thời gian này.");
                     return ResponseEntity.badRequest().body(response);
@@ -279,6 +300,7 @@ public class BookingApiController {
                 booking.setStatus(status);
                 booking.setPaymentStatus(normalizeAdminPaymentStatus(null, status));
                 booking.setTotalPrice(totalPrice);
+                bookingService.preparePendingBooking(booking, null);
                 booking = bookingRepository.save(booking);
                 
                 BookingDetail detail = new BookingDetail();
@@ -432,6 +454,7 @@ public class BookingApiController {
             return ResponseEntity.badRequest().body(response);
         }
         Booking booking = bookingOpt.get();
+        bookingService.normalizeBookingFinancials(booking);
         if (!"pending".equals(booking.getStatus())) {
             response.put("success", false);
             response.put("message", "Chỉ có thể duyệt đơn đang chờ.");

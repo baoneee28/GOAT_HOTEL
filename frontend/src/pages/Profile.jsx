@@ -41,6 +41,12 @@ function getStatusMeta(status) {
         summary: 'Đã hủy',
         className: 'bg-rose-50 text-rose-700 border border-rose-200',
       };
+    case 'expired':
+      return {
+        label: 'Hết hạn giữ chỗ',
+        summary: 'Giữ chỗ đã hết hạn',
+        className: 'bg-slate-100 text-slate-700 border border-slate-200',
+      };
     default:
       return {
         label: 'Chờ xử lý',

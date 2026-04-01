@@ -190,9 +190,9 @@ export default function BookingConfirmation() {
       if (!result?.success) return;
 
       if (window.Swal) {
-        window.Swal.fire('Thành công', 'Đã lưu yêu cầu đặt phòng!', 'success').then(() => navigate('/history'));
+        window.Swal.fire('Thành công', result.message || 'Đã lưu yêu cầu đặt phòng!', 'success').then(() => navigate('/history'));
       } else {
-        alert('Đặt phòng thành công!');
+        alert(result.message || 'Đặt phòng thành công!');
         navigate('/history');
       }
     } finally {
@@ -507,7 +507,7 @@ export default function BookingConfirmation() {
             </div>
             <p className="text-center mt-4">
               <span className="font-body text-[10px] text-on-surface-variant">
-                Gửi yêu cầu đặt phòng sẽ tạo booking chờ duyệt. Mở VNPay demo sẽ tạo booking chờ thanh toán, chưa tự động xác nhận thành công.
+                Gửi yêu cầu đặt phòng hoặc mở VNPay demo đều tạo booking giữ chỗ tạm thời. Trang chi tiết booking sẽ hiển thị rõ thời điểm hết hạn để bạn demo dễ hơn.
               </span>
             </p>
 

@@ -131,6 +131,7 @@ public class UserApiController {
             @PathVariable Integer id,
             @RequestParam(defaultValue = "") String status,
             @RequestParam(defaultValue = "1") int page) {
+        bookingService.expirePendingBookingsForUser(id);
         User user = userRepository.findById(id).orElse(null);
         if (user == null) {
             return ResponseEntity.status(404).body(Map.of(

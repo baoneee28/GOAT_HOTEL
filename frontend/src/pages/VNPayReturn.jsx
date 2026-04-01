@@ -73,7 +73,7 @@ export default function VNPayReturn() {
 
         {status !== 'success' && bookingId && (
           <div className="mt-6 rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 text-left text-sm leading-7 text-amber-900">
-            Booking này vẫn nên được giữ ở trạng thái chờ xử lý và chờ thanh toán. Nếu bạn cần demo case thành công để bảo vệ đồ án, hãy dùng nút mô phỏng bên dưới.
+            Booking này chỉ được giữ chỗ tạm thời trong một khoảng thời gian ngắn. Nếu bạn cần demo case thành công để bảo vệ đồ án, hãy xác nhận lại khi booking vẫn còn hiệu lực hoặc tạo booking mới khi đơn cũ đã hết hạn.
           </div>
         )}
 

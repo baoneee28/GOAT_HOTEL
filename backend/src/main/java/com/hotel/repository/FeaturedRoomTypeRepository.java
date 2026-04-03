@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface FeaturedRoomTypeRepository extends JpaRepository<FeaturedRoomType, Integer> {
     List<FeaturedRoomType> findAllByOrderByDisplayOrderAsc();
+    List<FeaturedRoomType> findAllByRoomType_Id(Integer roomTypeId);
 }

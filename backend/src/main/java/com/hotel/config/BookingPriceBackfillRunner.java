@@ -65,6 +65,16 @@ public class BookingPriceBackfillRunner implements CommandLineRunner {
                 changed = true;
             }
 
+            double discountAmount = booking.getDiscountAmount() == null ? 0.0 : booking.getDiscountAmount();
+            double finalAmount = Math.max(0.0, recalculatedTotal - discountAmount);
+            if (hasBookingDetails && (booking.getFinalAmount() == null || Math.abs(booking.getFinalAmount() - finalAmount) > 0.01)) {
+                booking.setFinalAmount(finalAmount);
+                changed = true;
+            } else if (booking.getFinalAmount() == null && booking.getTotalPrice() != null) {
+                booking.setFinalAmount(Math.max(0.0, booking.getTotalPrice() - discountAmount));
+                changed = true;
+            }
+
             if (booking.getPaymentStatus() == null || booking.getPaymentStatus().isBlank()) {
                 booking.setPaymentStatus(bookingService.inferLegacyPaymentStatus(booking));
                 changed = true;

@@ -8,10 +8,16 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class ContactMessageService {
+
+    private static final Set<String> ALLOWED_STATUSES = Set.of("new", "in_progress", "resolved");
 
     @Autowired
     private ContactMessageRepository contactMessageRepository;
@@ -30,8 +36,8 @@ public class ContactMessageService {
     public Page<ContactMessage> getAdminMessages(String search, String status, int page, int pageSize) {
         return contactMessageRepository.findWithFilters(
                 search == null || search.isBlank() ? null : search.trim(),
-                status == null || status.isBlank() ? null : status.trim(),
-                PageRequest.of(page - 1, pageSize, Sort.by("id").descending())
+                normalizeOptionalStatus(status),
+                PageRequest.of(Math.max(0, page - 1), pageSize, Sort.by("id").descending())
         );
     }
 
@@ -41,7 +47,7 @@ public class ContactMessageService {
 
     public ContactMessage updateMessage(ContactMessage existing, String status, String adminNote) {
         if (status != null && !status.isBlank()) {
-            existing.setStatus(status.trim());
+            existing.setStatus(normalizeRequiredStatus(status));
         }
         existing.setAdminNote(adminNote == null ? "" : adminNote.trim());
         return contactMessageRepository.save(existing);
@@ -53,5 +59,29 @@ public class ContactMessageService {
 
     public long countNewMessages() {
         return contactMessageRepository.countByStatus("new");
+    }
+
+    public Map<String, Long> countByAdminStatuses() {
+        Map<String, Long> summary = new LinkedHashMap<>();
+        summary.put("new", contactMessageRepository.countByStatus("new"));
+        summary.put("in_progress", contactMessageRepository.countByStatus("in_progress"));
+        summary.put("resolved", contactMessageRepository.countByStatus("resolved"));
+        return summary;
+    }
+
+    private String normalizeOptionalStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+
+        return normalizeRequiredStatus(status);
+    }
+
+    private String normalizeRequiredStatus(String status) {
+        String normalized = status.trim().toLowerCase(Locale.ROOT);
+        if (!ALLOWED_STATUSES.contains(normalized)) {
+            throw new IllegalArgumentException("Trạng thái liên hệ không hợp lệ.");
+        }
+        return normalized;
     }
 }

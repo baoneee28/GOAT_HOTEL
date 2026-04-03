@@ -144,21 +144,84 @@ export function calculateStayNights(checkIn, checkOut) {
   return diffDays > 0 ? diffDays : 1;
 }
 
+function toCurrencyNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function resolveStoredBookingTotal(booking) {
+  return toCurrencyNumber(
+    booking?.finalAmount
+      ?? booking?.payableAmount
+      ?? booking?.totalAfterDiscount
+      ?? booking?.totalPrice
+      ?? 0
+  );
+}
+
+function resolveDirectDiscountAmount(booking) {
+  const directDiscount = [
+    booking?.discountAmount,
+    booking?.couponDiscountAmount,
+    booking?.discountValue,
+  ].find((value) => toCurrencyNumber(value) > 0);
+
+  return toCurrencyNumber(directDiscount);
+}
+
+export function calculateBookingSubtotal(booking) {
+  if (!booking) return 0;
+
+  const details = Array.isArray(booking.details) ? booking.details : [];
+  if (details.length === 0) {
+    return resolveStoredBookingTotal(booking);
+  }
+
+  return details.reduce((sum, detail) => {
+    const nights = calculateStayNights(detail?.checkIn, detail?.checkOut);
+    const pricePerNight = toCurrencyNumber(detail?.priceAtBooking ?? detail?.room?.roomType?.pricePerNight ?? 0);
+    return sum + (nights > 0 ? pricePerNight * nights : 0);
+  }, 0);
+}
+
+export function calculateBookingDiscountAmount(booking) {
+  if (!booking) return 0;
+
+  const directDiscount = resolveDirectDiscountAmount(booking);
+  if (directDiscount > 0) {
+    return directDiscount;
+  }
+
+  const subtotal = calculateBookingSubtotal(booking);
+  const storedTotal = resolveStoredBookingTotal(booking);
+
+  if (subtotal > 0 && storedTotal > 0 && storedTotal < subtotal) {
+    return subtotal - storedTotal;
+  }
+
+  return 0;
+}
+
 export function calculateBookingDisplayTotal(booking) {
   if (!booking) return 0;
 
-  const storedTotal = Number(booking.totalPrice || 0);
+  const storedTotal = resolveStoredBookingTotal(booking);
   const details = Array.isArray(booking.details) ? booking.details : [];
-
   if (details.length === 0) {
     return storedTotal;
   }
 
-  const recalculatedTotal = details.reduce((sum, detail) => {
-    const nights = calculateStayNights(detail?.checkIn, detail?.checkOut);
-    const pricePerNight = Number(detail?.priceAtBooking ?? detail?.room?.roomType?.pricePerNight ?? 0);
-    return sum + (nights > 0 ? pricePerNight * nights : 0);
-  }, 0);
+  const recalculatedTotal = calculateBookingSubtotal(booking);
+  const discountAmount = calculateBookingDiscountAmount(booking);
+  const hasDiscountSignal = Boolean(
+    discountAmount > 0
+    || booking?.couponCode
+    || booking?.coupon?.code
+  );
+
+  if (hasDiscountSignal && storedTotal > 0) {
+    return storedTotal;
+  }
 
   if (recalculatedTotal > 0 && Math.abs(storedTotal - recalculatedTotal) > 0.01) {
     return recalculatedTotal;

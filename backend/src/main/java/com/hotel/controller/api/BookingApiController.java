@@ -9,6 +9,7 @@ import com.hotel.repository.BookingDetailRepository;
 import com.hotel.repository.RoomRepository;
 import com.hotel.repository.UserRepository;
 import com.hotel.service.BookingService;
+import com.hotel.service.PaymentService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -42,6 +43,9 @@ public class BookingApiController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private PaymentService paymentService;
+
     private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private User getSessionUser(HttpSession session) {
@@ -72,28 +76,6 @@ public class BookingApiController {
         return value.trim();
     }
 
-    private String normalizeAdminPaymentStatus(String currentPaymentStatus, String bookingStatus) {
-        if ("completed".equalsIgnoreCase(bookingStatus)) {
-            return "paid";
-        }
-        if ("cancelled".equalsIgnoreCase(bookingStatus)) {
-            return "paid".equalsIgnoreCase(currentPaymentStatus) ? "paid" : "unpaid";
-        }
-        if ("expired".equalsIgnoreCase(bookingStatus)) {
-            if ("pending_payment".equalsIgnoreCase(currentPaymentStatus)) {
-                return "failed";
-            }
-            if ("paid".equalsIgnoreCase(currentPaymentStatus)) {
-                return "paid";
-            }
-            return "unpaid";
-        }
-        if (currentPaymentStatus != null && !currentPaymentStatus.isBlank()) {
-            return currentPaymentStatus.trim().toLowerCase();
-        }
-        return "unpaid";
-    }
-
     @PostMapping("/bookings")
     public ResponseEntity<Map<String, Object>> bookRoom(@RequestBody Map<String, String> payload, HttpSession session) {
         Map<String, Object> response = new HashMap<>();
@@ -107,24 +89,28 @@ public class BookingApiController {
             String checkInRaw = requirePayloadField(payload, "checkIn", "Ngày nhận phòng");
             String checkOutRaw = requirePayloadField(payload, "checkOut", "Ngày trả phòng");
             String paymentFlow = payload.get("paymentFlow");
+            String couponCode = payload.get("couponCode");
 
             Integer roomId = Integer.parseInt(roomIdRaw);
             LocalDateTime checkIn = parseDate(checkInRaw);
             LocalDateTime checkOut = parseDate(checkOutRaw);
 
-            Booking createdBooking = bookingService.createBooking(currentUser, roomId, checkIn, checkOut, paymentFlow);
+            Booking createdBooking = bookingService.createBooking(currentUser, roomId, checkIn, checkOut, paymentFlow, couponCode);
 
             response.put("success", true);
             response.put(
                     "message",
                     "vnpay".equalsIgnoreCase(paymentFlow) || "vnpay_demo".equalsIgnoreCase(paymentFlow)
-                            ? "Đã tạo booking chờ thanh toán VNPay demo. Giữ chỗ có hiệu lực trong " + bookingService.getPendingHoldDisplayText() + "."
-                            : "Đã gửi yêu cầu đặt phòng. Hệ thống sẽ giữ chỗ trong " + bookingService.getPendingHoldDisplayText() + " để chờ xử lý."
+                            ? "Đã tạo booking giữ chỗ chờ thanh toán VNPay demo. Giữ chỗ có hiệu lực trong " + bookingService.getPendingHoldDisplayText() + "."
+                            : "Đã tạo booking giữ chỗ. Phòng sẽ được giữ trong " + bookingService.getPendingHoldDisplayText() + " để chờ khách sạn xác nhận."
             );
             response.put("bookingId", createdBooking.getId());
             response.put("bookingStatus", createdBooking.getStatus());
             response.put("paymentStatus", createdBooking.getPaymentStatus());
             response.put("expiresAt", createdBooking.getExpiresAt());
+            response.put("couponCode", createdBooking.getCouponCode());
+            response.put("discountAmount", createdBooking.getDiscountAmount());
+            response.put("finalAmount", createdBooking.getFinalAmount());
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             response.put("success", false);
@@ -151,6 +137,7 @@ public class BookingApiController {
         Map<String, Object> response = new HashMap<>();
         response.put("bookings", bookingService.normalizeBookingFinancials(historyPage.getContent()));
         response.put("totalPages", historyPage.getTotalPages());
+        response.put("statusSummary", bookingService.countHistoryStatuses(currentUser.getId()));
         return ResponseEntity.ok(response);
     }
 
@@ -226,7 +213,7 @@ public class BookingApiController {
             Integer roomId = Integer.parseInt(payload.get("roomId"));
             LocalDateTime checkIn = parseDate(payload.get("checkIn"));
             LocalDateTime checkOut = parseDate(payload.get("checkOut"));
-            String status = payload.get("status");
+            String requestedStatus = payload.get("status");
 
             Optional<Room> roomOpt = roomRepository.findById(roomId);
             if (roomOpt.isEmpty()) {
@@ -250,22 +237,24 @@ public class BookingApiController {
                     return ResponseEntity.badRequest().body(response);
                 }
                 
+                Booking existing = existingOpt.get();
+                bookingService.normalizeBookingFinancials(existing);
+                String previousStatus = existing.getStatus();
+                String nextStatus = bookingService.validateAdminEditableStatus(previousStatus, requestedStatus);
                 long overlapCount = bookingRepository.countOverlappingBookingsExcept(roomId, checkIn, checkOut, existingBookingId, now);
                 if (overlapCount > 0
-                        && !"cancelled".equalsIgnoreCase(status)
-                        && !"expired".equalsIgnoreCase(status)
-                        && !"refused".equalsIgnoreCase(status)) {
+                        && !"cancelled".equalsIgnoreCase(nextStatus)
+                        && !"expired".equalsIgnoreCase(nextStatus)
+                        && !"refused".equalsIgnoreCase(nextStatus)) {
                     response.put("success", false);
                     response.put("message", "Xung đột lịch! Đã có đơn đặt phòng khác được duyệt trong thời gian này.");
                     return ResponseEntity.badRequest().body(response);
                 }
 
-                Booking existing = existingOpt.get();
-                bookingService.normalizeBookingFinancials(existing);
-                String previousStatus = existing.getStatus();
                 existing.setTotalPrice(totalPrice);
-                existing.setStatus(status);
-                existing.setPaymentStatus(normalizeAdminPaymentStatus(existing.getPaymentStatus(), status));
+                existing.setFinalAmount(Math.max(0.0, totalPrice - (existing.getDiscountAmount() == null ? 0.0 : existing.getDiscountAmount())));
+                existing.setStatus(nextStatus);
+                existing.setPaymentStatus(bookingService.normalizeAdminPaymentStatus(existing.getPaymentStatus(), nextStatus));
                 bookingService.preparePendingBooking(existing, previousStatus);
                 bookingRepository.save(existing);
                 
@@ -279,6 +268,7 @@ public class BookingApiController {
 
                     // KHÔNG CẬP NHẬT TRẠNG THÁI BOOKED VẬT LÝ NỮA
                 }
+
             } else {
                 User user = userRepository.findById(userId).orElse(null);
                 if (user == null) {
@@ -288,11 +278,12 @@ public class BookingApiController {
                 }
 
                 // Check overlap cho Admin
+                String initialStatus = bookingService.validateAdminCreateStatus(requestedStatus);
                 long overlapCount = bookingRepository.countOverlappingBookings(roomId, checkIn, checkOut, now);
                 if (overlapCount > 0
-                        && !"cancelled".equalsIgnoreCase(status)
-                        && !"expired".equalsIgnoreCase(status)
-                        && !"refused".equalsIgnoreCase(status)) {
+                        && !"cancelled".equalsIgnoreCase(initialStatus)
+                        && !"expired".equalsIgnoreCase(initialStatus)
+                        && !"refused".equalsIgnoreCase(initialStatus)) {
                     response.put("success", false);
                     response.put("message", "Xung đột lịch! Đã có đơn đặt phòng khác được duyệt trong thời gian này.");
                     return ResponseEntity.badRequest().body(response);
@@ -300,9 +291,10 @@ public class BookingApiController {
 
                 Booking booking = new Booking();
                 booking.setUser(user);
-                booking.setStatus(status);
-                booking.setPaymentStatus(normalizeAdminPaymentStatus(null, status));
+                booking.setStatus(initialStatus);
+                booking.setPaymentStatus(bookingService.normalizeAdminPaymentStatus(null, initialStatus));
                 booking.setTotalPrice(totalPrice);
+                booking.setFinalAmount(totalPrice);
                 bookingService.preparePendingBooking(booking, null);
                 booking = bookingRepository.save(booking);
                 
@@ -364,6 +356,11 @@ public class BookingApiController {
             response.put("message", "Đơn này đã được checkout trước đó.");
             return ResponseEntity.badRequest().body(response);
         }
+        if (!"paid".equalsIgnoreCase(booking.getPaymentStatus())) {
+            response.put("success", false);
+            response.put("message", "Chỉ có thể checkout booking đã thanh toán. Hãy thu tiền trước khi checkout.");
+            return ResponseEntity.badRequest().body(response);
+        }
 
         if ("recalc".equals(checkoutType)) {
             LocalDateTime now = LocalDateTime.now();
@@ -376,13 +373,13 @@ public class BookingApiController {
             bookingDetailRepository.save(detail);
             
             booking.setTotalPrice(priceInfo.get("total"));
+            booking.setFinalAmount(Math.max(0.0, priceInfo.get("total") - (booking.getDiscountAmount() == null ? 0.0 : booking.getDiscountAmount())));
             booking.setStatus("completed");
-            booking.setPaymentStatus("paid");
         } else {
             detail.setCheckOutActual(LocalDateTime.now());
             bookingDetailRepository.save(detail);
             booking.setStatus("completed");
-            booking.setPaymentStatus("paid");
+            booking.setFinalAmount(Math.max(0.0, (booking.getTotalPrice() != null ? booking.getTotalPrice() : 0.0) - (booking.getDiscountAmount() == null ? 0.0 : booking.getDiscountAmount())));
         }
 
         bookingRepository.save(booking);
@@ -392,7 +389,7 @@ public class BookingApiController {
         }
 
         response.put("success", true);
-        response.put("message", "Thanh toán (Checkout) Đơn đặt phòng thành công.");
+        response.put("message", "Checkout đơn đặt phòng thành công.");
         return ResponseEntity.ok(response);
     }
 
@@ -431,6 +428,13 @@ public class BookingApiController {
         }
 
         LocalDateTime now = LocalDateTime.now();
+        try {
+            bookingService.validateAdminCheckInTime(detail, now);
+        } catch (IllegalArgumentException ex) {
+            response.put("success", false);
+            response.put("message", ex.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
 
         if (detail.getRoom() != null && "maintenance".equalsIgnoreCase(detail.getRoom().getStatus())) {
             response.put("success", false);
@@ -474,10 +478,29 @@ public class BookingApiController {
             return ResponseEntity.badRequest().body(response);
         }
         booking.setStatus("confirmed");
+        booking.setPaymentStatus(bookingService.normalizeAdminPaymentStatus(booking.getPaymentStatus(), "confirmed"));
         bookingRepository.save(booking);
         response.put("success", true);
         response.put("message", "Đã duyệt đơn phòng.");
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/admin/bookings/{id}/collect-cash-payment")
+    public ResponseEntity<Map<String, Object>> collectCashPayment(@PathVariable("id") Integer id) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Booking booking = paymentService.collectCashPayment(id);
+            response.put("success", true);
+            response.put("message", "Đã ghi nhận thanh toán tiền mặt.");
+            response.put("bookingId", booking.getId());
+            response.put("bookingStatus", booking.getStatus());
+            response.put("paymentStatus", booking.getPaymentStatus());
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException ex) {
+            response.put("success", false);
+            response.put("message", ex.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
     }
 
     @DeleteMapping("/admin/bookings/{id}")

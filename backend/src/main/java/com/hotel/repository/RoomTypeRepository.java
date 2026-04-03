@@ -23,4 +23,6 @@ public interface RoomTypeRepository extends JpaRepository<RoomType, Integer> {
     java.util.List<Object[]> countAvailableRoomsByDate(@Param("checkIn") java.time.LocalDateTime checkIn, 
                                              @Param("checkOut") java.time.LocalDateTime checkOut,
                                              @Param("now") java.time.LocalDateTime now);
+
+    long countByImage(String image);
 }

@@ -10,6 +10,7 @@ import java.util.List;
 @Repository
 public interface RoomTypeItemRepository extends JpaRepository<RoomTypeItem, Integer> {
     void deleteByRoomTypeId(Integer roomTypeId);
+    void deleteByItemId(Integer itemId);
 
     @Query("SELECT rti.roomType.id, COUNT(rti) FROM RoomTypeItem rti " +
            "WHERE rti.roomType.id IN :roomTypeIds GROUP BY rti.roomType.id")

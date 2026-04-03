@@ -20,6 +20,8 @@ public interface RoomRepository extends JpaRepository<Room, Integer> {
     List<Room> findAllByOrderByIdDesc();
 
     List<Room> findByRoomNumberContainingOrderByIdDesc(String roomNumber);
+    List<Room> findByRoomType_IdOrderByIdAsc(Integer roomTypeId);
+    void deleteByRoomType_Id(Integer roomTypeId);
 
     @Query("SELECT r FROM Room r WHERE r.roomType.id = :typeId AND r.status != 'maintenance' AND r.id NOT IN " +
            "(SELECT bd.room.id FROM BookingDetail bd JOIN bd.booking b " +
@@ -29,6 +31,17 @@ public interface RoomRepository extends JpaRepository<Room, Integer> {
                                         @Param("checkIn") java.time.LocalDateTime checkIn, 
                                         @Param("checkOut") java.time.LocalDateTime checkOut,
                                         @Param("now") java.time.LocalDateTime now);
+
+    @Query("SELECT r FROM Room r WHERE r.status != 'maintenance' AND r.id NOT IN " +
+           "(SELECT bd.room.id FROM BookingDetail bd JOIN bd.booking b " +
+           "WHERE (:excludeBookingId IS NULL OR b.id <> :excludeBookingId) " +
+           "AND (b.status = 'confirmed' OR (b.status = 'pending' AND b.expiresAt > :now)) " +
+           "AND (bd.checkIn < :checkOut AND bd.checkOut > :checkIn)) " +
+           "ORDER BY r.roomNumber ASC")
+    List<Room> findAvailableRoomsForDate(@Param("checkIn") java.time.LocalDateTime checkIn,
+                                         @Param("checkOut") java.time.LocalDateTime checkOut,
+                                         @Param("now") java.time.LocalDateTime now,
+                                         @Param("excludeBookingId") Integer excludeBookingId);
 
     List<Room> findByStatus(String status);
 

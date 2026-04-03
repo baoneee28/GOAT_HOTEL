@@ -54,7 +54,9 @@ public class AdminBookingController {
                 status.isBlank() ? null : status,
                 PageRequest.of(page - 1, PAGE_SIZE));
 
-        List<Room> availableRooms = roomRepository.findByStatus("available");
+        List<Room> availableRooms = roomRepository.findAll().stream()
+                .filter(room -> !"maintenance".equalsIgnoreCase(room.getStatus()))
+                .toList();
         List<User> allUsers = userRepository.findAll();
 
         model.addAttribute("bookings", bookingPage.getContent());
@@ -84,24 +86,29 @@ public class AdminBookingController {
         Map<String, Double> priceInfo = bookingService.calculateBookingPriceAdmin(check_in, check_out, pricePerNight);
         double totalHours = priceInfo.get("hours");
         double totalPrice = priceInfo.get("total");
+        LocalDateTime now = LocalDateTime.now();
 
         if (booking_id != null && booking_id > 0) {
             Optional<Booking> existingOpt = bookingRepository.findById(booking_id);
             if (existingOpt.isEmpty()) return "redirect:/admin/bookings";
-            
-            long overlapCount = bookingRepository.countOverlappingBookingsExcept(room_id, check_in, check_out, booking_id, LocalDateTime.now());
-            if (overlapCount > 0
-                    && !"cancelled".equalsIgnoreCase(status)
-                    && !"expired".equalsIgnoreCase(status)
-                    && !"refused".equalsIgnoreCase(status)) {
-                return "redirect:/admin/bookings?error=overlap";
-            }
-            
+
             Booking existing = existingOpt.get();
             bookingService.normalizeBookingFinancials(existing);
             String previousStatus = existing.getStatus();
+            String nextStatus = bookingService.validateAdminEditableStatus(previousStatus, status);
+
+            long overlapCount = bookingRepository.countOverlappingBookingsExcept(room_id, check_in, check_out, booking_id, now);
+            if (overlapCount > 0
+                    && !"cancelled".equalsIgnoreCase(nextStatus)
+                    && !"expired".equalsIgnoreCase(nextStatus)
+                    && !"refused".equalsIgnoreCase(nextStatus)) {
+                return "redirect:/admin/bookings?error=overlap";
+            }
+
             existing.setTotalPrice(totalPrice);
-            existing.setStatus(status);
+            existing.setFinalAmount(Math.max(0.0, totalPrice - (existing.getDiscountAmount() == null ? 0.0 : existing.getDiscountAmount())));
+            existing.setStatus(nextStatus);
+            existing.setPaymentStatus(bookingService.normalizeAdminPaymentStatus(existing.getPaymentStatus(), nextStatus));
             bookingService.preparePendingBooking(existing, previousStatus);
             bookingRepository.save(existing);
             
@@ -116,19 +123,22 @@ public class AdminBookingController {
         } else {
             User user = userRepository.findById(user_id).orElse(null);
             if (user == null) return "redirect:/admin/bookings";
-            
-            long overlapCount = bookingRepository.countOverlappingBookings(room_id, check_in, check_out, LocalDateTime.now());
+
+            String initialStatus = bookingService.validateAdminCreateStatus(status);
+            long overlapCount = bookingRepository.countOverlappingBookings(room_id, check_in, check_out, now);
             if (overlapCount > 0
-                    && !"cancelled".equalsIgnoreCase(status)
-                    && !"expired".equalsIgnoreCase(status)
-                    && !"refused".equalsIgnoreCase(status)) {
+                    && !"cancelled".equalsIgnoreCase(initialStatus)
+                    && !"expired".equalsIgnoreCase(initialStatus)
+                    && !"refused".equalsIgnoreCase(initialStatus)) {
                 return "redirect:/admin/bookings?error=overlap";
             }
 
             Booking booking = new Booking();
             booking.setUser(user);
-            booking.setStatus(status);
+            booking.setStatus(initialStatus);
+            booking.setPaymentStatus(bookingService.normalizeAdminPaymentStatus(null, initialStatus));
             booking.setTotalPrice(totalPrice);
+            booking.setFinalAmount(totalPrice);
             bookingService.preparePendingBooking(booking, null);
             booking = bookingRepository.save(booking);
             
@@ -158,20 +168,28 @@ public class AdminBookingController {
         
         BookingDetail detail = booking.getDetails().get(0);
         Room room = detail.getRoom();
+        if (!"confirmed".equalsIgnoreCase(booking.getStatus())) return "redirect:/admin/bookings?error=checkout-status";
+        if (detail.getCheckInActual() == null) return "redirect:/admin/bookings?error=checkout-checkin-required";
+        if (detail.getCheckOutActual() != null) return "redirect:/admin/bookings?error=checkout-duplicated";
+        if (!"paid".equalsIgnoreCase(booking.getPaymentStatus())) return "redirect:/admin/bookings?error=checkout-payment-required";
 
+        LocalDateTime now = LocalDateTime.now();
         if ("recalc".equals(checkout_type)) {
-            LocalDateTime now = LocalDateTime.now();
             double pricePerNight = detail.getPriceAtBooking();
-            Map<String, Double> priceInfo = bookingService.calculateBookingPriceAdmin(detail.getCheckIn(), now, pricePerNight);
+            LocalDateTime actualStayStart = detail.getCheckInActual() != null ? detail.getCheckInActual() : detail.getCheckIn();
+            Map<String, Double> priceInfo = bookingService.calculateBookingPriceAdmin(actualStayStart, now, pricePerNight);
 
-            detail.setCheckOut(now);
             detail.setCheckOutActual(now);
             detail.setTotalHours(priceInfo.get("hours"));
             bookingDetailRepository.save(detail);
             
             booking.setTotalPrice(priceInfo.get("total"));
+            booking.setFinalAmount(Math.max(0.0, priceInfo.get("total") - (booking.getDiscountAmount() == null ? 0.0 : booking.getDiscountAmount())));
             booking.setStatus("completed");
         } else {
+            detail.setCheckOutActual(now);
+            bookingDetailRepository.save(detail);
+            booking.setFinalAmount(Math.max(0.0, (booking.getTotalPrice() != null ? booking.getTotalPrice() : 0.0) - (booking.getDiscountAmount() == null ? 0.0 : booking.getDiscountAmount())));
             booking.setStatus("completed");
         }
 

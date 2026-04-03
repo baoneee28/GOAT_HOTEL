@@ -42,8 +42,8 @@ public class Item {
             return value.trim();
         }
 
-        if (normalized.startsWith("/icons/")) {
-            return normalized;
+        if (normalized.startsWith("/icons/") || normalized.startsWith("/uploads/") || normalized.startsWith("/images/")) {
+            return value.trim();
         }
 
         if (normalized.contains("/")) {

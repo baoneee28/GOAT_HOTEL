@@ -74,6 +74,7 @@ public class UserApiController {
         String phone = payload.get("phone");
         String role = payload.get("role");
         String password = payload.get("password");
+        String image = payload.get("image");
 
         User user;
         if (idStr != null && !idStr.isBlank()) {
@@ -84,7 +85,12 @@ public class UserApiController {
                         "message", "Không tìm thấy người dùng để cập nhật."
                 ));
             }
-            user.setRole(role);
+            if (role != null && !role.isBlank()) {
+                user.setRole(role.trim());
+            }
+            if (image != null) {
+                user.setImage(image.isBlank() ? null : image.trim());
+            }
             userRepository.save(user);
         } else {
             if (fullName == null || fullName.isBlank() || email == null || email.isBlank() || password == null || password.isBlank()) {
@@ -105,6 +111,7 @@ public class UserApiController {
             user.setPhone(phone != null ? phone.trim() : null);
             user.setRole(role != null && !role.isBlank() ? role.trim() : "customer");
             user.setPassword(password);
+            user.setImage(image != null && !image.isBlank() ? image.trim() : null);
             userRepository.save(user);
         }
 

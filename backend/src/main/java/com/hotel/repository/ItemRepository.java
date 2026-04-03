@@ -14,4 +14,6 @@ public interface ItemRepository extends JpaRepository<Item, Integer> {
 
     @Query("SELECT i FROM Item i WHERE :search IS NULL OR :search = '' OR i.name LIKE %:search%")
     Page<Item> findWithSearch(@Param("search") String search, Pageable pageable);
+
+    long countByImage(String image);
 }

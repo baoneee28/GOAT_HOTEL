@@ -4,9 +4,14 @@ package com.hotel.controller.api;
 import com.hotel.entity.RoomType;
 import com.hotel.entity.RoomTypeItem;
 import com.hotel.entity.Item;
+import com.hotel.entity.FeaturedRoomType;
 import com.hotel.repository.RoomTypeRepository;
 import com.hotel.repository.RoomTypeItemRepository;
 import com.hotel.repository.ItemRepository;
+import com.hotel.repository.RoomRepository;
+import com.hotel.repository.BookingDetailRepository;
+import com.hotel.repository.FeaturedRoomTypeRepository;
+import com.hotel.service.FileUploadService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +33,18 @@ public class RoomTypeApiController {
     
     @Autowired
     private ItemRepository itemRepository;
+
+    @Autowired
+    private RoomRepository roomRepository;
+
+    @Autowired
+    private BookingDetailRepository bookingDetailRepository;
+
+    @Autowired
+    private FeaturedRoomTypeRepository featuredRoomTypeRepository;
+
+    @Autowired
+    private FileUploadService fileUploadService;
 
     @GetMapping
     public org.springframework.http.ResponseEntity<?> getAllRoomTypes(
@@ -157,15 +174,56 @@ public class RoomTypeApiController {
     }
 
     @DeleteMapping("/admin/{id}")
+    @Transactional
     public org.springframework.http.ResponseEntity<Map<String, Object>> deleteRoomType(@PathVariable("id") Integer id) {
         Map<String, Object> response = new java.util.HashMap<>();
+        RoomType roomType = roomTypeRepository.findById(id).orElse(null);
+        if (roomType == null) {
+            response.put("success", false);
+            response.put("message", "Loại phòng không tồn tại.");
+            return org.springframework.http.ResponseEntity.status(404).body(response);
+        }
+
+        if (bookingDetailRepository.existsByRoom_RoomType_Id(id)) {
+            response.put("success", false);
+            response.put("message", "Loại phòng này đã phát sinh booking nên không thể xóa tự động.");
+            return org.springframework.http.ResponseEntity.badRequest().body(response);
+        }
+
+        String image = roomType.getImage();
+        boolean shouldDeleteImage = image != null && !image.isBlank() && roomTypeRepository.countByImage(image) <= 1;
+
         try {
-            roomTypeRepository.deleteById(id);
+            List<FeaturedRoomType> featuredRoomTypes = featuredRoomTypeRepository.findAllByRoomType_Id(id);
+            if (!featuredRoomTypes.isEmpty()) {
+                featuredRoomTypeRepository.deleteAll(featuredRoomTypes);
+            }
+            roomTypeItemRepository.deleteByRoomTypeId(id);
+            roomRepository.deleteByRoomType_Id(id);
+            roomTypeRepository.delete(roomType);
+            roomTypeRepository.flush();
+
+            normalizeFeaturedRoomDisplayOrder();
+            if (shouldDeleteImage) {
+                fileUploadService.deleteUploadedFile(image);
+            }
+
             response.put("success", true);
+            response.put("message", "Đã xóa loại phòng, các phòng trống liên quan và ảnh upload.");
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "Loại phòng này đang có người đặt hoặc đang có phòng gắn kết, không thể xóa");
         }
         return org.springframework.http.ResponseEntity.ok(response);
+    }
+
+    private void normalizeFeaturedRoomDisplayOrder() {
+        List<FeaturedRoomType> featuredRoomTypes = featuredRoomTypeRepository.findAllByOrderByDisplayOrderAsc();
+        for (int index = 0; index < featuredRoomTypes.size(); index++) {
+            featuredRoomTypes.get(index).setDisplayOrder(index);
+        }
+        if (!featuredRoomTypes.isEmpty()) {
+            featuredRoomTypeRepository.saveAll(featuredRoomTypes);
+        }
     }
 }

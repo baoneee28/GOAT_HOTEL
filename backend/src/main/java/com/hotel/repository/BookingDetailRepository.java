@@ -12,6 +12,9 @@ import java.util.List;
 public interface BookingDetailRepository extends JpaRepository<BookingDetail, Integer> {
     void deleteByBookingId(Integer bookingId);
 
+    boolean existsByRoom_Id(Integer roomId);
+    boolean existsByRoom_RoomType_Id(Integer roomTypeId);
+
     @Query("SELECT DISTINCT bd.room.id FROM BookingDetail bd JOIN bd.booking b " +
            "WHERE bd.room.id IS NOT NULL AND b.status = 'confirmed' " +
            "AND bd.checkInActual IS NOT NULL AND bd.checkInActual <= :atTime AND bd.checkOutActual IS NULL")

@@ -7,6 +7,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.*;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 
 
@@ -56,9 +59,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addResourceHandler("/**")
                 .addResourceLocations("file:../frontend/static/");
 
-        // Hàm này rất quan trọng: Cấu hình để website có thể đọc được ảnh người dùng upload
+        // Ảnh upload từ admin chỉ phục vụ từ backend static/uploads/<table>.
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:../frontend/static/uploads/");
+                .addResourceLocations(resolveUploadResourceLocation());
 
         // Phục vụ ảnh từ backend (classpath)
         registry.addResourceHandler("/images/**")
@@ -68,5 +71,32 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
 
+    }
+
+    private String resolveUploadResourceLocation() {
+        Path configuredPath = Paths.get(uploadDir);
+        Path resolved;
+
+        if (configuredPath.isAbsolute()) {
+            resolved = configuredPath.normalize();
+        } else {
+            Path cwd = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize();
+            Path backendModuleRoot = looksLikeBackendModule(cwd) ? cwd : cwd.resolve("backend").normalize();
+            resolved = looksLikeBackendModule(backendModuleRoot)
+                    ? backendModuleRoot.resolve(configuredPath).normalize()
+                    : cwd.resolve(configuredPath).normalize();
+        }
+
+        String uri = resolved.toUri().toString();
+        return uri.endsWith("/") ? uri : uri + "/";
+    }
+
+    private boolean looksLikeBackendModule(Path path) {
+        if (path == null) {
+            return false;
+        }
+
+        return Files.exists(path.resolve("src").resolve("main").resolve("java"))
+                && Files.exists(path.resolve("src").resolve("main").resolve("resources"));
     }
 }

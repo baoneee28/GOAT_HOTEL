@@ -216,7 +216,7 @@ export default function OrderDetail() {
         .finally(() => {
           if (showSpinner) setLoading(false);
         });
-    } catch (_) {
+    } catch {
       if (showSpinner) setLoading(false);
     }
   }, [id]);
@@ -225,6 +225,33 @@ export default function OrderDetail() {
     if (!id) return;
     fetchBookingDetail(!location.state?.booking);
   }, [id, location.state?.booking, fetchBookingDetail]);
+
+  const bookingDetails = Array.isArray(booking?.details) ? booking.details.filter(Boolean) : [];
+  const detail = bookingDetails[0];
+  const roomType = detail?.room?.roomType;
+  const currentStatus = (booking?.status || 'pending').toLowerCase();
+  const currentPaymentStatus = (booking?.paymentStatus || 'unpaid').toLowerCase();
+  const remainingHoldSeconds = currentStatus === 'pending' ? getRemainingSeconds(booking?.expiresAt, clockTick) : null;
+
+  React.useEffect(() => {
+    setHasSyncedExpiredState(false);
+  }, [booking?.id, booking?.expiresAt, currentStatus]);
+
+  React.useEffect(() => {
+    if (currentStatus !== 'pending' || !booking?.expiresAt) return undefined;
+    setClockTick(Date.now());
+    const timerId = window.setInterval(() => {
+      setClockTick(Date.now());
+    }, 1000);
+    return () => window.clearInterval(timerId);
+  }, [currentStatus, booking?.expiresAt]);
+
+  React.useEffect(() => {
+    if (!booking?.id || currentStatus !== 'pending' || remainingHoldSeconds == null) return;
+    if (remainingHoldSeconds > 0 || hasSyncedExpiredState) return;
+    setHasSyncedExpiredState(true);
+    fetchBookingDetail(false);
+  }, [booking?.id, currentStatus, remainingHoldSeconds, hasSyncedExpiredState, fetchBookingDetail]);
 
   if (loading) {
     return (
@@ -258,12 +285,6 @@ export default function OrderDetail() {
     );
   }
 
-  const bookingDetails = Array.isArray(booking.details) ? booking.details.filter(Boolean) : [];
-  const detail = bookingDetails[0];
-  const roomType = detail?.room?.roomType;
-  const currentStatus = (booking.status || 'pending').toLowerCase();
-  const currentPaymentStatus = (booking.paymentStatus || 'unpaid').toLowerCase();
-  const remainingHoldSeconds = currentStatus === 'pending' ? getRemainingSeconds(booking.expiresAt, clockTick) : null;
   const statusMeta = STATUS_META[currentStatus] || STATUS_META.pending;
   const paymentMeta = PAYMENT_META[currentPaymentStatus] || PAYMENT_META.unpaid;
   const orderNumber = String(booking.id || 0).padStart(5, '0');
@@ -309,26 +330,6 @@ export default function OrderDetail() {
     ? `Tạm tính lưu trú (${roomCount} phòng)`
     : `Giá phòng (${pricePerNight.toLocaleString('vi-VN')}đ x ${nights} đêm)`;
   const canOpenVNPay = currentStatus === 'pending' && currentPaymentStatus !== 'paid';
-
-  React.useEffect(() => {
-    setHasSyncedExpiredState(false);
-  }, [booking?.id, booking?.expiresAt, currentStatus]);
-
-  React.useEffect(() => {
-    if (currentStatus !== 'pending' || !booking?.expiresAt) return undefined;
-    setClockTick(Date.now());
-    const timerId = window.setInterval(() => {
-      setClockTick(Date.now());
-    }, 1000);
-    return () => window.clearInterval(timerId);
-  }, [currentStatus, booking?.expiresAt]);
-
-  React.useEffect(() => {
-    if (!booking?.id || currentStatus !== 'pending' || remainingHoldSeconds == null) return;
-    if (remainingHoldSeconds > 0 || hasSyncedExpiredState) return;
-    setHasSyncedExpiredState(true);
-    fetchBookingDetail(false);
-  }, [booking?.id, currentStatus, remainingHoldSeconds, hasSyncedExpiredState, fetchBookingDetail]);
 
   const handleShare = async () => {
     const shareUrl = window.location.href;

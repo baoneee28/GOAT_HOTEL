@@ -1,5 +1,28 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+
+const NAV_LINKS = [
+  { to: '/', label: 'TRANG CHỦ' },
+  { to: '/collections', label: 'ĐẶT PHÒNG' },
+  { to: '/coupons', label: 'KHUYẾN MÃI' },
+  { to: '/news', label: 'TIN TỨC' },
+  { to: '/contact', label: 'LIÊN HỆ' },
+];
+
+let lastNavbarActivePath = null;
+
+function matchesNavPath(currentPath, linkPath) {
+  if (linkPath === '/') {
+    return currentPath === '/';
+  }
+
+  return currentPath === linkPath || currentPath.startsWith(`${linkPath}/`);
+}
+
+function resolveActiveNavPath(currentPath) {
+  const activeLink = NAV_LINKS.find((item) => matchesNavPath(currentPath, item.to));
+  return activeLink?.to || null;
+}
 
 export default function Navbar({ user, onLogout, variant }) {
   const location = useLocation();
@@ -8,7 +31,10 @@ export default function Navbar({ user, onLogout, variant }) {
   const [visible, setVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [navIndicatorStyle, setNavIndicatorStyle] = useState({ left: 0, width: 0, opacity: 0 });
   const dropdownRef = useRef(null);
+  const desktopNavRef = useRef(null);
+  const navItemRefs = useRef({});
 
   useEffect(() => {
     const handleScroll = () => {
@@ -42,11 +68,59 @@ export default function Navbar({ user, onLogout, variant }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const isActive = (linkPath) => {
-    if (linkPath === '/' && path === '/') return true;
-    if (linkPath !== '/' && path.includes(linkPath)) return true;
-    return false;
-  };
+  const activeNavPath = resolveActiveNavPath(path);
+  const isActive = (linkPath) => activeNavPath === linkPath;
+
+  useLayoutEffect(() => {
+    const container = desktopNavRef.current;
+    const getIndicatorMetrics = (targetPath) => {
+      if (!targetPath || !container) return null;
+
+      const targetNode = navItemRefs.current[targetPath];
+      if (!targetNode) return null;
+
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = targetNode.getBoundingClientRect();
+
+      return {
+        left: targetRect.left - containerRect.left,
+        width: targetRect.width,
+        opacity: 1,
+      };
+    };
+
+    const updateNavIndicator = () => {
+      if (!activeNavPath) {
+        setNavIndicatorStyle((current) => ({ ...current, opacity: 0 }));
+        return;
+      }
+
+      const currentMetrics = getIndicatorMetrics(activeNavPath);
+      if (!currentMetrics) {
+        setNavIndicatorStyle((current) => ({ ...current, opacity: 0 }));
+        return;
+      }
+
+      const previousMetrics = getIndicatorMetrics(lastNavbarActivePath);
+      if (previousMetrics && lastNavbarActivePath !== activeNavPath) {
+        setNavIndicatorStyle(previousMetrics);
+        window.requestAnimationFrame(() => {
+          setNavIndicatorStyle(currentMetrics);
+        });
+      } else {
+        setNavIndicatorStyle(currentMetrics);
+      }
+
+      lastNavbarActivePath = activeNavPath;
+    };
+
+    updateNavIndicator();
+    window.addEventListener('resize', updateNavIndicator);
+
+    return () => {
+      window.removeEventListener('resize', updateNavIndicator);
+    };
+  }, [activeNavPath]);
 
   const navBg = variant === 'dark'
     ? 'bg-slate-950/70 backdrop-blur-xl border-b border-white/10 shadow-2xl shadow-slate-950/50'
@@ -62,11 +136,30 @@ export default function Navbar({ user, onLogout, variant }) {
       >
         GOAT HOTEL
       </Link>
-      <div className="hidden md:flex items-center gap-10">
-        <Link className={`font-label font-bold uppercase tracking-widest text-[11px] transition-colors no-underline ${isActive('/') ? 'text-secondary' : 'text-slate-300 hover:text-white'}`} to="/">TRANG CHỦ</Link>
-        <Link className={`font-label font-bold uppercase tracking-widest text-[11px] transition-colors no-underline ${isActive('/collections') ? 'text-secondary' : 'text-slate-300 hover:text-white'}`} to="/collections">ĐẶT PHÒNG</Link>
-        <Link className={`font-label font-bold uppercase tracking-widest text-[11px] transition-colors no-underline ${isActive('/news') ? 'text-secondary' : 'text-slate-300 hover:text-white'}`} to="/news">TIN TỨC</Link>
-        <Link className={`font-label font-bold uppercase tracking-widest text-[11px] transition-colors no-underline ${isActive('/contact') ? 'text-secondary' : 'text-slate-300 hover:text-white'}`} to="/contact">LIÊN HỆ</Link>
+      <div
+        ref={desktopNavRef}
+        className="relative hidden md:flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-2 backdrop-blur-md"
+      >
+        <span
+          className="pointer-events-none absolute inset-y-2 rounded-full border border-white/10 bg-white/10 shadow-[0_12px_28px_-18px_rgba(15,23,42,0.8)] transition-all duration-300 ease-out"
+          style={navIndicatorStyle}
+        />
+        {NAV_LINKS.map((item) => (
+          <Link
+            key={item.to}
+            ref={(node) => {
+              if (node) {
+                navItemRefs.current[item.to] = node;
+              }
+            }}
+            className={`relative z-10 rounded-full px-5 py-3 font-label font-bold uppercase tracking-widest text-[11px] transition-colors no-underline ${
+              isActive(item.to) ? 'text-secondary' : 'text-slate-300 hover:text-white'
+            }`}
+            to={item.to}
+          >
+            {item.label}
+          </Link>
+        ))}
       </div>
 
       <div className="flex items-center gap-6">
@@ -139,14 +232,16 @@ export default function Navbar({ user, onLogout, variant }) {
                     Lịch sử đặt phòng
                   </Link>
 
-                  <div
-                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', color: '#cbd5e1', fontSize: '12px', cursor: 'pointer', transition: 'all 0.15s' }}
+                  <Link
+                    to="/coupons"
+                    onClick={() => setDropdownOpen(false)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', color: '#cbd5e1', fontSize: '12px', textDecoration: 'none', cursor: 'pointer', transition: 'all 0.15s' }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#fff'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#cbd5e1'; }}
                   >
                     <span className="material-symbols-outlined text-base" style={{ fontSize: '16px', color: '#f59e0b', fontVariationSettings: "'FILL' 0, 'wght' 300" }}>confirmation_number</span>
                     Mã giảm giá
-                  </div>
+                  </Link>
                 </div>
 
                 {/* Logout */}

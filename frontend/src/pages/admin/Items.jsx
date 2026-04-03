@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import axios from 'axios';
 import API_BASE, { iconUrl } from '../../config';
 
@@ -9,15 +9,34 @@ export default function Items() {
 
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ id: '', name: '', image: '' });
+  const fileInputRef = useRef(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = async () => {
     try {
       const res = await axios.get(`${API_BASE}/api/admin/items?q=${q}&page=${page}`, { withCredentials: true });
       setData(res.data);
-    } catch (err) { console.error(err); }
-  }, [q, page]);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    let isActive = true;
+
+    const loadData = async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/api/admin/items?q=${q}&page=${page}`, { withCredentials: true });
+        if (isActive) {
+          setData(res.data);
+        }
+      } catch (err) {
+        if (isActive) console.error(err);
+      }
+    };
+
+    void loadData();
+    return () => { isActive = false; };
+  }, [page, q]);
 
   const handleDelete = (id) => {
     if (window.Swal) window.Swal.fire({
@@ -40,21 +59,40 @@ export default function Items() {
 
   const handleEdit = (i) => {
     setFormData({ id: i.id, name: i.name, image: i.image });
+    if (fileInputRef.current) fileInputRef.current.value = null;
     setShowModal(true);
   };
 
   const handleAddNew = () => {
     setFormData({ id: '', name: '', image: '' });
+    if (fileInputRef.current) fileInputRef.current.value = null;
     setShowModal(true);
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
     try {
+      let finalImage = formData.image.trim();
+
+      if (fileInputRef.current?.files?.length) {
+        const uploadData = new FormData();
+        uploadData.append('file', fileInputRef.current.files[0]);
+        uploadData.append('type', 'items');
+
+        const uploadRes = await axios.post(`${API_BASE}/api/upload`, uploadData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          withCredentials: true,
+        });
+
+        if (uploadRes.data?.success) {
+          finalImage = uploadRes.data.fileName;
+        }
+      }
+
       const payload = {
           id: formData.id || null,
           name: formData.name,
-          image: formData.image
+          image: finalImage
       };
 
       const res = await axios.post(`${API_BASE}/api/admin/items`, payload, { withCredentials: true });
@@ -63,7 +101,10 @@ export default function Items() {
           setShowModal(false);
           fetchData();
       }
-    } catch (err) { console.error(err); window.Swal.fire({ icon: 'error', title: 'Lỗi', text: 'Có lỗi xảy ra' }); }
+    } catch (err) {
+      console.error(err);
+      window.Swal.fire({ icon: 'error', title: 'Lỗi', text: err.response?.data?.message || 'Có lỗi xảy ra' });
+    }
   };
 
   return (
@@ -98,8 +139,12 @@ export default function Items() {
                       {data.items?.length > 0 ? data.items.map(i => (
                           <tr key={i.id}>
                               <td>
-                                  <img src={iconUrl(i.image)} 
-                                       className="item-icon-img" alt={i.name} onError={(e)=>{e.target.onerror=null; e.target.src=iconUrl('/icons/tv.png')}} />
+                                  <img
+                                      src={iconUrl(i.image)}
+                                      className="item-icon-img"
+                                      alt={i.name}
+                                      onError={(e)=>{e.target.onerror=null; e.target.src='/icons/tv.png';}}
+                                  />
                               </td>
                               <td className="fw-bold">{i.name}</td>
                               <td className="text-muted small">{i.image}</td>
@@ -144,8 +189,16 @@ export default function Items() {
                               </div>
                               <div className="mb-4">
                                   <label className="form-label fw-bold">Đường dẫn Icon (URL)</label>
-                                  <input type="text" className="form-control rounded-3" value={formData.image} onChange={e => setFormData({...formData, image: e.target.value})} placeholder="https://..." required />
-                                  <div className="form-text">Có thể nhập link đầy đủ, `/icons/ten-file.png` hoặc chỉ `ten-file.png` nếu icon nằm trong thư mục icons.</div>
+                                  <input type="text" className="form-control rounded-3" value={formData.image} onChange={e => setFormData({...formData, image: e.target.value})} placeholder="/icons/tv.png hoặc https://..." required />
+                                  <div className="form-text">Có thể dùng icon có sẵn trong dự án hoặc chọn file mới ở ô bên dưới.</div>
+                                  <input type="file" ref={fileInputRef} className="form-control rounded-3 mt-3" accept="image/*" />
+                                  <div className="form-text">Nếu tải file mới, hệ thống sẽ lưu vào `backend/static/uploads/items`.</div>
+                                  {formData.image && (
+                                      <div className="d-flex align-items-center gap-3 mt-3 p-3 bg-light rounded-3">
+                                          <img src={iconUrl(formData.image)} alt="Icon preview" className="item-icon-img" onError={(e)=>{e.target.onerror=null; e.target.src='/icons/tv.png';}} />
+                                          <span className="small text-muted">Xem trước icon hiện tại</span>
+                                      </div>
+                                  )}
                               </div>
                               <button type="submit" className="btn btn-primary w-100 py-2 fw-bold" style={{ background: 'var(--primary-color)', border: 'none', borderRadius: '12px' }}>
                                   Lưu vật phẩm

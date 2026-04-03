@@ -1,26 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
-import API_BASE from '../../config';
+import API_BASE, { uploadedImageUrl } from '../../config';
 const Swal = window.Swal;
 
 export default function Users() {
-  const navigate = useNavigate();
   const [data, setData] = useState({ users: [], totalPages: 1, currentPage: 1 });
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
 
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
-    id: '', fullName: '', email: '', phone: '', role: 'customer', password: ''
+    id: '', fullName: '', email: '', phone: '', role: 'customer', password: '', image: ''
   });
+  const fileInputRef = useRef(null);
 
   const fetchData = useCallback(async () => {
     try {
       const res = await axios.get(`${API_BASE}/api/admin/users?q=${q}&page=${page}`, { withCredentials: true });
       setData(res.data);
     } catch (err) { console.error(err); }
-  }, [q, page]);
+  }, [page, q]);
 
   useEffect(() => {
     fetchData();
@@ -47,20 +46,39 @@ export default function Users() {
 
   const handleEdit = (u) => {
     setFormData({
-      id: u.id, fullName: u.fullName, email: u.email, phone: u.phone || '', role: u.role, password: ''
+      id: u.id, fullName: u.fullName, email: u.email, phone: u.phone || '', role: u.role, password: '', image: u.image || ''
     });
+    if (fileInputRef.current) fileInputRef.current.value = null;
     setShowModal(true);
   };
 
   const handleAddNew = () => {
-    setFormData({ id: '', fullName: '', email: '', phone: '', role: 'customer', password: '' });
+    setFormData({ id: '', fullName: '', email: '', phone: '', role: 'customer', password: '', image: '' });
+    if (fileInputRef.current) fileInputRef.current.value = null;
     setShowModal(true);
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post(`${API_BASE}/api/admin/users`, formData, { withCredentials: true });
+      let finalImage = typeof formData.image === 'string' ? formData.image.trim() : '';
+
+      if (fileInputRef.current?.files?.length) {
+        const uploadData = new FormData();
+        uploadData.append('file', fileInputRef.current.files[0]);
+        uploadData.append('type', 'users');
+
+        const uploadRes = await axios.post(`${API_BASE}/api/upload`, uploadData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          withCredentials: true,
+        });
+
+        if (uploadRes.data?.success) {
+          finalImage = uploadRes.data.fileName;
+        }
+      }
+
+      const res = await axios.post(`${API_BASE}/api/admin/users`, { ...formData, image: finalImage }, { withCredentials: true });
       if (res.data.success) {
         Swal.fire({ icon: 'success', title: 'Thành công', timer: 1500, showConfirmButton: false });
         setShowModal(false);
@@ -113,7 +131,7 @@ export default function Users() {
                           <tr key={u.id}>
                               <td>
                                   <div className="d-flex align-items-center">
-                                      <img src={`https://ui-avatars.com/api/?name=${u.fullName}`} className="user-avatar" alt="Avatar" />
+                                      <img src={uploadedImageUrl(u.image, `https://ui-avatars.com/api/?name=${encodeURIComponent(u.fullName || 'GOAT User')}`)} className="user-avatar" alt="Avatar" />
                                       <div className="ms-3 fw-bold">{u.fullName}</div>
                                   </div>
                               </td>
@@ -121,7 +139,6 @@ export default function Users() {
                               <td>{u.phone}</td>
                               <td><span className={`badge-role ${u.role === 'admin' ? 'role-admin' : 'role-customer'}`}>{u.role}</span></td>
                               <td className="text-end">
-                                  <button className="btn-action bg-light text-dark me-1" title="Xem booking" onClick={() => navigate(`/admin/users/${u.id}/bookings`)}>🧾</button>
                                   <button className="btn-action bg-light text-primary me-1" onClick={() => handleEdit(u)}>✎</button>
                                   <button className="btn-action bg-light text-danger" onClick={() => handleDelete(u.id)}>🗑</button>
                               </td>
@@ -183,7 +200,13 @@ export default function Users() {
                               </div>
                               <div className="mb-4">
                                   <label className="form-label fw-bold small text-uppercase text-muted">Ảnh đại diện</label>
-                                  <input type="file" name="image" className="form-control rounded-3" disabled={!!formData.id} />
+                                  <input type="text" className="form-control rounded-3 mb-2" value={formData.image} onChange={e => setFormData({...formData, image: e.target.value})} placeholder="/uploads/users/... hoặc https://..." />
+                                  <input type="file" ref={fileInputRef} name="image" className="form-control rounded-3" accept="image/*" />
+                                  <small className="text-muted d-block mt-1">Ảnh tải lên sẽ được lưu trong `backend/static/uploads/users`.</small>
+                                  <div className="mt-3 d-flex align-items-center gap-3">
+                                      <img src={uploadedImageUrl(formData.image, `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.fullName || 'GOAT User')}`)} className="user-avatar" alt="Avatar preview" />
+                                      <span className="text-muted small">Xem trước ảnh đại diện</span>
+                                  </div>
                               </div>
                               <button type="submit" className="btn btn-primary w-100 py-3 fw-bold mt-2" style={{ background: 'var(--primary-color)', border: 'none', borderRadius: '12px' }}>Xác nhận</button>
                           </form>

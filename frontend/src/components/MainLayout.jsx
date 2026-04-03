@@ -9,12 +9,8 @@ export default function MainLayout() {
   const { user, setUser, logout } = useAuth();
 
   const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/');
-    } catch (error) {
-      console.error('Logout failed:', error);
-    }
+    await logout();
+    navigate('/');
   };
 
   return (

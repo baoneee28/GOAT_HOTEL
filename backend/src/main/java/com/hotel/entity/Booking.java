@@ -16,6 +16,12 @@ public class Booking {
     private User user;
     @Column(name = "total_price")
     private Double totalPrice;
+    @Column(name = "coupon_code")
+    private String couponCode;
+    @Column(name = "discount_amount", nullable = false)
+    private Double discountAmount = 0.0;
+    @Column(name = "final_amount")
+    private Double finalAmount;
     @Column(name = "status", length = 20)
     private String status = "pending";
     @Column(name = "payment_status", length = 30)
@@ -38,7 +44,10 @@ public class Booking {
     private List<Payment> payments;
 
     @PrePersist
+    @PreUpdate
     protected void onCreate() {
+        if (discountAmount == null) discountAmount = 0.0;
+        if (finalAmount == null && totalPrice != null) finalAmount = totalPrice;
         if (status == null || status.isBlank()) status = "pending";
         if (paymentStatus == null || paymentStatus.isBlank()) paymentStatus = "unpaid";
         if (createdAt == null) createdAt = LocalDateTime.now();

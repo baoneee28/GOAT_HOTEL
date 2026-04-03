@@ -28,4 +28,6 @@ public interface NewsRepository extends JpaRepository<News, Integer> {
 
     @Query("SELECT n FROM News n WHERE :search IS NULL OR :search = '' OR n.title LIKE %:search%")
     Page<News> findWithSearch(@Param("search") String search, Pageable pageable);
+
+    long countByImage(String image);
 }

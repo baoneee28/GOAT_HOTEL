@@ -18,6 +18,7 @@ import ContactPage from './pages/ContactPage';
 import RoomDetail from './pages/RoomDetail';
 import AvailableRooms from './pages/AvailableRooms';
 import BookingConfirmation from './pages/BookingConfirmation';
+import Coupons from './pages/Coupons';
 import VNPayLaunch from './pages/VNPayLaunch';
 import VNPayReturn from './pages/VNPayReturn';
 import AdminLayout from './pages/admin/AdminLayout';
@@ -26,6 +27,7 @@ import Rooms from './pages/admin/Rooms';
 import RoomTypes from './pages/admin/RoomTypes';
 import Items from './pages/admin/Items';
 import Bookings from './pages/admin/Bookings';
+import AdminCoupons from './pages/admin/Coupons';
 import Users from './pages/admin/Users';
 import News from './pages/admin/News';
 import Inbox from './pages/admin/Inbox';
@@ -46,6 +48,7 @@ function App() {
           <Route element={<MainLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/collections" element={<Collections />} />
+            <Route path="/coupons" element={<Coupons />} />
             <Route path="/news" element={<NewsPage />} />
             <Route path="/news/:id" element={<NewsDetail />} />
             <Route path="/contact" element={<ContactPage />} />
@@ -78,6 +81,7 @@ function App() {
               <Route path="room-types" element={<RoomTypes />} />
               <Route path="items" element={<Items />} />
               <Route path="bookings" element={<Bookings />} />
+              <Route path="coupons" element={<AdminCoupons />} />
               <Route path="users" element={<Users />} />
               <Route path="users/:id/bookings" element={<UserBookings />} />
               <Route path="news" element={<News />} />

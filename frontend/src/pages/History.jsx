@@ -1,9 +1,10 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE, { calculateBookingDisplayTotal, calculateStayNights, imageUrl, uploadedImageUrl } from '../config';
 
-const FILTERS = ['all', 'pending', 'confirmed', 'completed', 'cancelled', 'expired'];
+const FILTERS = ['all', 'pending', 'confirmed', 'staying', 'completed', 'cancelled', 'expired'];
+const EMPTY_STATUS_SUMMARY = { all: 0, pending: 0, confirmed: 0, staying: 0, completed: 0, cancelled: 0, expired: 0 };
 
 const STATUS_STYLES = {
   pending: {
@@ -17,6 +18,12 @@ const STATUS_STYLES = {
     pill: 'border border-emerald-400/25 bg-emerald-500/8 text-emerald-200',
     label: 'Đã xác nhận',
     summary: 'Kỳ nghỉ sắp tới',
+  },
+  staying: {
+    badge: 'border border-cyan-400/25 bg-cyan-500/10 text-cyan-200',
+    pill: 'border border-cyan-400/25 bg-cyan-500/8 text-cyan-200',
+    label: 'Đang thuê',
+    summary: 'Bạn đang lưu trú tại GOAT HOTEL',
   },
   completed: {
     badge: 'border border-slate-300/14 bg-white/8 text-white/82',
@@ -106,6 +113,20 @@ function getRoomImage(url) {
   return uploadedImageUrl(url, '/images/rooms/standard-room.jpg');
 }
 
+function resolveHistoryStatus(booking) {
+  const normalizedStatus = String(booking?.status || 'pending').toLowerCase();
+  if (normalizedStatus !== 'confirmed') {
+    return normalizedStatus;
+  }
+
+  const detail = booking?.details?.[0];
+  if (detail?.checkInActual && !detail?.checkOutActual) {
+    return 'staying';
+  }
+
+  return normalizedStatus;
+}
+
 export default function History() {
   const navigate = useNavigate();
   const { user: sessionUser } = useOutletContext() || {};
@@ -114,6 +135,7 @@ export default function History() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [statusSummary, setStatusSummary] = useState(EMPTY_STATUS_SUMMARY);
 
   const currentUserId = sessionUser?.id;
 
@@ -126,6 +148,7 @@ export default function History() {
       const res = await axios.get(`${API_BASE}/api/bookings/history?${params}`, { withCredentials: true });
       setBookings(res.data?.bookings || []);
       setTotalPages(res.data?.totalPages || 1);
+      setStatusSummary({ ...EMPTY_STATUS_SUMMARY, ...(res.data?.statusSummary || {}) });
     } catch (err) {
       console.error('History fetch error:', err);
     } finally {
@@ -138,24 +161,14 @@ export default function History() {
   }, [activeFilter, page, currentUserId]);
 
   useEffect(() => {
-    const hasPendingBooking = bookings.some((booking) => (booking.status || '').toLowerCase() === 'pending');
-    if (!hasPendingBooking) return undefined;
+    if (Number(statusSummary.pending || 0) <= 0) return undefined;
 
     const refreshTimer = window.setInterval(() => {
       fetchHistory(activeFilter, page, true);
     }, 5000);
 
     return () => window.clearInterval(refreshTimer);
-  }, [bookings, activeFilter, page, currentUserId]);
-
-  const filterCounts = useMemo(() => {
-    const counts = { all: bookings.length, pending: 0, confirmed: 0, completed: 0, cancelled: 0, expired: 0 };
-    bookings.forEach((booking) => {
-      const status = (booking.status || 'pending').toLowerCase();
-      if (counts[status] !== undefined) counts[status] += 1;
-    });
-    return counts;
-  }, [bookings]);
+  }, [statusSummary.pending, activeFilter, page, currentUserId]);
 
   const handleFilterChange = (filter) => {
     setActiveFilter(filter);
@@ -242,7 +255,7 @@ export default function History() {
                   >
                     <span>{label}</span>
                     <span className={`inline-flex min-w-6 justify-center rounded-full px-2 py-0.5 text-[0.58rem] tracking-normal ${isActive ? 'bg-slate-950/12 text-slate-950' : 'bg-primary/6 text-primary/58'}`}>
-                      {filterCounts[filter] || 0}
+                      {statusSummary[filter] || 0}
                     </span>
                   </button>
                 );
@@ -279,9 +292,9 @@ export default function History() {
             <div className="space-y-6">
               {bookings.map((booking) => {
                 const detail = booking.details?.[0];
-                const status = booking.status?.toLowerCase() || 'pending';
+                const historyStatus = resolveHistoryStatus(booking);
                 const paymentStatus = booking.paymentStatus?.toLowerCase() || 'unpaid';
-                const statusMeta = STATUS_STYLES[status] || STATUS_STYLES.pending;
+                const statusMeta = STATUS_STYLES[historyStatus] || STATUS_STYLES.pending;
                 const paymentMeta = PAYMENT_STYLES[paymentStatus] || PAYMENT_STYLES.unpaid;
                 const roomTypeName = detail?.room?.roomType?.typeName || 'Phòng tiêu chuẩn';
                 const roomNumber = detail?.room?.roomNumber || 'N/A';
@@ -328,7 +341,7 @@ export default function History() {
                             <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">
                               {statusMeta.summary}
                             </p>
-                            {status === 'pending' && booking.expiresAt ? (
+                            {historyStatus === 'pending' && booking.expiresAt ? (
                               <p className="mt-2 text-xs uppercase tracking-[0.18em] text-amber-700">
                                 Giữ chỗ đến {formatDateTime(booking.expiresAt)}
                               </p>
@@ -377,7 +390,7 @@ export default function History() {
                           </p>
 
                           <div className="flex flex-wrap gap-3">
-                            {status === 'completed' && (
+                            {historyStatus === 'completed' && (
                               <button
                                 type="button"
                                 onClick={(e) => {

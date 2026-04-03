@@ -23,19 +23,32 @@ public class UploadApiController {
                                                           @RequestParam(defaultValue = "general") String type) {
         Map<String, Object> response = new HashMap<>();
         try {
-            String fileName;
-            if ("news".equals(type)) {
-                fileName = fileUploadService.uploadNews(file);
-            } else {
-                fileName = fileUploadService.uploadGeneral(file, "");
-            }
+            String category = resolveCategory(type);
+            String fileName = fileUploadService.uploadByCategory(file, category);
             response.put("success", true);
             response.put("fileName", fileName);
+            response.put("url", fileName);
+            response.put("category", category);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "Lỗi tải ảnh: " + e.getMessage());
             return ResponseEntity.badRequest().body(response);
         }
+    }
+
+    private String resolveCategory(String type) {
+        if (type == null || type.isBlank()) {
+            return "general";
+        }
+
+        String normalized = type.trim().toLowerCase().replace('-', '_');
+        return switch (normalized) {
+            case "news" -> "news";
+            case "room_types", "room_type", "roomtypes" -> "room_types";
+            case "users", "user" -> "users";
+            case "items", "item" -> "items";
+            default -> "general";
+        };
     }
 }

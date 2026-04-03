@@ -2,6 +2,7 @@ package com.hotel.service;
 
 import com.hotel.entity.Booking;
 import com.hotel.entity.BookingDetail;
+import com.hotel.entity.Coupon;
 import com.hotel.entity.Room;
 import com.hotel.entity.User;
 import com.hotel.repository.BookingRepository;
@@ -10,6 +11,7 @@ import com.hotel.repository.RoomRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -29,6 +32,7 @@ import java.util.Optional;
 public class BookingService {
 
     private static final DateTimeFormatter HOLD_UNTIL_FORMATTER = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
+    private static final int HISTORY_PAGE_SIZE = 5;
 
     @Value("${booking.pending-hold-seconds:180}")
     private long pendingHoldSeconds;
@@ -41,6 +45,9 @@ public class BookingService {
 
     @Autowired
     private RoomRepository roomRepository;
+
+    @Autowired
+    private CouponService couponService;
 
     public long calculateStayNights(LocalDateTime checkIn, LocalDateTime checkOut) {
         if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
@@ -108,6 +115,86 @@ public class BookingService {
 
         if (booking.getExpiresAt() == null || !"pending".equalsIgnoreCase(previousStatus)) {
             booking.setExpiresAt(createPendingExpiry());
+        }
+    }
+
+    public String normalizeManagedBookingStatus(String status) {
+        String normalized = status == null ? "" : status.trim().toLowerCase();
+        return switch (normalized) {
+            case "pending", "confirmed", "completed", "cancelled", "expired" -> normalized;
+            default -> throw new IllegalArgumentException("Trạng thái booking không hợp lệ.");
+        };
+    }
+
+    public String validateAdminCreateStatus(String requestedStatus) {
+        String normalizedStatus = normalizeManagedBookingStatus(requestedStatus);
+        if (!"pending".equals(normalizedStatus) && !"confirmed".equals(normalizedStatus)) {
+            throw new IllegalArgumentException("Booking mới chỉ có thể tạo ở trạng thái chờ hoặc đã xác nhận.");
+        }
+        return normalizedStatus;
+    }
+
+    public String validateAdminEditableStatus(String currentStatus, String requestedStatus) {
+        String normalizedCurrentStatus = normalizeManagedBookingStatus(currentStatus);
+        String normalizedRequestedStatus = normalizeManagedBookingStatus(requestedStatus);
+
+        if (normalizedCurrentStatus.equals(normalizedRequestedStatus)) {
+            return normalizedCurrentStatus;
+        }
+
+        return switch (normalizedCurrentStatus) {
+            case "pending" -> {
+                if ("confirmed".equals(normalizedRequestedStatus) || "cancelled".equals(normalizedRequestedStatus)) {
+                    yield normalizedRequestedStatus;
+                }
+                throw new IllegalArgumentException("Đơn chờ chỉ được chuyển sang đã xác nhận hoặc đã hủy.");
+            }
+            case "confirmed" -> {
+                if ("cancelled".equals(normalizedRequestedStatus)) {
+                    yield normalizedRequestedStatus;
+                }
+                throw new IllegalArgumentException("Đơn đã xác nhận chỉ có thể đổi sang đã hủy trong form sửa. Trạng thái hoàn thành phải đi qua check-in và checkout.");
+            }
+            case "completed", "cancelled", "expired" ->
+                    throw new IllegalArgumentException("Booking ở trạng thái cuối không thể đổi lại bằng form sửa.");
+            default -> throw new IllegalArgumentException("Trạng thái booking không hợp lệ.");
+        };
+    }
+
+    public String normalizeAdminPaymentStatus(String currentPaymentStatus, String bookingStatus) {
+        String normalizedBookingStatus = normalizeManagedBookingStatus(bookingStatus);
+        String normalizedPaymentStatus = currentPaymentStatus == null ? "" : currentPaymentStatus.trim().toLowerCase();
+
+        if (!"pending".equals(normalizedBookingStatus) && "pending_payment".equals(normalizedPaymentStatus)) {
+            return "unpaid";
+        }
+        if ("completed".equals(normalizedBookingStatus)) {
+            return "paid".equals(normalizedPaymentStatus) ? "paid" : "unpaid";
+        }
+        if ("cancelled".equals(normalizedBookingStatus)) {
+            return "paid".equals(normalizedPaymentStatus) ? "paid" : "unpaid";
+        }
+        if ("expired".equals(normalizedBookingStatus)) {
+            if ("pending_payment".equals(normalizedPaymentStatus)) {
+                return "failed";
+            }
+            if ("paid".equals(normalizedPaymentStatus)) {
+                return "paid";
+            }
+            return "unpaid";
+        }
+        if (!normalizedPaymentStatus.isBlank()) {
+            return normalizedPaymentStatus;
+        }
+        return "unpaid";
+    }
+
+    public void validateAdminCheckInTime(BookingDetail detail, LocalDateTime now) {
+        if (detail == null || detail.getCheckIn() == null) {
+            throw new IllegalArgumentException("Đơn chưa có thời gian nhận phòng hợp lệ.");
+        }
+        if (now != null && now.isBefore(detail.getCheckIn())) {
+            throw new IllegalArgumentException("Chỉ có thể check-in từ thời điểm nhận phòng đã đặt.");
         }
     }
 
@@ -256,6 +343,14 @@ public class BookingService {
             booking.setTotalPrice(recalculatedTotal);
         }
 
+        double discountAmount = booking.getDiscountAmount() == null ? 0.0 : booking.getDiscountAmount();
+        double finalAmount = Math.max(0.0, recalculatedTotal - discountAmount);
+        if (recalculatedTotal > 0 && (booking.getFinalAmount() == null || Math.abs(booking.getFinalAmount() - finalAmount) > 0.01)) {
+            booking.setFinalAmount(finalAmount);
+        } else if (booking.getFinalAmount() == null && booking.getTotalPrice() != null) {
+            booking.setFinalAmount(Math.max(0.0, booking.getTotalPrice() - discountAmount));
+        }
+
         return booking;
     }
 
@@ -297,6 +392,16 @@ public class BookingService {
 
     @Transactional
     public Booking createBooking(User user, Integer roomId, LocalDateTime checkIn, LocalDateTime checkOut, String paymentFlow) {
+        return createBooking(user, roomId, checkIn, checkOut, paymentFlow, null);
+    }
+
+    @Transactional
+    public Booking createBooking(User user,
+                                 Integer roomId,
+                                 LocalDateTime checkIn,
+                                 LocalDateTime checkOut,
+                                 String paymentFlow,
+                                 String couponCode) {
         if (user == null || user.getId() == null) {
             throw new IllegalArgumentException("Phiên người dùng không hợp lệ.");
         }
@@ -339,10 +444,25 @@ public class BookingService {
         double pricePerNight = room.getRoomType().getPricePerNight();
         long totalPrice = calculatePriceIndex(checkIn, checkOut, pricePerNight);
         double totalHours = calculateHours(checkIn, checkOut);
+        CouponService.CouponPricingResult couponPricing = couponService.evaluatePricing(
+                room,
+                checkIn,
+                checkOut,
+                couponCode,
+                LocalDateTime.now(),
+                false
+        );
+        if (couponCode != null && !couponCode.isBlank() && !couponPricing.valid()) {
+            throw new IllegalArgumentException(couponPricing.message());
+        }
+        Coupon appliedCoupon = couponPricing.coupon();
 
         Booking booking = new Booking();
         booking.setUser(user);
         booking.setTotalPrice((double) totalPrice);
+        booking.setDiscountAmount(couponPricing.discountAmount());
+        booking.setFinalAmount(couponPricing.finalAmount());
+        booking.setCouponCode(appliedCoupon != null ? appliedCoupon.getCode() : null);
         booking.setStatus("pending");
         booking.setPaymentStatus(resolveInitialPaymentStatus(paymentFlow));
         booking.setExpiresAt(createPendingExpiry());
@@ -363,7 +483,7 @@ public class BookingService {
     @Transactional
     public String bookRoom(User user, Integer roomId, LocalDateTime checkIn, LocalDateTime checkOut) {
         try {
-            createBooking(user, roomId, checkIn, checkOut, "standard_request");
+            createBooking(user, roomId, checkIn, checkOut, "standard_request", null);
             return null;
         } catch (IllegalArgumentException ex) {
             return ex.getMessage();
@@ -393,16 +513,90 @@ public class BookingService {
 
     public Page<Booking> getHistory(Integer userId, String status, int page) {
         expirePendingBookingsForUser(userId);
-        Page<Booking> historyPage = bookingRepository.findByUserIdAndStatus(userId, status, PageRequest.of(page - 1, 5));
-        normalizeBookingFinancials(historyPage.getContent());
-        return historyPage;
+        String normalizedFilter = normalizeHistoryFilter(status);
+        List<Booking> allBookings = bookingRepository.findAllHistoryByUserId(userId);
+        normalizeBookingFinancials(allBookings);
+
+        List<Booking> filteredBookings = allBookings.stream()
+                .filter(booking -> matchesHistoryFilter(booking, normalizedFilter))
+                .toList();
+
+        int safePage = Math.max(1, page);
+        int totalItems = filteredBookings.size();
+        int fromIndex = Math.min((safePage - 1) * HISTORY_PAGE_SIZE, totalItems);
+        int toIndex = Math.min(fromIndex + HISTORY_PAGE_SIZE, totalItems);
+
+        return new PageImpl<>(
+                filteredBookings.subList(fromIndex, toIndex),
+                PageRequest.of(safePage - 1, HISTORY_PAGE_SIZE),
+                totalItems
+        );
+    }
+
+    public Map<String, Long> countHistoryStatuses(Integer userId) {
+        expirePendingBookingsForUser(userId);
+        List<Booking> allBookings = bookingRepository.findAllHistoryByUserId(userId);
+        normalizeBookingFinancials(allBookings);
+        Map<String, Long> summary = new LinkedHashMap<>();
+        summary.put("all", 0L);
+        summary.put("pending", 0L);
+        summary.put("confirmed", 0L);
+        summary.put("staying", 0L);
+        summary.put("completed", 0L);
+        summary.put("cancelled", 0L);
+        summary.put("expired", 0L);
+
+        for (Booking booking : allBookings) {
+            String historyStatus = resolveHistoryStatus(booking);
+            summary.put("all", summary.get("all") + 1);
+            if (summary.containsKey(historyStatus)) {
+                summary.put(historyStatus, summary.get(historyStatus) + 1);
+            }
+        }
+        return summary;
+    }
+
+    private String normalizeHistoryFilter(String status) {
+        if (status == null || status.isBlank()) {
+            return "all";
+        }
+        return status.trim().toLowerCase();
+    }
+
+    private boolean matchesHistoryFilter(Booking booking, String filter) {
+        if ("all".equalsIgnoreCase(filter)) {
+            return true;
+        }
+        return resolveHistoryStatus(booking).equalsIgnoreCase(filter);
+    }
+
+    private String resolveHistoryStatus(Booking booking) {
+        String normalizedStatus = booking == null || booking.getStatus() == null
+                ? "pending"
+                : booking.getStatus().trim().toLowerCase();
+        if (!"confirmed".equals(normalizedStatus)) {
+            return normalizedStatus;
+        }
+
+        BookingDetail primaryDetail = booking.getDetails() == null || booking.getDetails().isEmpty()
+                ? null
+                : booking.getDetails().get(0);
+        if (primaryDetail != null
+                && primaryDetail.getCheckInActual() != null
+                && primaryDetail.getCheckOutActual() == null) {
+            return "staying";
+        }
+
+        return normalizedStatus;
     }
 
     public double getTotalSpent(Integer userId) {
         List<Booking> paidBookings = bookingRepository.findAllByUserIdAndPaymentStatus(userId, "paid");
         normalizeBookingFinancials(paidBookings);
         return paidBookings.stream()
-                .mapToDouble(booking -> booking.getTotalPrice() != null ? booking.getTotalPrice() : 0.0)
+                .mapToDouble(booking -> booking.getFinalAmount() != null
+                        ? booking.getFinalAmount()
+                        : (booking.getTotalPrice() != null ? booking.getTotalPrice() : 0.0))
                 .sum();
     }
 }

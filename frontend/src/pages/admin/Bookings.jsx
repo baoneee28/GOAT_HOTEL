@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import API_BASE, { calculateBookingDisplayTotal, calculateStayNights } from '../../config';
+import API_BASE, { calculateBookingDiscountAmount, calculateBookingDisplayTotal, calculateBookingSubtotal, calculateStayNights } from '../../config';
 const Swal = window.Swal;
 
 export default function Bookings() {
+  const BOOKING_STATUS_LABELS = {
+    pending: 'Chờ duyệt',
+    confirmed: 'Đã xác nhận',
+    completed: 'Hoàn thành',
+    cancelled: 'Đã hủy',
+    expired: 'Hết hạn giữ chỗ',
+  };
   const [data, setData] = useState({ bookings: [], totalPages: 1, currentPage: 1 });
   const [users, setUsers] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -17,7 +24,7 @@ export default function Bookings() {
   const [invoiceData, setInvoiceData] = useState(null);
 
   const [formData, setFormData] = useState({
-    id: '', userId: '', roomId: '', checkIn: '', checkOut: '', status: 'pending'
+    id: '', userId: '', roomId: '', roomTypeId: '', checkIn: '', checkOut: '', status: 'pending'
   });
 
   const getErrorMessage = (error, fallback = 'Có lỗi xảy ra') => {
@@ -49,11 +56,34 @@ export default function Bookings() {
     } catch (err) { console.error(err); }
   }, [status, page]);
 
+  const fetchRoomOptions = useCallback(async (checkIn = '', checkOut = '', bookingId = '') => {
+    try {
+      const params = new URLSearchParams();
+      if (checkIn) params.set('checkIn', checkIn);
+      if (checkOut) params.set('checkOut', checkOut);
+      if (bookingId) params.set('excludeBookingId', bookingId);
+      const query = params.toString();
+      const res = await axios.get(`${API_BASE}/api/rooms${query ? `?${query}` : ''}`, { withCredentials: true });
+      setRooms(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchData();
     axios.get(`${API_BASE}/api/admin/users/all`, { withCredentials: true }).then(r => setUsers(r.data));
-    axios.get(`${API_BASE}/api/rooms`, { withCredentials: true }).then(r => setRooms(r.data));
-  }, [fetchData]);
+    fetchRoomOptions();
+  }, [fetchData, fetchRoomOptions]);
+
+  useEffect(() => {
+    if (!showModal) return;
+    if (formData.checkIn && formData.checkOut) {
+      fetchRoomOptions(formData.checkIn, formData.checkOut, formData.id);
+      return;
+    }
+    fetchRoomOptions();
+  }, [showModal, formData.checkIn, formData.checkOut, formData.id, fetchRoomOptions]);
 
   const handleCheckout = (b) => {
     const detail = b.details?.[0] || {};
@@ -152,10 +182,32 @@ export default function Bookings() {
     });
   };
 
+  const handleCollectCash = (booking) => {
+    Swal.fire({
+      title: 'Ghi nhận tiền mặt?',
+      text: 'Hệ thống sẽ tạo phiếu thu tiền mặt và cập nhật doanh thu từ thời điểm này.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Thu tiền mặt',
+      confirmButtonColor: '#16a34a'
+    }).then(async (res) => {
+      if (!res.isConfirmed) return;
+      try {
+        const result = await axios.post(`${API_BASE}/api/admin/bookings/${booking.id}/collect-cash-payment`, {}, { withCredentials: true });
+        if (result.data.success) {
+          Swal.fire({ icon: 'success', title: 'Đã ghi nhận tiền mặt', timer: 1500, showConfirmButton: false });
+          fetchData();
+        }
+      } catch (error) {
+        Swal.fire({ icon: 'error', title: 'Lỗi', text: getErrorMessage(error) });
+      }
+    });
+  };
+
   const handleEdit = (b) => {
     const detail = b.details?.[0] || {};
     setFormData({
-      id: b.id, userId: b.user?.id || '', roomId: detail.room?.id || '',
+      id: b.id, userId: b.user?.id || '', roomId: detail.room?.id || '', roomTypeId: detail.room?.roomType?.id || '',
       checkIn: toDateTimeLocalValue(detail.checkIn),
       checkOut: toDateTimeLocalValue(detail.checkOut),
       status: b.status
@@ -164,7 +216,7 @@ export default function Bookings() {
   };
 
   const handleAddNew = () => {
-    setFormData({ id: '', userId: '', roomId: '', checkIn: '', checkOut: '', status: 'pending' });
+    setFormData({ id: '', userId: '', roomId: '', roomTypeId: '', checkIn: '', checkOut: '', status: 'pending' });
     setShowModal(true);
   };
 
@@ -184,7 +236,22 @@ export default function Bookings() {
 
   const printInvoice = () => { window.print(); };
 
-  const availableRooms = rooms.filter(r => r.status === 'available');
+  const selectedRoom = rooms.find((room) => String(room?.id) === String(formData.roomId));
+  const roomTypeOptions = rooms.reduce((acc, room) => {
+    const type = room?.roomType;
+    if (!type?.id || acc.some((entry) => String(entry.id) === String(type.id))) {
+      return acc;
+    }
+    acc.push(type);
+    return acc;
+  }, []).sort((a, b) => String(a?.typeName || '').localeCompare(String(b?.typeName || ''), 'vi'));
+  const isSameSelectedRoomType = (room) => !formData.roomTypeId || String(room?.roomType?.id) === String(formData.roomTypeId);
+  const hasPinnedCurrentRoom = Boolean(formData.id && selectedRoom && isSameSelectedRoomType(selectedRoom));
+  const selectableRooms = rooms.filter((room) =>
+    String(room?.status || '').toLowerCase() !== 'maintenance'
+    && isSameSelectedRoomType(room)
+    && (!hasPinnedCurrentRoom || String(room?.id) !== String(formData.roomId))
+  );
   const getPrimaryDetail = (booking) => booking?.details?.[0] || {};
   const formatBookingDate = (value) => {
     if (Array.isArray(value)) {
@@ -209,19 +276,29 @@ export default function Bookings() {
     const nights = calculateStayNights(checkIn, checkOut);
     return nights > 0 ? `${nights} đêm` : 'Chưa cập nhật';
   };
-  const getBookingStatusLabel = (value) => ({
-    pending: 'Chờ duyệt',
-    confirmed: 'Đã xác nhận',
-    completed: 'Hoàn thành',
-    cancelled: 'Đã hủy',
-    expired: 'Hết hạn giữ chỗ',
-  }[String(value || '').toLowerCase()] || value || 'pending');
+  const isTerminalStatus = (value) => ['completed', 'cancelled', 'expired'].includes(String(value || '').toLowerCase());
+  const canEditBooking = (value) => ['pending', 'confirmed'].includes(String(value || '').toLowerCase());
+  const getBookingStatusLabel = (value) => BOOKING_STATUS_LABELS[String(value || '').toLowerCase()] || value || 'pending';
   const getPaymentStatusLabel = (value) => ({
     unpaid: 'Chưa thanh toán',
     pending_payment: 'Chờ thanh toán',
     paid: 'Đã thanh toán',
     failed: 'Thanh toán lỗi',
   }[String(value || '').toLowerCase()] || value || 'unpaid');
+  const getAllowedStatusOptions = (bookingId, currentStatus) => {
+    const normalizedStatus = String(currentStatus || 'pending').toLowerCase();
+    if (!bookingId) {
+      return ['pending', 'confirmed'];
+    }
+    if (normalizedStatus === 'pending') {
+      return ['pending', 'confirmed', 'cancelled'];
+    }
+    if (normalizedStatus === 'confirmed') {
+      return ['confirmed', 'cancelled'];
+    }
+    return [normalizedStatus];
+  };
+  const statusOptions = getAllowedStatusOptions(formData.id, formData.status);
 
   return (
     <>
@@ -283,6 +360,8 @@ export default function Bookings() {
                           const checkedIn = hasCheckedIn(b);
                           const checkedOut = hasCheckedOut(b);
                           const displayTotal = calculateBookingDisplayTotal(b);
+                          const normalizedStatus = String(b.status || '').toLowerCase();
+                          const normalizedPaymentStatus = String(b.paymentStatus || '').toLowerCase();
                           return (
                           <tr key={b.id}>
                               <td className="fw-bold px-3 text-wrap text-break">{b.user?.fullName}</td>
@@ -318,10 +397,13 @@ export default function Bookings() {
                                       {b.status === 'pending' && (
                                           <button className="btn btn-sm btn-light text-success border rounded-circle" style={{width:'32px', height:'32px'}} title="Duyệt đơn" onClick={() => handleApprove(b.id)}>✓</button>
                                       )}
+                                      {normalizedStatus === 'confirmed' && normalizedPaymentStatus !== 'paid' && (
+                                          <button className="btn btn-sm btn-light text-success border rounded-circle" style={{width:'32px', height:'32px'}} title="Thu tiền mặt" onClick={() => handleCollectCash(b)}>₫</button>
+                                      )}
                                       {b.status === 'confirmed' && !checkedIn && !checkedOut && (
                                           <button className="btn btn-sm btn-light text-primary border rounded-circle" style={{width:'32px', height:'32px'}} title="Nhận phòng" onClick={() => handleCheckIn(b)}>⇢</button>
                                       )}
-                                      {b.status === 'confirmed' && checkedIn && (
+                                      {b.status === 'confirmed' && checkedIn && normalizedPaymentStatus === 'paid' && (
                                           <button className="btn btn-sm btn-light text-warning border rounded-circle" style={{width:'32px', height:'32px'}} title="Chấm trả phòng" onClick={() => handleCheckout(b)}>⚡</button>
                                       )}
                                       {b.status === 'completed' && (
@@ -330,7 +412,7 @@ export default function Bookings() {
                                               setShowInvoice(true);
                                           }}>👁</button>
                                       )}
-                                      {b.status !== 'completed' && (
+                                      {canEditBooking(b.status) && (
                                           <button className="btn btn-sm btn-light text-primary border rounded-circle" style={{width:'32px', height:'32px'}} title="Sửa" onClick={() => handleEdit(b)}>✎</button>
                                       )}
                                   </div>
@@ -372,15 +454,39 @@ export default function Bookings() {
                                   </select>
                               </div>
                               <div className="mb-3">
-                                  <label className="form-label fw-bold small text-muted text-uppercase">Phòng</label>
-                                  <select className="form-select rounded-3" value={formData.roomId} onChange={e => setFormData({...formData, roomId: e.target.value})} required>
-                                      <option value="">-- Chọn phòng --</option>
-                                      {formData.id && rooms.find(r => r.id == formData.roomId) && (
-                                          <option value={formData.roomId}>Phòng {rooms.find(r => r.id == formData.roomId)?.roomNumber} (Hiện tại)</option>
-                                      )}
-                                      {availableRooms.map(r => <option key={r.id} value={r.id}>Phòng {r.roomNumber}</option>)}
+                                  <label className="form-label fw-bold small text-muted text-uppercase">Loại phòng</label>
+                                  <select
+                                      className="form-select rounded-3"
+                                      value={formData.roomTypeId}
+                                      onChange={e => setFormData({ ...formData, roomTypeId: e.target.value, roomId: '' })}
+                                      required
+                                  >
+                                      <option value="">-- Chọn loại phòng --</option>
+                                      {roomTypeOptions.map(type => (
+                                        <option key={type.id} value={type.id}>
+                                          {type.typeName} {type.pricePerNight ? `- ${Number(type.pricePerNight).toLocaleString('vi-VN')}đ/đêm` : ''}
+                                        </option>
+                                      ))}
                                   </select>
+                                  <small className="text-muted d-block mt-2">Chọn loại phòng trước để hệ thống chỉ hiện đúng các phòng thuộc hạng đó.</small>
                               </div>
+                              <div className="mb-3">
+                                   <label className="form-label fw-bold small text-muted text-uppercase">Phòng</label>
+                                   <select
+                                       className="form-select rounded-3"
+                                       value={formData.roomId}
+                                       onChange={e => setFormData({...formData, roomId: e.target.value})}
+                                       required
+                                       disabled={!formData.roomTypeId}
+                                   >
+                                       <option value="">{formData.roomTypeId ? '-- Chọn phòng --' : '-- Chọn loại phòng trước --'}</option>
+                                       {hasPinnedCurrentRoom && (
+                                           <option value={formData.roomId}>Phòng {selectedRoom?.roomNumber} (Hiện tại)</option>
+                                       )}
+                                       {selectableRooms.map(r => <option key={r.id} value={r.id}>Phòng {r.roomNumber}</option>)}
+                                   </select>
+                                   <small className="text-muted d-block mt-2">Danh sách phòng được lọc theo khoảng ngày đang chọn, không còn dựa riêng vào trạng thái vật lý của phòng.</small>
+                               </div>
                               <div className="row mb-3 g-3">
                                   <div className="col-6">
                                       <label className="form-label fw-bold small text-muted text-uppercase">Giờ Check-in</label>
@@ -391,16 +497,17 @@ export default function Bookings() {
                                       <input type="datetime-local" className="form-control" value={formData.checkOut} onChange={e => setFormData({...formData, checkOut: e.target.value})} required />
                                   </div>
                               </div>
-                              <div className="mb-4">
-                                  <label className="form-label fw-bold small text-muted text-uppercase">Trạng thái</label>
-                                  <select className="form-select rounded-3" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
-                                      <option value="pending">Đang chờ</option>
-                                      <option value="confirmed">Đã xác nhận</option>
-                                      <option value="completed">Đã hoàn thành</option>
-                                      <option value="cancelled">Đã hủy</option>
-                                      <option value="expired">Hết hạn giữ chỗ</option>
-                                  </select>
-                              </div>
+                               <div className="mb-4">
+                                   <label className="form-label fw-bold small text-muted text-uppercase">Trạng thái</label>
+                                   <select className="form-select rounded-3" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+                                      {statusOptions.map((value) => (
+                                        <option key={value} value={value}>{BOOKING_STATUS_LABELS[value] || value}</option>
+                                      ))}
+                                   </select>
+                                   {formData.id && isTerminalStatus(formData.status) && (
+                                     <small className="text-muted d-block mt-2">Booking ở trạng thái cuối chỉ được xem lại, không được đổi trạng thái.</small>
+                                   )}
+                               </div>
                               <button type="submit" className="btn btn-primary w-100 py-3 fw-bold" style={{ background: 'var(--primary-color)', border: 'none', borderRadius: '12px' }}>Lưu thông tin</button>
                           </form>
                       </div>
@@ -441,6 +548,14 @@ export default function Bookings() {
                                   </div>
                                 </div>
                               ))}
+
+                              {Number(calculateBookingDiscountAmount(invoiceData) || 0) > 0 && (
+                                <>
+                                  <div className="invoice-row"><span className="text-muted">Tạm tính:</span> <span>{calculateBookingSubtotal(invoiceData).toLocaleString('vi-VN')}đ</span></div>
+                                  <div className="invoice-row"><span className="text-muted">Mã giảm giá:</span> <span className="fw-bold">{invoiceData.couponCode}</span></div>
+                                  <div className="invoice-row"><span className="text-muted">Giảm giá:</span> <span className="text-success">-{calculateBookingDiscountAmount(invoiceData).toLocaleString('vi-VN')}đ</span></div>
+                                </>
+                              )}
 
                               <div className="invoice-total d-flex justify-content-between">
                                   <span>TỔNG CỘNG</span>

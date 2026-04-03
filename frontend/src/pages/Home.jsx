@@ -1,19 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import API_BASE, { imageUrl, uploadedImageUrl } from '../config';
 
 export default function Home() {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedRoom, setSelectedRoom] = useState('');
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
 
   const [featuredRooms, setFeaturedRooms] = useState([]);
   const [featuredNews, setFeaturedNews] = useState([]);
   const [activeBooking, setActiveBooking] = useState(null);
-  const [sliderImages, setSliderImages] = useState([]);
   const [isHovering, setIsHovering] = useState(false);
 
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
@@ -22,6 +20,22 @@ export default function Home() {
 
   const normalizeFeaturedNews = (items) => {
     return (items || []).map((entry) => entry?.news || entry).filter(Boolean);
+  };
+
+  const normalizeFeaturedRooms = (items) => {
+    return (items || [])
+      .map((entry) => {
+        const roomType = entry?.roomType || entry;
+        if (!roomType?.id) {
+          return null;
+        }
+
+        return {
+          id: entry?.id || roomType.id,
+          roomType,
+        };
+      })
+      .filter(Boolean);
   };
 
   const handleNextNews = () => {
@@ -49,7 +63,7 @@ export default function Home() {
     const fetchData = async () => {
       try {
         const res = await axios.get(`${API_BASE}/api/home/`, { withCredentials: true });
-        const homeFeaturedRooms = res.data.featured_rooms || [];
+        const homeFeaturedRooms = normalizeFeaturedRooms(res.data.featured_rooms);
         const homeFeaturedNews = normalizeFeaturedNews(res.data.featured_news);
 
         if (homeFeaturedRooms.length > 0) {
@@ -64,7 +78,6 @@ export default function Home() {
         }
 
         setActiveBooking(res.data.active_booking || null);
-        if (res.data.slider_images) setSliderImages(res.data.slider_images);
         if (homeFeaturedNews.length > 0) {
           setFeaturedNews(homeFeaturedNews);
         } else {
@@ -101,12 +114,10 @@ export default function Home() {
   }, []);
 
   const goToRoom = (room) => {
+    if (!room?.id) {
+      return;
+    }
     navigate(`/rooms/${room.id}`, { state: room });
-  };
-
-  const selectRoomSelection = (selectionName) => {
-    setSelectedRoom(selectionName);
-    setIsModalOpen(true);
   };
 
   const closeModal = () => {
@@ -238,13 +249,23 @@ export default function Home() {
             </header>
             <div className="flex flex-col gap-6">
               {featuredRooms.map((featured) => (
-                <div key={featured.id} className="group flex items-center gap-6 p-4 rounded-xl bg-white/70 hover:bg-white transition-all cursor-pointer border border-[#c5bba8] hover:border-[#a99880] hover:shadow-md" onClick={() => goToRoom(featured.roomType)}>
+                <div
+                  key={featured.id}
+                  className="group flex items-center gap-6 p-4 rounded-xl bg-white/70 hover:bg-white transition-all cursor-pointer border border-[#c5bba8] hover:border-[#a99880] hover:shadow-md"
+                  onClick={() => goToRoom(featured.roomType)}
+                >
                   <div className="w-24 h-24 flex-shrink-0 overflow-hidden rounded-xl shadow-lg">
-                    <img alt={featured.roomType.typeName} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" src={uploadedImageUrl(featured.roomType.image, '/images/rooms/standard-room.jpg')}/>
+                    <img
+                      alt={featured.roomType?.typeName || 'Phòng GOAT HOTEL'}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      src={uploadedImageUrl(featured.roomType?.image, '/images/rooms/standard-room.jpg')}
+                    />
                   </div>
                   <div>
-                    <h3 className="font-headline text-xl text-slate-800">{featured.roomType.typeName}</h3>
-                    <p className="font-sans font-bold text-slate-700 mt-1">{featured.roomType.pricePerNight?.toLocaleString('vi-VN')}đ <span className="text-[10px] uppercase font-normal text-slate-500">/ Đêm</span></p>
+                    <h3 className="font-headline text-xl text-slate-800">{featured.roomType?.typeName || 'Phòng đang cập nhật'}</h3>
+                    <p className="font-sans font-bold text-slate-700 mt-1">
+                      {Number(featured.roomType?.pricePerNight || 0).toLocaleString('vi-VN')}đ <span className="text-[10px] uppercase font-normal text-slate-500">/ Đêm</span>
+                    </p>
                   </div>
                   <span className="material-symbols-outlined ml-auto text-slate-400 group-hover:text-slate-700 transition-colors">chevron_right</span>
 

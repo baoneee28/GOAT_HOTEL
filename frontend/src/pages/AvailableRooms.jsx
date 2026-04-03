@@ -94,7 +94,7 @@ export default function AvailableRooms() {
         const mapped = res.data.map(r => ({
           id: r.id,
           roomNumber: r.roomNumber,
-          status: (r.effectiveStatus || 'available').toLowerCase().trim(),
+          status: (r.status || 'available').toLowerCase().trim(),
           price: actualPrice,
           capacity: baseCapacity,
           beds: actualBeds,

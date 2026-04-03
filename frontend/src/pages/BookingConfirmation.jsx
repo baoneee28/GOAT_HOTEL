@@ -11,6 +11,87 @@ function fmtDate(d) {
   });
 }
 
+function openVNPayTabPlaceholder() {
+  if (typeof window === 'undefined') return null;
+
+  const paymentWindow = window.open('', '_blank');
+  if (!paymentWindow) return null;
+
+  try {
+    paymentWindow.document.write(`
+      <!doctype html>
+      <html lang="vi">
+        <head>
+          <meta charset="utf-8" />
+          <title>GOAT HOTEL | Dang mo VNPay</title>
+          <style>
+            body {
+              margin: 0;
+              min-height: 100vh;
+              display: grid;
+              place-items: center;
+              background: linear-gradient(180deg, #f5efe5 0%, #fbf8f3 100%);
+              color: #0f172a;
+              font-family: Arial, sans-serif;
+            }
+            .panel {
+              width: min(92vw, 420px);
+              padding: 32px;
+              border-radius: 24px;
+              background: rgba(255, 255, 255, 0.94);
+              border: 1px solid rgba(15, 23, 42, 0.08);
+              box-shadow: 0 24px 60px -42px rgba(15, 23, 42, 0.28);
+              text-align: center;
+            }
+            .spinner {
+              width: 42px;
+              height: 42px;
+              margin: 0 auto 18px;
+              border-radius: 999px;
+              border: 3px solid #d4af37;
+              border-top-color: transparent;
+              animation: spin 0.9s linear infinite;
+            }
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="panel">
+            <div class="spinner"></div>
+            <h1 style="margin: 0 0 12px; font-size: 24px;">Dang mo VNPay Demo</h1>
+            <p style="margin: 0; line-height: 1.7;">
+              GOAT HOTEL dang khoi tao cong thanh toan trong tab moi.
+            </p>
+          </div>
+        </body>
+      </html>
+    `);
+    paymentWindow.document.close();
+  } catch (error) {
+    console.error('Khong the khoi tao tab VNPay:', error);
+  }
+
+  return paymentWindow;
+}
+
+function redirectOpenedVNPayTab(paymentWindow, bookingId) {
+  if (!paymentWindow || paymentWindow.closed || !bookingId || typeof window === 'undefined') {
+    return false;
+  }
+
+  try {
+    paymentWindow.opener = null;
+    paymentWindow.location.replace(`${window.location.origin}/vnpay-launch?bookingId=${bookingId}`);
+    paymentWindow.focus();
+    return true;
+  } catch (error) {
+    console.error('Khong the dieu huong tab VNPay:', error);
+    return false;
+  }
+}
+
 export default function BookingConfirmation() {
   const location = useLocation();
   const { state } = location;
@@ -44,6 +125,7 @@ export default function BookingConfirmation() {
   const nights = formData.checkIn && formData.checkOut
     ? calculateStayNights(formData.checkIn, formData.checkOut)
     : 0; 
+  const bookingSubtotal = nights > 0 ? Math.round((booking.pricePerNight || 0) * nights) : 0;
   const displayCapacity = booking.capacity || formData.guests || 0;
   const displaySize = resolveRoomTypeSpec(booking.room, 'size', booking.size);
   const displayBeds = resolveRoomTypeSpec(booking.room, 'beds', booking.beds);
@@ -51,6 +133,15 @@ export default function BookingConfirmation() {
   const accountName = sessionUser?.fullName?.trim() || 'Chưa cập nhật trong hồ sơ';
   const accountPhone = sessionUser?.phone?.trim() || 'Chưa cập nhật trong hồ sơ';
   const accountEmail = sessionUser?.email?.trim() || 'Chưa cập nhật trong hồ sơ';
+  const [couponInput, setCouponInput] = useState('');
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
+  const [couponFeedback, setCouponFeedback] = useState(null);
+  const [pricingSummary, setPricingSummary] = useState({
+    subtotal: bookingSubtotal,
+    discountAmount: 0,
+    finalAmount: bookingSubtotal,
+    couponCode: null,
+  });
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -59,6 +150,33 @@ export default function BookingConfirmation() {
 
   const [submitting, setSubmitting] = useState(false);
   const [preparingVNPay, setPreparingVNPay] = useState(false);
+  const appliedCouponCode = pricingSummary.couponCode || '';
+
+  useEffect(() => {
+    setPricingSummary((prev) => {
+      if (prev.couponCode) {
+        return prev;
+      }
+
+      return {
+        subtotal: bookingSubtotal,
+        discountAmount: 0,
+        finalAmount: bookingSubtotal,
+        couponCode: null,
+      };
+    });
+  }, [bookingSubtotal]);
+
+  useEffect(() => {
+    setCouponInput('');
+    setCouponFeedback(null);
+    setPricingSummary({
+      subtotal: bookingSubtotal,
+      discountAmount: 0,
+      finalAmount: bookingSubtotal,
+      couponCode: null,
+    });
+  }, [roomId, formData.checkIn, formData.checkOut, bookingSubtotal]);
 
   useEffect(() => {
     const needsRoomRefresh = !state?.room || !state?.size || !state?.beds || !state?.view || !state?.capacity;
@@ -138,6 +256,7 @@ export default function BookingConfirmation() {
       const res = await axios.post(`${API_BASE}/api/bookings`, {
         ...payload,
         paymentFlow,
+        couponCode: appliedCouponCode || null,
       }, { withCredentials: true });
       if (res.data?.success) {
         return res.data;
@@ -165,6 +284,95 @@ export default function BookingConfirmation() {
     return null;
   };
 
+  const handleApplyCoupon = async () => {
+    const payload = validateBookingInput();
+    if (!payload) {
+      return;
+    }
+
+    const normalizedCouponCode = couponInput.trim().toUpperCase();
+    if (!normalizedCouponCode) {
+      setCouponFeedback({ type: 'error', message: 'Vui lòng nhập mã giảm giá trước khi áp dụng.' });
+      setPricingSummary({
+        subtotal: bookingSubtotal,
+        discountAmount: 0,
+        finalAmount: bookingSubtotal,
+        couponCode: null,
+      });
+      return;
+    }
+
+    setApplyingCoupon(true);
+    try {
+      const res = await axios.post(`${API_BASE}/api/coupons/apply`, {
+        roomId: payload.roomId,
+        checkIn: payload.checkIn,
+        checkOut: payload.checkOut,
+        couponCode: normalizedCouponCode,
+      }, { withCredentials: true });
+
+      if (!res.data?.success) {
+        setCouponFeedback({ type: 'error', message: res.data?.message || 'Không thể áp dụng mã giảm giá.' });
+        setPricingSummary({
+          subtotal: bookingSubtotal,
+          discountAmount: 0,
+          finalAmount: bookingSubtotal,
+          couponCode: null,
+        });
+        return;
+      }
+
+      setCouponFeedback({
+        type: res.data.valid ? 'success' : 'error',
+        message: res.data.message,
+      });
+
+      if (res.data.valid) {
+        const appliedCode = res.data?.coupon?.code || normalizedCouponCode;
+        setCouponInput(appliedCode);
+        setPricingSummary({
+          subtotal: Number(res.data.subtotal || 0),
+          discountAmount: Number(res.data.discountAmount || 0),
+          finalAmount: Number(res.data.finalAmount || 0),
+          couponCode: appliedCode,
+        });
+      } else {
+        setPricingSummary({
+          subtotal: Number(res.data.subtotal || bookingSubtotal),
+          discountAmount: 0,
+          finalAmount: Number(res.data.finalAmount || bookingSubtotal),
+          couponCode: null,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      if (err.response?.status === 401) {
+        setUser?.(null);
+        if (window.Swal) {
+          window.Swal.fire('Phiên đăng nhập đã hết', 'Vui lòng đăng nhập lại để tiếp tục đặt phòng.', 'warning')
+            .then(() => navigate('/login', { state: { from: location } }));
+        } else {
+          alert('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
+          navigate('/login', { state: { from: location } });
+        }
+        return;
+      }
+
+      setCouponFeedback({
+        type: 'error',
+        message: err.response?.data?.message || 'Không thể kiểm tra mã giảm giá lúc này.',
+      });
+      setPricingSummary({
+        subtotal: bookingSubtotal,
+        discountAmount: 0,
+        finalAmount: bookingSubtotal,
+        couponCode: null,
+      });
+    } finally {
+      setApplyingCoupon(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -173,9 +381,9 @@ export default function BookingConfirmation() {
       if (!result?.success) return;
 
       if (window.Swal) {
-        window.Swal.fire('Thành công', result.message || 'Đã lưu yêu cầu đặt phòng!', 'success').then(() => navigate('/history'));
+        window.Swal.fire('Thành công', result.message || 'Đã tạo booking giữ chỗ!', 'success').then(() => navigate('/history'));
       } else {
-        alert(result.message || 'Đặt phòng thành công!');
+        alert(result.message || 'Đã tạo booking giữ chỗ!');
         navigate('/history');
       }
     } finally {
@@ -184,12 +392,21 @@ export default function BookingConfirmation() {
   };
 
   const handleVNPaySubmit = async () => {
+    const paymentWindow = openVNPayTabPlaceholder();
     setPreparingVNPay(true);
     try {
       const result = await createBooking('vnpay_demo');
-      if (!result?.success) return;
+      if (!result?.success) {
+        if (paymentWindow && !paymentWindow.closed) {
+          paymentWindow.close();
+        }
+        return;
+      }
 
       if (!result.bookingId) {
+        if (paymentWindow && !paymentWindow.closed) {
+          paymentWindow.close();
+        }
         if (window.Swal) {
           window.Swal.fire('Thiếu dữ liệu', 'Đơn đã được tạo nhưng chưa lấy được mã booking để mở VNPay. Bạn có thể vào lịch sử để thanh toán lại.', 'warning')
             .then(() => navigate('/history'));
@@ -200,7 +417,16 @@ export default function BookingConfirmation() {
         return;
       }
 
-      navigate(`/vnpay-launch?bookingId=${result.bookingId}`);
+      const vnPayOpened = redirectOpenedVNPayTab(paymentWindow, result.bookingId);
+      navigate(`/booking/${result.bookingId}`);
+
+      if (!vnPayOpened && window.Swal) {
+        window.Swal.fire({
+          icon: 'warning',
+          title: 'Trình duyệt đang chặn tab VNPay',
+          text: 'Booking đã được tạo. Bạn có thể bấm "Mở lại VNPay Demo" trong trang chi tiết đơn để tiếp tục.',
+        });
+      }
     } finally {
       setPreparingVNPay(false);
     }
@@ -423,11 +649,21 @@ export default function BookingConfirmation() {
                 <>
                   <div className="flex justify-between text-sm">
                     <span className="text-on-surface-variant">Giá phòng ({booking.pricePerNight.toLocaleString('vi-VN')}đ × {nights} đêm)</span>
-                    <span className="font-medium">{(booking.pricePerNight * nights).toLocaleString('vi-VN')}đ</span>
+                    <span className="font-medium">{pricingSummary.subtotal.toLocaleString('vi-VN')}đ</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-on-surface-variant">Thuế & phí dịch vụ</span>
                     <span className="font-medium">0đ</span>
+                  </div>
+                  <div className={`flex justify-between text-sm ${pricingSummary.discountAmount > 0 ? 'text-emerald-700' : 'text-on-surface-variant'}`}>
+                    <span>
+                      Giảm giá {pricingSummary.couponCode ? `(${pricingSummary.couponCode})` : ''}
+                    </span>
+                    <span className="font-medium">
+                      {pricingSummary.discountAmount > 0
+                        ? `-${pricingSummary.discountAmount.toLocaleString('vi-VN')}đ`
+                        : '0đ'}
+                    </span>
                   </div>
                 </>
               ) : (
@@ -435,11 +671,55 @@ export default function BookingConfirmation() {
               )}
             </div>
 
+            <div className="space-y-3 mb-6 border-t border-outline-variant/20 pt-6">
+              <h4 className="font-label uppercase tracking-widest text-[10px] text-secondary">Mã giảm giá</h4>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={couponInput}
+                  onChange={(e) => {
+                    const nextValue = e.target.value.toUpperCase();
+                    setCouponInput(nextValue);
+                    setCouponFeedback(null);
+                    if (pricingSummary.couponCode && nextValue.trim() !== pricingSummary.couponCode) {
+                      setPricingSummary({
+                        subtotal: bookingSubtotal,
+                        discountAmount: 0,
+                        finalAmount: bookingSubtotal,
+                        couponCode: null,
+                      });
+                    }
+                  }}
+                  placeholder="VD: WELCOME50"
+                  className="min-w-0 flex-1 border border-outline-variant/40 bg-white/80 px-3 py-3 text-sm text-on-surface focus:border-secondary focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleApplyCoupon}
+                  disabled={nights <= 0 || !couponInput.trim() || applyingCoupon || submitting || preparingVNPay}
+                  className={`px-4 py-3 font-label uppercase tracking-widest text-[10px] transition-all ${(nights > 0 && couponInput.trim() && !applyingCoupon && !submitting && !preparingVNPay) ? 'bg-secondary text-slate-950 hover:brightness-105' : 'bg-surface-variant text-on-surface-variant cursor-not-allowed opacity-70'}`}
+                >
+                  {applyingCoupon ? 'ĐANG KIỂM TRA...' : 'ÁP DỤNG'}
+                </button>
+              </div>
+              {couponFeedback && (
+                <div className={`border px-3 py-3 text-xs ${couponFeedback.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`}>
+                  {couponFeedback.message}
+                </div>
+              )}
+              {pricingSummary.couponCode && (
+                <p className="text-[11px] text-on-surface-variant">
+                  Đang áp dụng mã <span className="font-semibold text-on-surface">{pricingSummary.couponCode}</span>.
+                  Nếu muốn bỏ mã, chỉ cần xóa hoặc đổi nội dung trong ô nhập rồi áp dụng lại.
+                </p>
+              )}
+            </div>
+
             {/* Total */}
             <div className="flex justify-between items-end font-headline text-xl lg:text-2xl pt-6 border-t border-outline-variant/20 mb-8">
-              <span>Tổng cộng</span>
+              <span>Tổng thanh toán</span>
               <span className="text-secondary tracking-tight">
-                {nights > 0 ? (booking.pricePerNight * nights).toLocaleString('vi-VN') + 'đ' : '0đ'}
+                {nights > 0 ? pricingSummary.finalAmount.toLocaleString('vi-VN') + 'đ' : '0đ'}
               </span>
             </div>
 
@@ -451,7 +731,7 @@ export default function BookingConfirmation() {
                 disabled={nights <= 0 || submitting || preparingVNPay}
                 className={`w-full font-label uppercase tracking-widest text-xs py-5 transition-all shadow-xl active:scale-95 ${(nights > 0 && !submitting && !preparingVNPay) ? 'bg-primary text-on-primary hover:bg-primary-container shadow-primary/10' : 'bg-surface-variant text-on-surface-variant cursor-not-allowed opacity-70'}`}
               >
-                {submitting ? 'ĐANG XỬ LÝ...' : 'GỬI YÊU CẦU ĐẶT PHÒNG'}
+                {submitting ? 'ĐANG XỬ LÝ...' : 'XÁC NHẬN GIỮ CHỖ'}
               </button>
               <button
                 type="button"
@@ -459,12 +739,12 @@ export default function BookingConfirmation() {
                 disabled={nights <= 0 || submitting || preparingVNPay}
                 className={`w-full font-label uppercase tracking-widest text-xs py-5 transition-all border active:scale-95 ${(nights > 0 && !submitting && !preparingVNPay) ? 'border-emerald-500 text-emerald-600 hover:bg-emerald-500/10' : 'border-outline-variant/30 text-on-surface-variant cursor-not-allowed opacity-70'}`}
               >
-                {preparingVNPay ? 'ĐANG MỞ VNPAY...' : 'MỞ VNPAY DEMO'}
+                {preparingVNPay ? 'ĐANG MỞ VNPAY...' : 'MỞ VNPAY DEMO (TAB MỚI)'}
               </button>
             </div>
             <p className="text-center mt-4">
               <span className="font-body text-[10px] text-on-surface-variant">
-                Gửi yêu cầu đặt phòng hoặc mở VNPay demo đều tạo booking giữ chỗ tối đa 3 phút. Nếu chưa xử lý tiếp trong thời gian này, booking sẽ tự hết hiệu lực.
+                Khi mở VNPay demo, hệ thống sẽ tạo booking giữ chỗ tối đa 3 phút, mở cổng thanh toán ở tab mới và tự đưa tab hiện tại sang trang chi tiết booking để bạn theo dõi trạng thái.
               </span>
             </p>
 

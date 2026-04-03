@@ -2,11 +2,14 @@ package com.hotel.controller.api;
 
 import com.hotel.entity.Item;
 import com.hotel.repository.ItemRepository;
+import com.hotel.repository.RoomTypeItemRepository;
+import com.hotel.service.FileUploadService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -19,6 +22,12 @@ public class ItemApiController {
 
     @Autowired
     private ItemRepository itemRepository;
+
+    @Autowired
+    private RoomTypeItemRepository roomTypeItemRepository;
+
+    @Autowired
+    private FileUploadService fileUploadService;
 
     @GetMapping("/all")
     public java.util.List<Item> getAllItems() {
@@ -63,16 +72,34 @@ public class ItemApiController {
     }
 
     @DeleteMapping("/{id}")
+    @Transactional
     public ResponseEntity<Map<String, Object>> deleteItem(@PathVariable("id") Integer id) {
         Map<String, Object> response = new HashMap<>();
+        Item item = itemRepository.findById(id).orElse(null);
+        if (item == null) {
+            response.put("success", false);
+            response.put("message", "Tiện ích không tồn tại.");
+            return ResponseEntity.status(404).body(response);
+        }
+
+        String image = item.getImage();
+        boolean shouldDeleteImage = image != null && !image.isBlank() && itemRepository.countByImage(image) <= 1;
+
         try {
-            itemRepository.deleteById(id);
+            roomTypeItemRepository.deleteByItemId(id);
+            itemRepository.delete(item);
+            itemRepository.flush();
+
+            if (shouldDeleteImage) {
+                fileUploadService.deleteUploadedFile(image);
+            }
+
             response.put("success", true);
-            response.put("message", "Xóa thành công");
+            response.put("message", "Đã xóa tiện ích và dọn dữ liệu liên quan.");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);
-            response.put("message", "Không thể xóa tiện ích do ràng buộc khóa ngoại đang dính ở các Phòng");
+            response.put("message", "Không thể xóa tiện ích do vẫn còn ràng buộc dữ liệu.");
             return ResponseEntity.badRequest().body(response);
         }
     }

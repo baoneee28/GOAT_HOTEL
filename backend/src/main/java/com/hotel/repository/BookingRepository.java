@@ -33,6 +33,14 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT b FROM Booking b WHERE b.user.id = :userId AND b.status = :status ORDER BY b.id DESC")
     List<Booking> findAllByUserIdAndStatus(@Param("userId") Integer userId, @Param("status") String status);
 
+    @Query("SELECT DISTINCT b FROM Booking b " +
+           "LEFT JOIN FETCH b.details bd " +
+           "LEFT JOIN FETCH bd.room r " +
+           "LEFT JOIN FETCH r.roomType rt " +
+           "WHERE b.user.id = :userId " +
+           "ORDER BY b.id DESC")
+    List<Booking> findAllHistoryByUserId(@Param("userId") Integer userId);
+
     @Query("SELECT b FROM Booking b WHERE b.user.id = :userId AND b.paymentStatus = :paymentStatus ORDER BY b.id DESC")
     List<Booking> findAllByUserIdAndPaymentStatus(@Param("userId") Integer userId, @Param("paymentStatus") String paymentStatus);
 
@@ -43,12 +51,12 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
 
 
-    @Query("SELECT SUM(b.totalPrice) FROM Booking b WHERE b.user.id = :userId AND b.status = 'completed'")
+    @Query("SELECT SUM(COALESCE(b.finalAmount, b.totalPrice)) FROM Booking b WHERE b.user.id = :userId AND b.status = 'completed'")
     Double sumTotalPriceByUserIdAndCompleted(@Param("userId") Integer userId);
 
 
 
-    @Query("SELECT SUM(b.totalPrice) FROM Booking b WHERE b.status = 'completed'")
+    @Query("SELECT SUM(COALESCE(b.finalAmount, b.totalPrice)) FROM Booking b WHERE b.status = 'completed'")
     Double sumTotalRevenue();
 
     List<Booking> findByStatusAndExpiresAtLessThanEqual(String status, LocalDateTime expiresAt);
@@ -80,6 +88,18 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT COUNT(b) FROM Booking b " +
            "WHERE (:status IS NULL OR :status = '' OR b.status = :status)")
     long countAdminBookings(@Param("status") String status);
+
+    @Query("SELECT COUNT(b) FROM Booking b " +
+           "WHERE b.couponCode IS NOT NULL AND UPPER(b.couponCode) = UPPER(:couponCode) " +
+           "AND (" +
+           "LOWER(b.status) IN ('confirmed', 'completed') " +
+           "OR (LOWER(b.status) = 'pending' AND (b.expiresAt IS NULL OR b.expiresAt > CURRENT_TIMESTAMP))" +
+           ")")
+    long countActiveCouponUsages(@Param("couponCode") String couponCode);
+
+    @Query("SELECT COUNT(b) FROM Booking b " +
+           "WHERE b.couponCode IS NOT NULL AND UPPER(b.couponCode) = UPPER(:couponCode)")
+    long countAllCouponUsages(@Param("couponCode") String couponCode);
 
     @Query("SELECT COUNT(b) FROM BookingDetail bd JOIN bd.booking b " +
            "WHERE bd.room.id = :roomId AND (b.status = 'confirmed' OR (b.status = 'pending' AND b.expiresAt > :now)) " +

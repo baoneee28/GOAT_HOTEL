@@ -1,14 +1,7 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import API_BASE, { uploadedImageUrl, iconUrl, resolveRoomTypeSpec } from '../../config';
-
-const buildSpecs = (roomType) => ([
-  { icon: 'square_foot', label: 'Kích thước', value: resolveRoomTypeSpec(roomType.typeName, 'size', roomType.size) },
-  { icon: 'group', label: 'Khách', value: `Tối đa ${roomType.capacity || 0} người` },
-  { icon: 'bed', label: 'Giường', value: resolveRoomTypeSpec(roomType.typeName, 'beds', roomType.beds) },
-  { icon: 'visibility', label: 'Hướng nhìn', value: resolveRoomTypeSpec(roomType.typeName, 'view', roomType.view) },
-]);
+import API_BASE, { iconUrl, uploadedImageUrl } from '../../config';
 
 export default function RoomTypes() {
   const [data, setData] = useState({ roomTypes: [], totalPages: 1 });
@@ -18,20 +11,43 @@ export default function RoomTypes() {
   const [itemSearch, setItemSearch] = useState('');
 
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({ id: '', typeName: '', pricePerNight: '', capacity: '', size: '', beds: '', view: '', description: '', currentImage: '', itemsIds: [] });
+  const [formData, setFormData] = useState({ id: '', typeName: '', pricePerNight: '', capacity: '', description: '', currentImage: '', itemsIds: [] });
   const fileInputRef = useRef(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/api/room-types/admin?q=${q}&page=${page}`, { withCredentials: true });
-      setData(res.data);
-    } catch (err) { console.error(err); }
-  }, [q, page]);
+      const [roomTypesRes, itemsRes] = await Promise.all([
+        axios.get(`${API_BASE}/api/room-types/admin?q=${q}&page=${page}`, { withCredentials: true }),
+        axios.get(`${API_BASE}/api/admin/items/all`, { withCredentials: true }),
+      ]);
+      setData(roomTypesRes.data);
+      setAllItems(itemsRes.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-  useEffect(() => { 
-      fetchData(); 
-      axios.get(`${API_BASE}/api/admin/items/all`, { withCredentials: true }).then(r => setAllItems(r.data));
-  }, [fetchData]);
+  useEffect(() => {
+    let isActive = true;
+
+    const loadData = async () => {
+      try {
+        const [roomTypesRes, itemsRes] = await Promise.all([
+          axios.get(`${API_BASE}/api/room-types/admin?q=${q}&page=${page}`, { withCredentials: true }),
+          axios.get(`${API_BASE}/api/admin/items/all`, { withCredentials: true }),
+        ]);
+
+        if (!isActive) return;
+        setData(roomTypesRes.data);
+        setAllItems(itemsRes.data);
+      } catch (err) {
+        if (isActive) console.error(err);
+      }
+    };
+
+    void loadData();
+    return () => { isActive = false; };
+  }, [page, q]);
 
   const handleDelete = (id) => {
     if (window.Swal) window.Swal.fire({
@@ -47,31 +63,20 @@ export default function RoomTypes() {
           } else {
             window.Swal.fire({ icon: 'error', title: 'Lỗi', text: res.data.message });
           }
-        } catch (err) { window.Swal.fire({ icon: 'error', title: 'Lỗi', text: 'Có lỗi xảy ra' }); }
+        } catch { window.Swal.fire({ icon: 'error', title: 'Lỗi', text: 'Có lỗi xảy ra' }); }
       }
     });
   };
 
   const handleEdit = (t) => {
     const existingIds = t.items ? t.items.map(i => i.item?.id).filter(id => id) : [];
-    setFormData({
-      id: t.id,
-      typeName: t.typeName,
-      pricePerNight: t.pricePerNight,
-      capacity: t.capacity,
-      size: resolveRoomTypeSpec(t.typeName, 'size', t.size, ''),
-      beds: resolveRoomTypeSpec(t.typeName, 'beds', t.beds, ''),
-      view: resolveRoomTypeSpec(t.typeName, 'view', t.view, ''),
-      description: t.description || '',
-      currentImage: t.image || '',
-      itemsIds: existingIds
-    });
+    setFormData({ id: t.id, typeName: t.typeName, pricePerNight: t.pricePerNight, capacity: t.capacity, description: t.description || '', currentImage: t.image || '', itemsIds: existingIds });
     if(fileInputRef.current) fileInputRef.current.value = null;
     setShowModal(true);
   };
 
   const handleAddNew = () => {
-    setFormData({ id: '', typeName: '', pricePerNight: '', capacity: '', size: '', beds: '', view: '', description: '', currentImage: '', itemsIds: [] });
+    setFormData({ id: '', typeName: '', pricePerNight: '', capacity: '', description: '', currentImage: '', itemsIds: [] });
     if(fileInputRef.current) fileInputRef.current.value = null;
     setShowModal(true);
   };
@@ -85,7 +90,7 @@ export default function RoomTypes() {
           const file = fileInputRef.current.files[0];
           const uploadData = new FormData();
           uploadData.append('file', file);
-          uploadData.append('type', 'general');
+          uploadData.append('type', 'room_types');
 
           const uploadRes = await axios.post(`${API_BASE}/api/upload`, uploadData, {
               headers: { 'Content-Type': 'multipart/form-data' },
@@ -101,9 +106,6 @@ export default function RoomTypes() {
           typeName: formData.typeName,
           pricePerNight: parseFloat(formData.pricePerNight),
           capacity: parseInt(formData.capacity),
-          size: formData.size,
-          beds: formData.beds,
-          view: formData.view,
           description: formData.description,
           image: finalImageName,
           itemsIds: formData.itemsIds.join(',')
@@ -115,7 +117,7 @@ export default function RoomTypes() {
           setShowModal(false);
           fetchData();
       }
-    } catch (err) { console.error(err); window.Swal.fire({ icon: 'error', title: 'Lỗi', text: err.response?.data?.message || 'Có lỗi xảy ra' }); }
+    } catch (err) { console.error(err); window.Swal.fire({ icon: 'error', title: 'Lỗi', text: 'Có lỗi xảy ra' }); }
   };
 
   const toggleItem = (itemId) => {
@@ -149,42 +151,31 @@ export default function RoomTypes() {
           </div>
 
           <div className="table-responsive">
-              <table className="table roomtype-admin-table mb-0">
+              <table className="table mb-0">
                   <thead>
                       <tr>
-                          <th className="roomtype-col-image">Ảnh</th>
-                          <th className="roomtype-col-name">Tên loại (Tiện ích)</th>
-                          <th className="roomtype-col-price">Giá/đêm</th>
-                          <th className="roomtype-col-specs">Specs</th>
-                          <th className="roomtype-col-description">Mô tả</th>
-                          <th className="roomtype-col-actions text-end">Hành động</th>
+                          <th>Ảnh</th>
+                          <th>Tên loại (Tiện ích)</th>
+                          <th>Giá/h</th>
+                          <th>Sức chứa</th>
+                          <th>Mô tả</th>
+                          <th className="text-end">Hành động</th>
                       </tr>
                   </thead>
                   <tbody>
                       {data.roomTypes?.length > 0 ? data.roomTypes.map(t => (
                           <tr key={t.id}>
-                              <td className="roomtype-col-image">
-                                  <img src={uploadedImageUrl(t.image, '/images/rooms/standard-room.jpg')} className="type-img" alt={t.typeName} />
+                              <td>
+                                  <img src={uploadedImageUrl(t.image, '/images/rooms/standard-room.jpg')} className="type-img" alt={t.typeName || 'Loại phòng'} />
                               </td>
-                              <td className="roomtype-col-name">
+                              <td>
                                   <div className="fw-bold">{t.typeName}</div>
                                   <small className="text-muted d-block mt-1">{(t.items && t.items.length) || 0} tiện ích</small>
                               </td>
-                              <td className="roomtype-col-price text-primary fw-bold">{t.pricePerNight.toLocaleString('vi-VN')}đ</td>
-                              <td className="roomtype-col-specs">
-                                  <div className="roomtype-specs-wrap">
-                                      {buildSpecs(t).map((spec) => (
-                                          <div key={spec.label} className="roomtype-spec-row">
-                                              <span className="roomtype-spec-inline-label">{spec.label}:</span>
-                                              <span className="roomtype-spec-inline-value">{spec.value}</span>
-                                          </div>
-                                      ))}
-                                  </div>
-                              </td>
-                              <td className="roomtype-col-description">
-                                  <div className="roomtype-desc" title={t.description || ''}>{t.description}</div>
-                              </td>
-                              <td className="roomtype-col-actions text-end">
+                              <td className="text-primary fw-bold">{Number(t.pricePerNight || 0).toLocaleString('vi-VN')}đ</td>
+                              <td>{t.capacity} người</td>
+                              <td className="text-muted small" style={{ maxWidth: '250px' }}>{t.description}</td>
+                              <td className="text-end">
                                   <button className="btn-action btn-edit me-1" onClick={() => handleEdit(t)}>✎</button>
                                   <button className="btn-action btn-delete" onClick={() => handleDelete(t.id)}>🗑</button>
                               </td>
@@ -234,48 +225,11 @@ export default function RoomTypes() {
                                   </div>
                               </div>
                               <div className="row">
-                                  <div className="col-md-4 mb-3">
-                                      <label className="form-label fw-bold">Kích thước</label>
-                                      <input type="text" className="form-control rounded-3" value={formData.size} onChange={e => setFormData({...formData, size: e.target.value})} placeholder="VD: 32m²" />
-                                  </div>
-                                  <div className="col-md-4 mb-3">
-                                      <label className="form-label fw-bold">Giường</label>
-                                      <input type="text" className="form-control rounded-3" value={formData.beds} onChange={e => setFormData({...formData, beds: e.target.value})} placeholder="VD: 1 giường đôi" />
-                                  </div>
-                                  <div className="col-md-4 mb-3">
-                                      <label className="form-label fw-bold">Hướng nhìn</label>
-                                      <input type="text" className="form-control rounded-3" value={formData.view} onChange={e => setFormData({...formData, view: e.target.value})} placeholder="VD: Hướng biển" />
-                                  </div>
-                              </div>
-                              <div className="mb-3">
-                                  <div className="border rounded-4 p-3 bg-light-subtle">
-                                      <div className="fw-bold small text-uppercase text-muted mb-3">Preview specs bên user</div>
-                                      <div className="row g-2">
-                                          {buildSpecs({
-                                              typeName: formData.typeName,
-                                              size: formData.size,
-                                              capacity: formData.capacity,
-                                              beds: formData.beds,
-                                              view: formData.view,
-                                          }).map((spec) => (
-                                              <div key={spec.label} className="col-md-6">
-                                                  <div className="border rounded-3 px-3 py-3 h-100 bg-white">
-                                                      <div className="d-flex align-items-center gap-2 text-muted small mb-1">
-                                                          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>{spec.icon}</span>
-                                                          <span className="fw-semibold">{spec.label}</span>
-                                                      </div>
-                                                      <div className="fw-bold">{spec.value}</div>
-                                                  </div>
-                                              </div>
-                                          ))}
-                                      </div>
-                                  </div>
-                              </div>
-                              <div className="row">
                                   <div className="col-md-6 mb-3">
                                       <label className="form-label fw-bold">Ảnh đại diện</label>
                                       <input type="file" ref={fileInputRef} className="form-control rounded-3" accept="image/*" />
                                       {formData.currentImage && <small className="text-muted d-block mt-1">Hiện tại: {formData.currentImage}</small>}
+                                      <small className="text-muted d-block mt-1">Ảnh tải lên sẽ được lưu trong `backend/static/uploads/room_types`.</small>
                                   </div>
                                   <div className="col-md-6 mb-3">
                                       <label className="form-label fw-bold">Mô tả ngắn</label>

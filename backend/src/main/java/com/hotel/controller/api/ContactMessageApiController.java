@@ -48,15 +48,25 @@ public class ContactMessageApiController {
             @RequestParam(defaultValue = "") String q,
             @RequestParam(defaultValue = "") String status,
             @RequestParam(defaultValue = "1") int page) {
-        Page<ContactMessage> messagePage = contactMessageService.getAdminMessages(q, status, page, 8);
+        Page<ContactMessage> messagePage;
+        try {
+            messagePage = contactMessageService.getAdminMessages(q, status, page, 8);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", ex.getMessage()
+            ));
+        }
 
         Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
         response.put("messages", messagePage.getContent());
         response.put("totalPages", messagePage.getTotalPages());
-        response.put("currentPage", page);
+        response.put("currentPage", messagePage.getNumber() + 1);
         response.put("search", q);
         response.put("status", status);
         response.put("newCount", contactMessageService.countNewMessages());
+        response.put("statusSummary", contactMessageService.countByAdminStatuses());
         return ResponseEntity.ok(response);
     }
 
@@ -86,17 +96,23 @@ public class ContactMessageApiController {
             ));
         }
 
-        ContactMessage updated = contactMessageService.updateMessage(
-                messageOpt.get(),
-                payload.get("status"),
-                payload.get("adminNote")
-        );
-
-        return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "Đã cập nhật trạng thái liên hệ.",
-                "messageItem", updated
-        ));
+        try {
+            ContactMessage updated = contactMessageService.updateMessage(
+                    messageOpt.get(),
+                    payload.get("status"),
+                    payload.get("adminNote")
+            );
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Đã cập nhật trạng thái liên hệ.",
+                    "messageItem", updated
+            ));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", ex.getMessage()
+            ));
+        }
     }
 
     @DeleteMapping("/admin/contact-messages/{id}")

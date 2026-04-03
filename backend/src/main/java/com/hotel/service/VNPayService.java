@@ -2,9 +2,7 @@ package com.hotel.service;
 
 import com.hotel.config.VNPayConfig;
 import com.hotel.entity.Booking;
-import com.hotel.entity.Payment;
 import com.hotel.repository.BookingRepository;
-import com.hotel.repository.PaymentRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,10 +47,10 @@ public class VNPayService {
     private BookingRepository bookingRepository;
 
     @Autowired
-    private PaymentRepository paymentRepository;
+    private BookingService bookingService;
 
     @Autowired
-    private BookingService bookingService;
+    private PaymentService paymentService;
 
     public String createPaymentUrl(Integer bookingId, Integer currentUserId, HttpServletRequest request) throws Exception {
         validateConfiguration();
@@ -81,7 +79,7 @@ public class VNPayService {
         if ("paid".equalsIgnoreCase(booking.getPaymentStatus())) {
             throw new IllegalArgumentException("Booking này đã được đánh dấu đã thanh toán.");
         }
-        double bookingTotal = booking.getTotalPrice() != null ? booking.getTotalPrice() : 0.0;
+        double bookingTotal = paymentService.resolvePayableAmount(booking);
         if (bookingTotal <= 0) {
             throw new IllegalArgumentException("Đơn đặt phòng chưa có số tiền hợp lệ để thanh toán.");
         }
@@ -148,7 +146,7 @@ public class VNPayService {
     public String buildFrontendReturnUrl(Map<String, String> queryParams) {
         VNPayValidationResult validation = validateCallback(queryParams);
         if (validation.success() && validation.booking() != null) {
-            confirmBookingPayment(validation.booking(), "VNPay");
+            paymentService.confirmBookingPayment(validation.booking(), "VNPay", true);
         }
 
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(vnpFrontendReturnUrl.trim())
@@ -177,7 +175,7 @@ public class VNPayService {
         }
 
         if (validation.paymentSuccess()) {
-            confirmBookingPayment(validation.booking(), "VNPay");
+            paymentService.confirmBookingPayment(validation.booking(), "VNPay", true);
             return createIpnResponse("00", "Confirm Success");
         }
 
@@ -236,7 +234,10 @@ public class VNPayService {
         if ("cancelled".equalsIgnoreCase(booking.getStatus())) {
             return new VNPayValidationResult(true, false, true, bookingId, booking, "Booking đã bị hủy nên không thể xác nhận thanh toán.");
         }
-        long expectedAmount = Math.round((booking.getTotalPrice() != null ? booking.getTotalPrice() : 0.0) * 100L);
+        if (!"pending".equalsIgnoreCase(booking.getStatus())) {
+            return new VNPayValidationResult(true, false, true, bookingId, booking, "Chỉ có thể xác nhận thanh toán VNPay cho booking đang chờ xử lý.");
+        }
+        long expectedAmount = Math.round(paymentService.resolvePayableAmount(booking) * 100L);
         boolean amountValid = String.valueOf(expectedAmount).equals(fields.get("vnp_Amount"));
         if (!amountValid) {
             return new VNPayValidationResult(true, false, false, bookingId, booking, "Số tiền VNPay trả về không khớp với booking.");
@@ -300,43 +301,12 @@ public class VNPayService {
         if ("cancelled".equalsIgnoreCase(booking.getStatus())) {
             throw new IllegalArgumentException("Booking đã bị hủy nên không thể mô phỏng thanh toán.");
         }
-        if (!"pending".equalsIgnoreCase(booking.getStatus()) && !"confirmed".equalsIgnoreCase(booking.getStatus())) {
-            throw new IllegalArgumentException("Chỉ có thể mô phỏng thanh toán cho booking đang chờ hoặc đã xác nhận.");
+        if (!"pending".equalsIgnoreCase(booking.getStatus())) {
+            throw new IllegalArgumentException("Chỉ có thể mô phỏng thanh toán cho booking đang chờ xử lý.");
         }
 
-        confirmBookingPayment(booking, "VNPay Demo");
+        paymentService.confirmBookingPayment(booking, "VNPay Demo", true);
         return booking;
-    }
-
-    private void confirmBookingPayment(Booking booking, String paymentMethod) {
-        if (booking == null
-                || "cancelled".equalsIgnoreCase(booking.getStatus())
-                || "expired".equalsIgnoreCase(booking.getStatus())) {
-            return;
-        }
-
-        boolean changed = false;
-        if ("pending".equalsIgnoreCase(booking.getStatus())) {
-            booking.setStatus("confirmed");
-            changed = true;
-        }
-        if (!"paid".equalsIgnoreCase(booking.getPaymentStatus())) {
-            booking.setPaymentStatus("paid");
-            changed = true;
-        }
-        if (changed) {
-            bookingRepository.save(booking);
-        }
-
-        if (!paymentRepository.existsByBooking_Id(booking.getId())) {
-            Payment payment = new Payment();
-            payment.setBooking(booking);
-            payment.setAmount(booking.getTotalPrice());
-            payment.setPaymentMethod(paymentMethod);
-            payment.setPaymentDate(java.time.LocalDateTime.now());
-            payment.setStatus("paid");
-            paymentRepository.save(payment);
-        }
     }
 
     private record VNPayValidationResult(

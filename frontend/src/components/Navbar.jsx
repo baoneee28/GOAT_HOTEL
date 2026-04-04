@@ -9,8 +9,6 @@ const NAV_LINKS = [
   { to: '/contact', label: 'LIÊN HỆ' },
 ];
 
-let lastNavbarActivePath = null;
-
 function matchesNavPath(currentPath, linkPath) {
   if (linkPath === '/') {
     return currentPath === '/';
@@ -73,6 +71,8 @@ export default function Navbar({ user, onLogout, variant }) {
 
   useLayoutEffect(() => {
     const container = desktopNavRef.current;
+    if (!container) return undefined;
+
     const getIndicatorMetrics = (targetPath) => {
       if (!targetPath || !container) return null;
 
@@ -101,24 +101,28 @@ export default function Navbar({ user, onLogout, variant }) {
         return;
       }
 
-      const previousMetrics = getIndicatorMetrics(lastNavbarActivePath);
-      if (previousMetrics && lastNavbarActivePath !== activeNavPath) {
-        setNavIndicatorStyle(previousMetrics);
-        window.requestAnimationFrame(() => {
-          setNavIndicatorStyle(currentMetrics);
-        });
-      } else {
-        setNavIndicatorStyle(currentMetrics);
-      }
-
-      lastNavbarActivePath = activeNavPath;
+      setNavIndicatorStyle(currentMetrics);
     };
 
     updateNavIndicator();
+    const frameId = window.requestAnimationFrame(updateNavIndicator);
     window.addEventListener('resize', updateNavIndicator);
 
+    let resizeObserver;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateNavIndicator);
+      resizeObserver.observe(container);
+    }
+
+    const fontsReady = document.fonts?.ready;
+    fontsReady?.then(() => {
+      updateNavIndicator();
+    }).catch(() => {});
+
     return () => {
+      window.cancelAnimationFrame(frameId);
       window.removeEventListener('resize', updateNavIndicator);
+      resizeObserver?.disconnect();
     };
   }, [activeNavPath]);
 

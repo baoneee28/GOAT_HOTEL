@@ -397,7 +397,7 @@ export default function OrderDetail() {
 
     const normalizedPaymentMode = paymentMode === 'deposit' ? 'deposit' : 'full';
     const launchUrl = `${window.location.origin}/vnpay-launch?bookingId=${booking.id}&paymentMode=${normalizedPaymentMode}`;
-    const paymentWindow = window.open(launchUrl, '_blank', 'noopener,noreferrer');
+    const paymentWindow = window.open('', '_blank');
 
     if (!paymentWindow) {
       if (window.Swal) {
@@ -408,6 +408,14 @@ export default function OrderDetail() {
         });
       }
       return;
+    }
+
+    try {
+      paymentWindow.opener = null;
+      paymentWindow.location.href = launchUrl;
+      paymentWindow.focus?.();
+    } catch (error) {
+      window.location.assign(launchUrl);
     }
 
     setPendingVNPayMode(normalizedPaymentMode);

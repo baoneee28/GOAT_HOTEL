@@ -2,7 +2,13 @@ import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE from '../config';
-import { isAdminRole, normalizeSessionPayload, resolvePostLoginDestination } from './authUtils';
+import {
+  isAdminRole,
+  isBackofficeRole,
+  isStaffRole,
+  normalizeSessionPayload,
+  resolvePostLoginDestination,
+} from './authUtils';
 import { AuthContext } from './AuthContextValue';
 
 async function fetchSessionPayload() {
@@ -105,7 +111,9 @@ export function AuthProvider({ children }) {
 
   const setUser = React.useCallback((nextUser) => {
     const resolvedUser = typeof nextUser === 'function' ? nextUser(user) : nextUser;
-    const nextRole = resolvedUser ? (isAdminRole(resolvedUser.role) ? 'ADMIN' : 'USER') : null;
+    const nextRole = resolvedUser
+      ? (isAdminRole(resolvedUser.role) ? 'ADMIN' : (isStaffRole(resolvedUser.role) ? 'STAFF' : 'USER'))
+      : null;
     setUserState(resolvedUser || null);
     setRoleState(nextRole);
   }, [user]);
@@ -117,6 +125,8 @@ export function AuthProvider({ children }) {
     loading,
     isAuthenticated: Boolean(user),
     isAdmin: role === 'ADMIN' || isAdminRole(user?.role),
+    isStaff: role === 'STAFF' || isStaffRole(user?.role),
+    isBackoffice: role === 'ADMIN' || role === 'STAFF' || isBackofficeRole(user?.role),
     refreshAuth,
     login,
     logout,
@@ -126,9 +136,15 @@ export function AuthProvider({ children }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function ProtectedRoute({ adminOnly = false }) {
+export function ProtectedRoute({ adminOnly = false, backofficeOnly = false }) {
   const location = useLocation();
-  const { initialized, loading, isAuthenticated, isAdmin } = useAuthContext();
+  const {
+    initialized,
+    loading,
+    isAuthenticated,
+    isAdmin,
+    isBackoffice,
+  } = useAuthContext();
 
   if (!initialized || loading) {
     return <AuthLoadingScreen />;
@@ -138,8 +154,12 @@ export function ProtectedRoute({ adminOnly = false }) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (adminOnly && !isAdmin) {
+  if (backofficeOnly && !isBackoffice) {
     return <Navigate to="/" replace />;
+  }
+
+  if (adminOnly && !isAdmin) {
+    return <Navigate to="/admin" replace />;
   }
 
   return <Outlet />;

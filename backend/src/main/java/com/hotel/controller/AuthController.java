@@ -24,7 +24,7 @@ public class AuthController {
         // Đá thẳng về trang chủ (nếu là user) hoặc trang quản trị (nếu là admin)
         if (session.getAttribute("user") != null) {
             User user = (User) session.getAttribute("user");
-            return authService.isAdmin(user) ? "redirect:/admin" : "redirect:/";
+            return authService.isBackoffice(user) ? "redirect:/admin" : "redirect:/";
         }
         // Trả về file giao diện login.html
         return "login";
@@ -42,7 +42,7 @@ public class AuthController {
         
         if (user != null) {
             // Đăng nhập thành công, điều hướng dựa trên Role (Quyền)
-            if (authService.isAdmin(user)) {
+            if (authService.isBackoffice(user)) {
                 return "redirect:/admin";
             } else {
                 return "redirect:/";

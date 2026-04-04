@@ -77,6 +77,14 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
            "ORDER BY b.id DESC", countQuery = "SELECT COUNT(b) FROM Booking b WHERE (:status IS NULL OR :status = '' OR b.status = :status)")
     Page<Booking> findAdminBookings(@Param("status") String status, Pageable pageable);
 
+    @Query("SELECT DISTINCT b FROM Booking b JOIN FETCH b.user u " +
+           "LEFT JOIN FETCH b.details bd " +
+           "LEFT JOIN FETCH bd.room r " +
+           "LEFT JOIN FETCH r.roomType rt " +
+           "WHERE (:status IS NULL OR :status = '' OR b.status = :status) " +
+           "ORDER BY b.id DESC")
+    List<Booking> findAllAdminBookings(@Param("status") String status);
+
     @Query(value = "SELECT b FROM Booking b JOIN FETCH b.user u " +
            "WHERE b.user.id = :userId AND (:status IS NULL OR :status = '' OR b.status = :status) " +
            "ORDER BY b.id DESC",

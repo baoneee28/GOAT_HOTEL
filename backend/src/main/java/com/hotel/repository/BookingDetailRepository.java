@@ -33,4 +33,14 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, In
            "ORDER BY bd.room.id ASC, bd.checkIn ASC, b.id DESC")
     List<BookingDetail> findReservedBookingDetailsAfter(@Param("roomIds") List<Integer> roomIds,
                                                         @Param("atTime") LocalDateTime atTime);
+
+    @Query("SELECT COUNT(bd) FROM BookingDetail bd WHERE bd.checkInActual IS NOT NULL " +
+           "AND bd.checkInActual >= :startTime AND bd.checkInActual < :endTime")
+    long countCheckInsBetween(@Param("startTime") LocalDateTime startTime,
+                              @Param("endTime") LocalDateTime endTime);
+
+    @Query("SELECT COUNT(bd) FROM BookingDetail bd WHERE bd.checkOutActual IS NOT NULL " +
+           "AND bd.checkOutActual >= :startTime AND bd.checkOutActual < :endTime")
+    long countCheckOutsBetween(@Param("startTime") LocalDateTime startTime,
+                               @Param("endTime") LocalDateTime endTime);
 }

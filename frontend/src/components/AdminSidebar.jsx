@@ -1,26 +1,57 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 
-const ADMIN_MENU_ITEMS = [
-  { to: '/admin', label: 'Bảng điều khiển', icon: 'bi bi-grid-1x2-fill', end: true },
-  { to: '/admin/rooms', label: 'Quản lý phòng', icon: 'bi bi-door-open-fill' },
-  { to: '/admin/bookings', label: 'Đơn đặt phòng', icon: 'bi bi-calendar-check-fill' },
-  { to: '/admin/coupons', label: 'Mã giảm giá', icon: 'bi bi-ticket-perforated-fill' },
-  { to: '/admin/news', label: 'Tin tức & Sự kiện', icon: 'bi bi-newspaper' },
-  { to: '/admin/inbox', label: 'Inbox liên hệ', icon: 'bi bi-envelope-fill' },
-  { to: '/admin/room-types', label: 'Loại phòng', icon: 'bi bi-collection-fill' },
-  { to: '/admin/users', label: 'Người dùng', icon: 'bi bi-people-fill' },
-  { to: '/admin/items', label: 'Vật phẩm', icon: 'bi bi-box-seam-fill' },
+const SIDEBAR_GROUPS = [
+  {
+    key: 'operations',
+    label: 'Vận hành',
+    items: [
+      { to: '/admin', label: 'Bảng điều khiển', icon: 'bi bi-grid-1x2-fill', end: true, access: 'backoffice' },
+      { to: '/admin/rooms', label: 'Quản lý phòng', icon: 'bi bi-door-open-fill', access: 'backoffice' },
+      { to: '/admin/bookings', label: 'Đơn đặt phòng', icon: 'bi bi-calendar-check-fill', access: 'backoffice' },
+      { to: '/admin/inbox', label: 'Inbox liên hệ', icon: 'bi bi-envelope-fill', access: 'backoffice' },
+    ],
+  },
+  {
+    key: 'system',
+    label: 'Hệ thống',
+    items: [
+      { to: '/admin/coupons', label: 'Mã giảm giá', icon: 'bi bi-ticket-perforated-fill', access: 'admin' },
+      { to: '/admin/news', label: 'Tin tức & Sự kiện', icon: 'bi bi-newspaper', access: 'admin' },
+      { to: '/admin/room-types', label: 'Loại phòng', icon: 'bi bi-collection-fill', access: 'admin' },
+      { to: '/admin/items', label: 'Vật phẩm', icon: 'bi bi-box-seam-fill', access: 'admin' },
+      { to: '/admin/users', label: 'Người dùng', icon: 'bi bi-people-fill', access: 'admin' },
+    ],
+  },
 ];
+
+function canAccessItem(item, isAdmin) {
+  return item.access === 'backoffice' || isAdmin;
+}
 
 export default function AdminSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, isAdmin, isStaff } = useAuth();
   const [menuIndicatorStyle, setMenuIndicatorStyle] = useState({ top: 0, height: 0, opacity: 0 });
   const menuListRef = useRef(null);
   const menuItemRefs = useRef({});
+
+  const visibleGroups = useMemo(
+    () => SIDEBAR_GROUPS
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => canAccessItem(item, isAdmin)),
+      }))
+      .filter((group) => group.items.length > 0),
+    [isAdmin],
+  );
+
+  const visibleItems = useMemo(
+    () => visibleGroups.flatMap((group) => group.items),
+    [visibleGroups],
+  );
 
   const handleLogout = async () => {
     try {
@@ -41,7 +72,7 @@ export default function AdminSidebar() {
 
   useEffect(() => {
     const updateMenuIndicator = () => {
-      const activeItem = ADMIN_MENU_ITEMS.find((item) => isMenuItemActive(item));
+      const activeItem = visibleItems.find((item) => isMenuItemActive(item));
       const container = menuListRef.current;
       const activeNode = activeItem ? menuItemRefs.current[activeItem.to] : null;
 
@@ -67,7 +98,7 @@ export default function AdminSidebar() {
       window.cancelAnimationFrame(frameId);
       window.removeEventListener('resize', updateMenuIndicator);
     };
-  }, [location.pathname]);
+  }, [location.pathname, visibleItems]);
 
   return (
     <>
@@ -89,7 +120,6 @@ export default function AdminSidebar() {
         .sidebar::-webkit-scrollbar { width: 6px; }
         .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); border-radius: 999px; }
         .sidebar::-webkit-scrollbar-track { background: transparent; }
-        .logo-circle { width: 50px; height: 50px; background: var(--accent-color); border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; color: #fff; }
         .menu-list { position: relative; }
         .menu-indicator {
           position: absolute;
@@ -106,17 +136,35 @@ export default function AdminSidebar() {
         .menu-item i { margin-right: 15px; font-style: normal; font-size: 1.2rem; }
         .menu-item:hover { background: rgba(255,255,255,0.1); color: #fff; text-decoration: none; }
         .menu-item.active { background: transparent; color: #fff; box-shadow: none; text-decoration: none; }
+        .menu-group-label {
+          position: relative;
+          z-index: 1;
+          margin: 22px 0 12px;
+          padding: 0 8px;
+          font-size: 0.72rem;
+          font-weight: 700;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: rgba(255,255,255,0.42);
+        }
       `}</style>
-      
-      <div className="sidebar p-4 shadow-lg">
-          <div className="text-center mb-5">
-              <h5 className="fw-bold text-white mb-0" style={{ paddingBottom: '10px' }}>GOAT ADMIN</h5>
-              <small style={{ color: 'rgba(255,255,255,0.5)' }}>Hệ thống quản lý khách sạn</small>
-          </div>
 
-          <div className="menu-list" ref={menuListRef}>
-              <span className="menu-indicator" style={menuIndicatorStyle}></span>
-              {ADMIN_MENU_ITEMS.map((item) => (
+      <div className="sidebar p-4 shadow-lg">
+        <div className="text-center mb-5">
+          <h5 className="fw-bold text-white mb-0" style={{ paddingBottom: '10px' }}>
+            {isStaff && !isAdmin ? 'GOAT OPERATIONS' : 'GOAT ADMIN'}
+          </h5>
+          <small style={{ color: 'rgba(255,255,255,0.5)' }}>
+            {isStaff && !isAdmin ? 'Khu vận hành cho nhân viên' : 'Hệ thống quản lý khách sạn'}
+          </small>
+        </div>
+
+        <div className="menu-list" ref={menuListRef}>
+          <span className="menu-indicator" style={menuIndicatorStyle}></span>
+          {visibleGroups.map((group) => (
+            <div key={group.key}>
+              <div className="menu-group-label">{group.label}</div>
+              {group.items.map((item) => (
                 <NavLink
                   key={item.to}
                   end={item.end}
@@ -126,17 +174,20 @@ export default function AdminSidebar() {
                       menuItemRefs.current[item.to] = node;
                     }
                   }}
-                  className={({isActive}) => isActive ? "menu-item active" : "menu-item"}
+                  className={({ isActive }) => (isActive ? 'menu-item active' : 'menu-item')}
                 >
-                    <i className={item.icon}></i> <span>{item.label}</span>
+                  <i className={item.icon}></i> <span>{item.label}</span>
                 </NavLink>
               ))}
-              <div className="mt-5 pt-5 pb-3">
-                  <span onClick={handleLogout} style={{ cursor: 'pointer' }} className="menu-item text-danger">
-                      <i className="bi bi-box-arrow-right"></i> <span>Đăng xuất</span>
-                  </span>
-              </div>
+            </div>
+          ))}
+
+          <div className="mt-5 pt-4 pb-3">
+            <span onClick={handleLogout} style={{ cursor: 'pointer' }} className="menu-item text-danger">
+              <i className="bi bi-box-arrow-right"></i> <span>Đăng xuất</span>
+            </span>
           </div>
+        </div>
       </div>
     </>
   );

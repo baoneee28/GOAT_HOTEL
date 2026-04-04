@@ -8,6 +8,7 @@ import com.hotel.repository.BookingRepository;
 import com.hotel.repository.BookingDetailRepository;
 import com.hotel.repository.RoomRepository;
 import com.hotel.repository.UserRepository;
+import com.hotel.service.AuthService;
 import com.hotel.service.BookingService;
 import com.hotel.service.PaymentService;
 import jakarta.servlet.http.HttpSession;
@@ -46,6 +47,9 @@ public class BookingApiController {
 
     @Autowired
     private PaymentService paymentService;
+
+    @Autowired
+    private AuthService authService;
 
     private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
@@ -221,7 +225,9 @@ public class BookingApiController {
     public ResponseEntity<Map<String, Object>> listAdminBookings(
             @RequestParam(value = "status", defaultValue = "") String status,
             @RequestParam(value = "page", defaultValue = "1") int page,
-            @RequestParam(value = "bookingId", required = false) Integer bookingId) {
+            @RequestParam(value = "bookingId", required = false) Integer bookingId,
+            @RequestParam(value = "fromDateTime", required = false) String fromDateTime,
+            @RequestParam(value = "toDateTime", required = false) String toDateTime) {
         bookingService.expirePendingBookings();
 
         Map<String, Object> response = new HashMap<>();
@@ -236,6 +242,35 @@ public class BookingApiController {
             return ResponseEntity.ok(response);
         }
 
+        boolean hasDateFilter = fromDateTime != null && !fromDateTime.isBlank()
+                && toDateTime != null && !toDateTime.isBlank();
+        if (hasDateFilter) {
+            LocalDateTime from = parseDate(fromDateTime);
+            LocalDateTime to = parseDate(toDateTime);
+            if (!to.isAfter(from)) {
+                response.put("success", false);
+                response.put("message", "Khoang thoi gian loc booking khong hop le.");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            List<Booking> filteredBookings = bookingRepository.findAllAdminBookings(status.isBlank() ? null : status)
+                    .stream()
+                    .filter(booking -> overlapsBookingWindow(booking, from, to))
+                    .map(bookingService::normalizeBookingFinancials)
+                    .toList();
+
+            int safePageSize = 5;
+            int totalPages = Math.max(1, (int) Math.ceil((double) filteredBookings.size() / safePageSize));
+            int safePage = Math.min(Math.max(1, page), totalPages);
+            int fromIndex = Math.min((safePage - 1) * safePageSize, filteredBookings.size());
+            int toIndex = Math.min(fromIndex + safePageSize, filteredBookings.size());
+
+            response.put("bookings", filteredBookings.subList(fromIndex, toIndex));
+            response.put("totalPages", totalPages);
+            response.put("currentPage", safePage);
+            return ResponseEntity.ok(response);
+        }
+
         Page<Booking> bookingPage = bookingRepository.findAdminBookings(
                 status.isBlank() ? null : status,
                 PageRequest.of(page - 1, 5));
@@ -247,8 +282,15 @@ public class BookingApiController {
     }
 
     @PostMapping("/admin/bookings")
-    public ResponseEntity<Map<String, Object>> saveAdminBooking(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<Map<String, Object>> saveAdminBooking(@RequestBody Map<String, String> payload,
+                                                                HttpSession session) {
         Map<String, Object> response = new HashMap<>();
+        User currentUser = getSessionUser(session);
+        if (!authService.isAdmin(currentUser)) {
+            response.put("success", false);
+            response.put("message", "Nhan vien chi duoc xu ly van hanh booking, khong duoc tao hoac sua booking.");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
         try {
             String bookingIdStr = payload.get("id");
             Integer userId = Integer.parseInt(payload.get("userId"));
@@ -359,6 +401,21 @@ public class BookingApiController {
             response.put("message", e.getMessage());
             return ResponseEntity.badRequest().body(response);
         }
+    }
+
+    private boolean overlapsBookingWindow(Booking booking, LocalDateTime from, LocalDateTime to) {
+        if (booking == null || booking.getDetails() == null) {
+            return false;
+        }
+        for (BookingDetail detail : booking.getDetails()) {
+            if (detail == null || detail.getCheckIn() == null || detail.getCheckOut() == null) {
+                continue;
+            }
+            if (detail.getCheckIn().isBefore(to) && detail.getCheckOut().isAfter(from)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @PostMapping("/admin/bookings/{id}/checkout")

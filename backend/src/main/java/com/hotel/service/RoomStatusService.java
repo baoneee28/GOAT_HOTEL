@@ -103,6 +103,15 @@ public class RoomStatusService {
     }
 
     public Map<String, Object> buildAdminRoomPage(String search, String status, int page, int pageSize) {
+        return buildAdminRoomPage(search, status, page, pageSize, null, null);
+    }
+
+    public Map<String, Object> buildAdminRoomPage(String search,
+                                                  String status,
+                                                  int page,
+                                                  int pageSize,
+                                                  String availableFrom,
+                                                  String availableTo) {
         List<Room> rooms = (search == null || search.isBlank())
                 ? roomRepository.findAllByOrderByIdDesc()
                 : roomRepository.findByRoomNumberContainingOrderByIdDesc(search.trim());
@@ -111,9 +120,12 @@ public class RoomStatusService {
         applyRoomTypeItemCounts(rooms);
 
         String normalizedStatus = status == null ? "" : status.trim().toLowerCase();
+        Set<Integer> availableRoomIds = resolveAvailableRoomIdsForWindow(availableFrom, availableTo);
         List<Room> filteredRooms = rooms.stream()
                 .filter(room -> normalizedStatus.isBlank()
                         || normalizedStatus.equalsIgnoreCase(room.getEffectiveStatus()))
+                .filter(room -> availableRoomIds == null
+                        || (room.getId() != null && availableRoomIds.contains(room.getId())))
                 .toList();
 
         int safePageSize = Math.max(1, pageSize);
@@ -127,6 +139,37 @@ public class RoomStatusService {
         response.put("totalPages", totalPages);
         response.put("currentPage", safePage);
         return response;
+    }
+
+    private Set<Integer> resolveAvailableRoomIdsForWindow(String availableFrom, String availableTo) {
+        if (availableFrom == null || availableFrom.isBlank() || availableTo == null || availableTo.isBlank()) {
+            return null;
+        }
+
+        LocalDateTime start = parseDateTimeParam(availableFrom);
+        LocalDateTime end = parseDateTimeParam(availableTo);
+        if (!end.isAfter(start)) {
+            throw new IllegalArgumentException("Khoang thoi gian tim phong trong khong hop le.");
+        }
+
+        Set<Integer> availableRoomIds = new HashSet<>();
+        for (Room room : roomRepository.findAvailableRoomsForDate(start, end, LocalDateTime.now(), null)) {
+            if (room != null && room.getId() != null) {
+                availableRoomIds.add(room.getId());
+            }
+        }
+        return availableRoomIds;
+    }
+
+    private LocalDateTime parseDateTimeParam(String value) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.contains("T")) {
+            normalized = normalized.replace("T", " ");
+        }
+        if (normalized.length() == 10) {
+            normalized += " 12:00";
+        }
+        return LocalDateTime.parse(normalized, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
     }
 
     private void applyRoomTypeItemCounts(List<Room> rooms) {

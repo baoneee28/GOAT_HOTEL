@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import API_BASE from '../../config';
+import { useAuth } from '../../auth/useAuth';
 
 const ROOM_STATUS_META = {
   available: {
@@ -49,6 +50,7 @@ const createEmptyForm = () => ({
 });
 
 export default function Rooms() {
+  const { isAdmin } = useAuth();
   const [data, setData] = useState({ rooms: [], totalPages: 1, currentPage: 1 });
   const [types, setTypes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +61,8 @@ export default function Rooms() {
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
+  const [availableFrom, setAvailableFrom] = useState('');
+  const [availableTo, setAvailableTo] = useState('');
 
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState(createEmptyForm());
@@ -73,8 +77,13 @@ export default function Rooms() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      const params = { q, status, page };
+      if (availableFrom && availableTo) {
+        params.availableFrom = availableFrom;
+        params.availableTo = availableTo;
+      }
       const res = await axios.get(`${API_BASE}/api/rooms/admin`, {
-        params: { q, status, page },
+        params,
         withCredentials: true,
       });
 
@@ -97,7 +106,7 @@ export default function Rooms() {
     } finally {
       setLoading(false);
     }
-  }, [page, q, status]);
+  }, [availableFrom, availableTo, page, q, status]);
 
   const fetchTypes = useCallback(async () => {
     try {
@@ -124,6 +133,9 @@ export default function Rooms() {
   };
 
   const handleAddNew = () => {
+    if (!isAdmin) {
+      return;
+    }
     if (!types.length) {
       window.Swal?.fire({
         icon: 'warning',
@@ -204,6 +216,9 @@ export default function Rooms() {
   };
 
   const handleDelete = async (room) => {
+    if (!isAdmin) {
+      return;
+    }
     let confirmed = false;
 
     if (window.Swal) {
@@ -321,13 +336,45 @@ export default function Rooms() {
           gap: 8px;
           margin-top: 8px;
         }
+        .room-availability-from label,
+        .room-availability-to label,
+        .room-clear-filter {
+          font-size: 0;
+        }
+        .room-availability-from label::after,
+        .room-availability-to label::after,
+        .room-clear-filter::after {
+          font-size: 0.75rem;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #64748b;
+        }
+        .room-availability-from label::after {
+          content: 'Trống từ';
+        }
+        .room-availability-to label::after {
+          content: 'Đến';
+        }
+        .room-clear-filter::after {
+          content: 'Xóa lọc lịch';
+          font-size: 0.95rem;
+          letter-spacing: normal;
+          text-transform: none;
+          color: #0f172a;
+        }
       `}</style>
 
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h2 className="fw-bold mb-1">Quản lý phòng</h2>
-          <p className="text-muted mb-0">Danh sách, trạng thái và thao tác CRUD cho từng phòng nghỉ</p>
+          <p className="text-muted mb-0">
+            {isAdmin
+              ? 'Danh sách, trạng thái và thao tác quản trị cho từng phòng nghỉ.'
+              : 'Nhân viên có thể cập nhật trạng thái vận hành và xem booking liên quan của từng phòng.'}
+          </p>
         </div>
+        {isAdmin && (
         <button
           className="btn btn-primary px-4 py-2 rounded-3 fw-bold shadow-sm"
           style={{ background: 'var(--primary-color)', border: 'none' }}
@@ -335,6 +382,7 @@ export default function Rooms() {
         >
           + Thêm phòng mới
         </button>
+        )}
       </div>
 
       {loadError && (
@@ -344,7 +392,7 @@ export default function Rooms() {
       )}
 
       <div className="card-table">
-        <div className="p-4 border-bottom d-flex flex-wrap gap-3">
+        <div className="p-4 border-bottom d-flex flex-wrap align-items-end gap-3">
           <input
             type="text"
             className="form-control"
@@ -369,6 +417,45 @@ export default function Rooms() {
               <option key={option.value || 'all'} value={option.value}>{option.label}</option>
             ))}
           </select>
+          <div className="room-availability-from" style={{ minWidth: '220px' }}>
+            <label className="form-label small fw-bold text-uppercase text-muted">Trá»‘ng tá»«</label>
+            <input
+              type="datetime-local"
+              className="form-control"
+              style={{ borderRadius: '12px' }}
+              value={availableFrom}
+              onChange={(e) => {
+                setAvailableFrom(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+          <div className="room-availability-to" style={{ minWidth: '220px' }}>
+            <label className="form-label small fw-bold text-uppercase text-muted">Äáº¿n</label>
+            <input
+              type="datetime-local"
+              className="form-control"
+              style={{ borderRadius: '12px' }}
+              value={availableTo}
+              onChange={(e) => {
+                setAvailableTo(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+          {(availableFrom || availableTo) && (
+            <button
+              type="button"
+              className="btn btn-light border rounded-3 px-3 room-clear-filter"
+              onClick={() => {
+                setAvailableFrom('');
+                setAvailableTo('');
+                setPage(1);
+              }}
+            >
+              XÃ³a lá»c lá»‹ch
+            </button>
+          )}
         </div>
 
         <div className="table-responsive">
@@ -439,14 +526,16 @@ export default function Rooms() {
                       >
                         ✎
                       </button>
-                      <button
-                        className="btn-action btn-delete"
-                        title="Xóa phòng"
-                        disabled={deletingId === room.id}
-                        onClick={() => handleDelete(room)}
-                      >
-                        {deletingId === room.id ? '…' : '🗑'}
-                      </button>
+                      {isAdmin && (
+                        <button
+                          className="btn-action btn-delete"
+                          title="Xóa phòng"
+                          disabled={deletingId === room.id}
+                          onClick={() => handleDelete(room)}
+                        >
+                          {deletingId === room.id ? '…' : '🗑'}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -511,6 +600,7 @@ export default function Rooms() {
                           ...prev,
                           roomNumber: e.target.value.toUpperCase(),
                         }))}
+                        disabled={!isAdmin}
                         required
                       />
                     </div>
@@ -520,6 +610,7 @@ export default function Rooms() {
                         className="form-select rounded-3"
                         value={formData.typeId}
                         onChange={(e) => setFormData((prev) => ({ ...prev, typeId: e.target.value }))}
+                        disabled={!isAdmin}
                         required
                       >
                         <option value="">-- Chọn loại phòng --</option>
@@ -581,7 +672,7 @@ export default function Rooms() {
                       style={{ background: 'var(--primary-color)', border: 'none' }}
                       disabled={submitting}
                     >
-                      {submitting ? 'Đang lưu...' : 'Lưu thông tin phòng'}
+                      {submitting ? 'Đang lưu...' : (isAdmin ? 'Lưu thông tin phòng' : 'Lưu trạng thái phòng')}
                     </button>
                   </div>
                 </form>

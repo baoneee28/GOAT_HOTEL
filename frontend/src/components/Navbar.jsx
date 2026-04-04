@@ -201,7 +201,7 @@ export default function Navbar({ user, onLogout, variant }) {
 
                 {/* Menu items */}
                 <div className="py-1" style={{ background: '#0f172a' }}>
-                  {user?.role?.toLowerCase() === 'admin' && (
+                  {['admin', 'staff'].includes(String(user?.role || '').toLowerCase()) && (
                     <Link
                       to="/admin"
                       onClick={() => setDropdownOpen(false)}
@@ -210,7 +210,7 @@ export default function Navbar({ user, onLogout, variant }) {
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#cbd5e1'; }}
                     >
                       <span className="material-symbols-outlined text-base" style={{ fontSize: '16px', color: '#f59e0b', fontVariationSettings: "'FILL' 0, 'wght' 300" }}>admin_panel_settings</span>
-                      Trang quản trị
+                      {String(user?.role || '').toLowerCase() === 'staff' ? 'Khu vận hành' : 'Trang quản trị'}
                     </Link>
                   )}
 

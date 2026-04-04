@@ -1,13 +1,26 @@
 package com.hotel.controller.api;
 
 import com.hotel.entity.Room;
-import com.hotel.repository.RoomRepository;
+import com.hotel.entity.User;
 import com.hotel.repository.BookingDetailRepository;
+import com.hotel.repository.RoomRepository;
+import com.hotel.service.AuthService;
 import com.hotel.service.RoomStatusService;
-import org.springframework.dao.DataIntegrityViolationException;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +29,6 @@ import java.util.Set;
 
 @RestController
 @RequestMapping("/api/rooms")
-
 public class RoomApiController {
 
     private static final Set<String> ALLOWED_ROOM_STATUSES = Set.of("available", "booked", "maintenance");
@@ -30,20 +42,25 @@ public class RoomApiController {
     @Autowired
     private BookingDetailRepository bookingDetailRepository;
 
-    // Trả về tất cả các phòng
+    @Autowired
+    private AuthService authService;
+
+    @Autowired
+    private com.hotel.repository.RoomTypeRepository roomTypeRepository;
+
     @GetMapping
     public List<Room> getAllRooms(
             @RequestParam(value = "checkIn", required = false) String checkIn,
             @RequestParam(value = "checkOut", required = false) String checkOut,
             @RequestParam(value = "excludeBookingId", required = false) Integer excludeBookingId) {
-        if (checkIn != null && !checkIn.isBlank() && checkOut != null && !checkOut.isBlank()) {
+        if (hasDateRange(checkIn, checkOut)) {
             try {
-                java.time.LocalDateTime start = parseDateTimeParam(checkIn);
-                java.time.LocalDateTime end = parseDateTimeParam(checkOut);
+                LocalDateTime start = parseDateTimeParam(checkIn);
+                LocalDateTime end = parseDateTimeParam(checkOut);
                 List<Room> availableRooms = roomRepository.findAvailableRoomsForDate(
                         start,
                         end,
-                        java.time.LocalDateTime.now(),
+                        LocalDateTime.now(),
                         excludeBookingId
                 );
                 return sanitizePublicRooms(availableRooms);
@@ -54,46 +71,34 @@ public class RoomApiController {
         return sanitizePublicRooms(roomRepository.findAll());
     }
 
-    // Lấy chi tiết 1 phòng theo ID
     @GetMapping("/{id}")
     public Room getRoomById(@PathVariable("id") Integer id) {
         Room room = roomRepository.findById(id).orElse(null);
         return sanitizePublicRoom(room);
     }
 
-    // Lấy danh sách phòng lọc theo Loại phòng — mặc định chỉ trả phòng "available"
-    // Nếu truyền checkIn và checkOut sẽ tính trùng lịch, Admin/internal gán ?status=all
     @GetMapping("/type/{typeId}")
     public List<Room> getRoomsByType(
             @PathVariable("typeId") Integer typeId,
             @RequestParam(value = "status", defaultValue = "available") String status,
             @RequestParam(value = "checkIn", required = false) String checkIn,
             @RequestParam(value = "checkOut", required = false) String checkOut) {
-        
         if ("all".equalsIgnoreCase(status)) {
             return roomRepository.findByRoomTypeIdOrderByRoomNumberAsc(typeId);
         }
 
-        if (checkIn != null && !checkIn.isBlank() && checkOut != null && !checkOut.isBlank()) {
+        if (hasDateRange(checkIn, checkOut)) {
             try {
-                java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-                String startStr = checkIn.contains("T") ? checkIn.replace("T", " ") : checkIn;
-                String endStr = checkOut.contains("T") ? checkOut.replace("T", " ") : checkOut;
-                if (startStr.length() == 10) startStr += " 12:00";
-                if (endStr.length() == 10) endStr += " 12:00";
-                
-                java.time.LocalDateTime start = java.time.LocalDateTime.parse(startStr, formatter);
-                java.time.LocalDateTime end = java.time.LocalDateTime.parse(endStr, formatter);
-
+                LocalDateTime start = parseDateTimeParam(checkIn);
+                LocalDateTime end = parseDateTimeParam(checkOut);
                 List<Room> availableRooms = roomRepository.findAvailableRoomsByDate(
                         typeId,
                         start,
                         end,
-                        java.time.LocalDateTime.now()
+                        LocalDateTime.now()
                 );
                 return sanitizePublicRooms(availableRooms);
             } catch (Exception e) {
-                // Ignore parse error, fallback to normal status check
                 e.printStackTrace();
             }
         }
@@ -101,55 +106,71 @@ public class RoomApiController {
         return sanitizePublicRooms(roomRepository.findByRoomTypeIdAndStatusOrderByRoomNumberAsc(typeId, status));
     }
 
-    // ==========================================
-    // API CỦA ADMIN (CRUD BẢNG PHÒNG VÀ TIỆN ÍCH PHÒNG)
-    // ==========================================
-    @Autowired
-    private com.hotel.repository.RoomTypeRepository roomTypeRepository;
-
     @GetMapping("/admin")
-    public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> listRoomsForAdmin(
+    public ResponseEntity<Map<String, Object>> listRoomsForAdmin(
             @RequestParam(defaultValue = "") String q,
             @RequestParam(defaultValue = "") String status,
-            @RequestParam(defaultValue = "1") int page) {
-        return org.springframework.http.ResponseEntity.ok(
-                roomStatusService.buildAdminRoomPage(q, status, Math.max(1, page), 5)
-        );
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(value = "availableFrom", required = false) String availableFrom,
+            @RequestParam(value = "availableTo", required = false) String availableTo) {
+        try {
+            return ResponseEntity.ok(
+                    roomStatusService.buildAdminRoomPage(q, status, Math.max(1, page), 5, availableFrom, availableTo)
+            );
+        } catch (IllegalArgumentException ex) {
+            return badRequest(ex.getMessage());
+        }
     }
 
     @PostMapping("/admin")
-    public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> saveRoom(@RequestBody java.util.Map<String, Object> payload) {
+    public ResponseEntity<Map<String, Object>> saveRoom(@RequestBody Map<String, Object> payload, HttpSession session) {
         try {
-            Integer roomId = parseNullableInteger(payload.get("id"), "Mã phòng");
-            Integer typeId = parseRequiredInteger(payload.get("typeId"), "Loại phòng");
+            User currentUser = getSessionUser(session);
+            boolean isAdmin = authService.isAdmin(currentUser);
+
+            Integer roomId = parseNullableInteger(payload.get("id"), "Ma phong");
+            Integer typeId = parseRequiredInteger(payload.get("typeId"), "Loai phong");
             String status = normalizeRoomStatus(payload.get("status"));
             String roomNumber = normalizeRoomNumber(payload.get("roomNumber"));
 
+            if (!isAdmin && (roomId == null || roomId <= 0)) {
+                return forbidden("Nhan vien chi duoc cap nhat trang thai van hanh cua phong hien co.");
+            }
             if (roomNumber.isBlank()) {
-                return badRequest("Số phòng không được để trống.");
+                return badRequest("So phong khong duoc de trong.");
             }
             if (roomNumber.length() > 10) {
-                return badRequest("Số phòng tối đa 10 ký tự.");
+                return badRequest("So phong toi da 10 ky tu.");
             }
 
             com.hotel.entity.RoomType roomType = roomTypeRepository.findById(typeId).orElse(null);
             if (roomType == null) {
-                return badRequest("Loại phòng không tồn tại.");
+                return badRequest("Loai phong khong ton tai.");
             }
 
             Room room;
             if (roomId != null && roomId > 0) {
                 room = roomRepository.findById(roomId).orElse(null);
                 if (room == null) {
-                    return badRequest("Phòng không tồn tại.");
+                    return badRequest("Phong khong ton tai.");
                 }
             } else {
                 room = new Room();
             }
 
+            if (!isAdmin) {
+                room.setStatus(status);
+                room = roomRepository.save(room);
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("message", "Da cap nhat trang thai van hanh cua phong.");
+                response.put("room", room);
+                return ResponseEntity.ok(response);
+            }
+
             Optional<Room> roomNumberOwner = roomRepository.findByRoomNumber(roomNumber);
             if (roomNumberOwner.isPresent() && (room.getId() == null || !roomNumberOwner.get().getId().equals(room.getId()))) {
-                return badRequest("Số phòng này đã tồn tại.");
+                return badRequest("So phong nay da ton tai.");
             }
 
             room.setRoomNumber(roomNumber);
@@ -159,60 +180,77 @@ public class RoomApiController {
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("message", room.getId() != null && roomId != null ? "Đã cập nhật thông tin phòng." : "Đã thêm phòng mới.");
+            response.put("message", room.getId() != null && roomId != null ? "Da cap nhat thong tin phong." : "Da them phong moi.");
             response.put("room", room);
-            return org.springframework.http.ResponseEntity.ok(response);
+            return ResponseEntity.ok(response);
         } catch (IllegalArgumentException ex) {
             return badRequest(ex.getMessage());
         } catch (Exception ex) {
-            return badRequest("Không thể lưu thông tin phòng lúc này.");
+            return badRequest("Khong the luu thong tin phong luc nay.");
         }
     }
 
     @DeleteMapping("/admin/{id}")
-    public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> deleteRoom(@PathVariable("id") Integer id) {
+    public ResponseEntity<Map<String, Object>> deleteRoom(@PathVariable("id") Integer id, HttpSession session) {
+        User currentUser = getSessionUser(session);
+        if (!authService.isAdmin(currentUser)) {
+            return forbidden("Nhan vien khong duoc xoa phong.");
+        }
+
         Map<String, Object> response = new HashMap<>();
         Room room = roomRepository.findById(id).orElse(null);
         if (room == null) {
             response.put("success", false);
-            response.put("message", "Phòng không tồn tại.");
-            return org.springframework.http.ResponseEntity.status(404).body(response);
+            response.put("message", "Phong khong ton tai.");
+            return ResponseEntity.status(404).body(response);
         }
 
         if (bookingDetailRepository.existsByRoom_Id(id)) {
             response.put("success", false);
-            response.put("message", "Phòng này đã phát sinh booking nên không thể xóa.");
-            return org.springframework.http.ResponseEntity.badRequest().body(response);
+            response.put("message", "Phong nay da phat sinh booking nen khong the xoa.");
+            return ResponseEntity.badRequest().body(response);
         }
 
         try {
             roomRepository.delete(room);
             roomRepository.flush();
             response.put("success", true);
-            response.put("message", "Đã xóa phòng thành công.");
+            response.put("message", "Da xoa phong thanh cong.");
         } catch (DataIntegrityViolationException e) {
             response.put("success", false);
-            response.put("message", "Phòng đang được tham chiếu bởi dữ liệu khác nên không thể xóa.");
-            return org.springframework.http.ResponseEntity.badRequest().body(response);
+            response.put("message", "Phong dang duoc tham chieu boi du lieu khac nen khong the xoa.");
+            return ResponseEntity.badRequest().body(response);
         }
-        return org.springframework.http.ResponseEntity.ok(response);
+        return ResponseEntity.ok(response);
     }
 
-    private org.springframework.http.ResponseEntity<Map<String, Object>> badRequest(String message) {
+    private User getSessionUser(HttpSession session) {
+        Object userObj = session == null ? null : session.getAttribute("user");
+        return userObj instanceof User ? (User) userObj : null;
+    }
+
+    private ResponseEntity<Map<String, Object>> badRequest(String message) {
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
         response.put("message", message);
-        return org.springframework.http.ResponseEntity.badRequest().body(response);
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    private ResponseEntity<Map<String, Object>> forbidden(String message) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", message);
+        return ResponseEntity.status(403).body(response);
     }
 
     private Integer parseRequiredInteger(Object value, String label) {
         if (value == null || value.toString().isBlank()) {
-            throw new IllegalArgumentException(label + " không được để trống.");
+            throw new IllegalArgumentException(label + " khong duoc de trong.");
         }
         try {
             return Integer.parseInt(value.toString());
         } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException(label + " không hợp lệ.");
+            throw new IllegalArgumentException(label + " khong hop le.");
         }
     }
 
@@ -223,20 +261,20 @@ public class RoomApiController {
         try {
             return Integer.parseInt(value.toString());
         } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException(label + " không hợp lệ.");
+            throw new IllegalArgumentException(label + " khong hop le.");
         }
     }
 
     private String normalizeRoomStatus(Object value) {
         String normalized = value == null ? "" : value.toString().trim().toLowerCase();
         if (!ALLOWED_ROOM_STATUSES.contains(normalized)) {
-            throw new IllegalArgumentException("Trạng thái phòng không hợp lệ.");
+            throw new IllegalArgumentException("Trang thai phong khong hop le.");
         }
         return normalized;
     }
 
-    private java.time.LocalDateTime parseDateTimeParam(String value) {
-        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private LocalDateTime parseDateTimeParam(String value) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         String normalized = value == null ? "" : value.trim();
         if (normalized.contains("T")) {
             normalized = normalized.replace("T", " ");
@@ -244,7 +282,11 @@ public class RoomApiController {
         if (normalized.length() == 10) {
             normalized += " 12:00";
         }
-        return java.time.LocalDateTime.parse(normalized, formatter);
+        return LocalDateTime.parse(normalized, formatter);
+    }
+
+    private boolean hasDateRange(String checkIn, String checkOut) {
+        return checkIn != null && !checkIn.isBlank() && checkOut != null && !checkOut.isBlank();
     }
 
     private List<Room> sanitizePublicRooms(List<Room> rooms) {

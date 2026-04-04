@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import Chart from 'chart.js/auto';
 import API_BASE, { formatDateValue, iconUrl, imageUrl, uploadedImageUrl } from '../../config';
+import { useAuth } from '../../auth/useAuth';
 
 export default function Dashboard() {
+  const { isAdmin } = useAuth();
   const [stats, setStats] = useState(null);
   const [user, setUser] = useState({ fullName: 'Admin' });
   const [time, setTime] = useState('');
@@ -168,7 +170,7 @@ export default function Dashboard() {
     );
   }
 
-  const statCards = [
+  const statCards = isAdmin ? [
     {
       label: 'Tổng doanh thu',
       value: `${Number(stats.total_revenue || 0).toLocaleString('vi-VN')}đ`,
@@ -197,7 +199,49 @@ export default function Dashboard() {
       toneClass: 'tone-pending',
       helper: `${Number(stats.new_contacts || 0)} liên hệ mới chưa đọc`,
     },
+  ] : [
+    {
+      label: 'Check-in hôm nay',
+      value: `${Number(stats.today_checkins || 0)} lượt`,
+      icon: 'CI',
+      toneClass: 'tone-rooms',
+      helper: 'Lượt nhận phòng đã ghi nhận trong ngày',
+    },
+    {
+      label: 'Check-out hôm nay',
+      value: `${Number(stats.today_checkouts || 0)} lượt`,
+      icon: 'CO',
+      toneClass: 'tone-pending',
+      helper: 'Lượt trả phòng đã hoàn tất trong ngày',
+    },
+    {
+      label: 'Phòng trống',
+      value: `${Number(stats.rooms_available || 0)} phòng`,
+      icon: 'PT',
+      toneClass: 'tone-customers',
+      helper: 'Sẵn sàng nhận booking mới',
+    },
+    {
+      label: 'Phòng đang có khách',
+      value: `${Number(stats.rooms_booked || 0)} phòng`,
+      icon: 'DK',
+      toneClass: 'tone-revenue',
+      helper: `${Number(stats.rooms_reserved || 0)} phòng có lịch sắp tới`,
+    },
   ];
+
+  const quickLinks = isAdmin
+    ? [
+        { to: '/admin/rooms', label: 'Quản lý phòng' },
+        { to: '/admin/room-types', label: 'Loại phòng' },
+        { to: '/admin/items', label: 'Vật phẩm' },
+        { to: '/admin/news', label: 'Tin tức' },
+      ]
+    : [
+        { to: '/admin/rooms', label: 'Quản lý phòng' },
+        { to: '/admin/bookings', label: 'Đơn đặt phòng' },
+        { to: '/admin/inbox', label: 'Inbox liên hệ' },
+      ];
 
   const roomTypes = Array.isArray(stats.featured_room_types) ? stats.featured_room_types : [];
   const items = Array.isArray(stats.featured_items) ? stats.featured_items : [];
@@ -363,17 +407,25 @@ export default function Dashboard() {
       <div className="dashboard-shell">
         <section className="dashboard-panel dashboard-hero d-flex flex-wrap justify-content-between align-items-end gap-4">
           <div style={{ position: 'relative', zIndex: 1 }}>
-            <p className="text-uppercase small fw-bold mb-2 opacity-75">GOAT Admin Dashboard</p>
+            <p className="text-uppercase small fw-bold mb-2 opacity-75">{isAdmin ? 'GOAT Admin Dashboard' : 'GOAT Operations Dashboard'}</p>
             <h2 className="fw-bold mb-2">Xin chào, {user.fullName || 'Admin'}!</h2>
             <p className="mb-4 opacity-75" style={{ maxWidth: '640px' }}>
-              Hệ thống đang theo dõi đồng thời phòng nghỉ, tiện ích và nội dung truyền thông.
-              Bạn hiện có <b>{Number(stats.pending_count || 0)}</b> booking chờ xử lý và <b>{Number(stats.new_contacts || 0)}</b> liên hệ mới.
+              {isAdmin ? (
+                <>
+                  Hệ thống đang theo dõi đồng thời phòng nghỉ, tiện ích và nội dung truyền thông.
+                  Bạn hiện có <b>{Number(stats.pending_count || 0)}</b> booking chờ xử lý và <b>{Number(stats.new_contacts || 0)}</b> liên hệ mới.
+                </>
+              ) : (
+                <>
+                  Đây là bảng điều hành cho ca vận hành hôm nay.
+                  Hiện có <b>{Number(stats.rooms_available || 0)}</b> phòng sẵn sàng, <b>{Number(stats.rooms_booked || 0)}</b> phòng đang có khách và <b>{Number(stats.rooms_reserved || 0)}</b> phòng có lịch sắp tới.
+                </>
+              )}
             </p>
             <div className="d-flex flex-wrap gap-2">
-              <Link to="/admin/rooms" className="quick-link">Quản lý phòng</Link>
-              <Link to="/admin/room-types" className="quick-link">Loại phòng</Link>
-              <Link to="/admin/items" className="quick-link">Vật phẩm</Link>
-              <Link to="/admin/news" className="quick-link">Tin tức</Link>
+              {quickLinks.map((link) => (
+                <Link key={link.to} to={link.to} className="quick-link">{link.label}</Link>
+              ))}
             </div>
           </div>
           <div className="dashboard-clock">{time}</div>
@@ -393,129 +445,188 @@ export default function Dashboard() {
         </section>
 
         <section className="row g-4">
-          <div className="col-xl-8">
-            <article className="dashboard-panel chart-panel">
-              <div className="section-head">
-                <div>
-                  <p className="small text-uppercase text-muted fw-bold mb-2">Thanh toán gần đây</p>
-                  <h4 className="fw-bold mb-0">Biểu đồ tiền đã thu 7 ngày</h4>
-                </div>
-                <span className="badge bg-light text-dark border rounded-pill px-3 py-2">Realtime summary</span>
-              </div>
-              <div style={{ height: '260px', position: 'relative' }}>
-                <canvas ref={waveChartRef}></canvas>
-              </div>
-            </article>
-          </div>
-          <div className="col-xl-4">
-            <article className="dashboard-panel chart-panel">
-              <div className="section-head">
-                <div>
-                  <p className="small text-uppercase text-muted fw-bold mb-2">Tình trạng buồng phòng</p>
-                  <h4 className="fw-bold mb-0">Phân bổ trạng thái</h4>
-                </div>
-              </div>
-              <div style={{ height: '260px', position: 'relative' }}>
-                <canvas ref={pieChartRef}></canvas>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section className="dashboard-panel media-panel">
-          <div className="section-head">
-            <div>
-              <p className="small text-uppercase text-muted fw-bold mb-2">Hình ảnh loại phòng</p>
-              <h4 className="fw-bold mb-0">Danh mục phòng đang khai thác</h4>
-            </div>
-            <Link to="/admin/room-types" className="btn btn-sm btn-light border rounded-pill px-3">
-              Mở quản lý loại phòng
-            </Link>
-          </div>
-
-          <div className="row g-4">
-            {roomTypes.map((roomType) => (
-              <div key={roomType.id} className="col-md-6 col-xl-3">
-                <article className="room-preview-card">
-                  <img
-                    src={uploadedImageUrl(roomType.image, '/images/rooms/standard-room.jpg')}
-                    alt={roomType.typeName}
-                    className="room-preview-image"
-                  />
-                  <div className="room-preview-body">
-                    <p className="small text-uppercase text-muted fw-bold mb-2">Loại phòng</p>
-                    <h5 className="fw-bold mb-2">{roomType.typeName}</h5>
-                    <div className="text-primary fw-bold mb-2">
-                      {Number(roomType.pricePerNight || 0).toLocaleString('vi-VN')}đ / đêm
+          {isAdmin ? (
+            <>
+              <div className="col-xl-8">
+                <article className="dashboard-panel chart-panel">
+                  <div className="section-head">
+                    <div>
+                      <p className="small text-uppercase text-muted fw-bold mb-2">Thanh toán gần đây</p>
+                      <h4 className="fw-bold mb-0">Biểu đồ tiền đã thu 7 ngày</h4>
                     </div>
-                    <div className="small text-muted">
-                      {Number(roomType.capacity || 0)} khách • {Number(roomType.itemCount || 0)} tiện ích
-                    </div>
+                    <span className="badge bg-light text-dark border rounded-pill px-3 py-2">Realtime summary</span>
+                  </div>
+                  <div style={{ height: '260px', position: 'relative' }}>
+                    <canvas ref={waveChartRef}></canvas>
                   </div>
                 </article>
               </div>
-            ))}
-          </div>
+              <div className="col-xl-4">
+                <article className="dashboard-panel chart-panel">
+                  <div className="section-head">
+                    <div>
+                      <p className="small text-uppercase text-muted fw-bold mb-2">Tình trạng buồng phòng</p>
+                      <h4 className="fw-bold mb-0">Phân bổ trạng thái</h4>
+                    </div>
+                  </div>
+                  <div style={{ height: '260px', position: 'relative' }}>
+                    <canvas ref={pieChartRef}></canvas>
+                  </div>
+                </article>
+              </div>
+            </>
+          ) : (
+            <div className="col-12">
+              <article className="dashboard-panel chart-panel">
+                <div className="section-head">
+                  <div>
+                    <p className="small text-uppercase text-muted fw-bold mb-2">Tình trạng buồng phòng</p>
+                    <h4 className="fw-bold mb-0">Phân bổ trạng thái hiện tại</h4>
+                  </div>
+                  <span className="badge bg-light text-dark border rounded-pill px-3 py-2">Vận hành hôm nay</span>
+                </div>
+                <div className="row g-4 align-items-center">
+                  <div className="col-lg-5">
+                    <div style={{ height: '260px', position: 'relative' }}>
+                      <canvas ref={pieChartRef}></canvas>
+                    </div>
+                  </div>
+                  <div className="col-lg-7">
+                    <div className="row g-3">
+                      <div className="col-md-6">
+                        <article className="stat-card tone-rooms">
+                          <div className="small text-muted mb-2 text-uppercase fw-bold">Check-in hôm nay</div>
+                          <h4 className="fw-bold mb-2">{Number(stats.today_checkins || 0)} lượt</h4>
+                          <p className="text-muted mb-0 small">Số lượt đã nhận phòng trong ngày hiện tại.</p>
+                        </article>
+                      </div>
+                      <div className="col-md-6">
+                        <article className="stat-card tone-pending">
+                          <div className="small text-muted mb-2 text-uppercase fw-bold">Check-out hôm nay</div>
+                          <h4 className="fw-bold mb-2">{Number(stats.today_checkouts || 0)} lượt</h4>
+                          <p className="text-muted mb-0 small">Số lượt đã trả phòng và hoàn tất vận hành.</p>
+                        </article>
+                      </div>
+                      <div className="col-md-6">
+                        <article className="stat-card tone-customers">
+                          <div className="small text-muted mb-2 text-uppercase fw-bold">Phòng trống</div>
+                          <h4 className="fw-bold mb-2">{Number(stats.rooms_available || 0)} phòng</h4>
+                          <p className="text-muted mb-0 small">Có thể nhận booking hoặc check-in mới.</p>
+                        </article>
+                      </div>
+                      <div className="col-md-6">
+                        <article className="stat-card tone-revenue">
+                          <div className="small text-muted mb-2 text-uppercase fw-bold">Phòng đang có khách</div>
+                          <h4 className="fw-bold mb-2">{Number(stats.rooms_booked || 0)} phòng</h4>
+                          <p className="text-muted mb-0 small">{Number(stats.rooms_reserved || 0)} phòng có lịch sắp tới cần theo dõi.</p>
+                        </article>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            </div>
+          )}
         </section>
 
-        <section className="row g-4">
-          <div className="col-xl-5">
-            <article className="dashboard-panel media-panel h-100">
+        {isAdmin && (
+          <>
+            <section className="dashboard-panel media-panel">
               <div className="section-head">
                 <div>
-                  <p className="small text-uppercase text-muted fw-bold mb-2">Icon vật phẩm</p>
-                  <h4 className="fw-bold mb-0">Tiện ích đang dùng trong hệ thống</h4>
+                  <p className="small text-uppercase text-muted fw-bold mb-2">Hình ảnh loại phòng</p>
+                  <h4 className="fw-bold mb-0">Danh mục phòng đang khai thác</h4>
                 </div>
-                <Link to="/admin/items" className="btn btn-sm btn-light border rounded-pill px-3">
-                  Mở quản lý vật phẩm
-                </Link>
-              </div>
-
-              <div className="item-icon-grid">
-                {items.map((item) => (
-                  <article key={item.id} className="item-icon-card">
-                    <img src={iconUrl(item.image, '/icons/tv.png')} alt={item.name} />
-                    <div className="fw-bold small">{item.name}</div>
-                  </article>
-                ))}
-              </div>
-            </article>
-          </div>
-
-          <div className="col-xl-7">
-            <article className="dashboard-panel media-panel h-100">
-              <div className="section-head">
-                <div>
-                  <p className="small text-uppercase text-muted fw-bold mb-2">Ảnh bài viết</p>
-                  <h4 className="fw-bold mb-0">Tin tức gần đây</h4>
-                </div>
-                <Link to="/admin/news" className="btn btn-sm btn-light border rounded-pill px-3">
-                  Mở quản lý tin tức
+                <Link to="/admin/room-types" className="btn btn-sm btn-light border rounded-pill px-3">
+                  Mở quản lý loại phòng
                 </Link>
               </div>
 
               <div className="row g-4">
-                {newsList.map((news) => (
-                  <div key={news.id} className="col-md-6">
-                    <article className="news-preview-card">
+                {roomTypes.map((roomType) => (
+                  <div key={roomType.id} className="col-md-6 col-xl-3">
+                    <article className="room-preview-card">
                       <img
-                        src={imageUrl(news.image, '/images/news/news-default.png')}
-                        alt={news.title}
+                        src={uploadedImageUrl(roomType.image, '/images/rooms/standard-room.jpg')}
+                        alt={roomType.typeName}
+                        className="room-preview-image"
                       />
-                      <div className="news-preview-body">
-                        <div className="small text-muted mb-2">{formatDateValue(news.createdAt) || 'Mới cập nhật'}</div>
-                        <h5 className="fw-bold mb-2">{news.title}</h5>
-                        <p className="text-muted small mb-0">
-                          {news.summary || 'Bài viết hiện chưa có mô tả ngắn.'}
-                        </p>
+                      <div className="room-preview-body">
+                        <p className="small text-uppercase text-muted fw-bold mb-2">Loại phòng</p>
+                        <h5 className="fw-bold mb-2">{roomType.typeName}</h5>
+                        <div className="text-primary fw-bold mb-2">
+                          {Number(roomType.pricePerNight || 0).toLocaleString('vi-VN')}đ / đêm
+                        </div>
+                        <div className="small text-muted">
+                          {Number(roomType.capacity || 0)} khách • {Number(roomType.itemCount || 0)} tiện ích
+                        </div>
                       </div>
                     </article>
                   </div>
                 ))}
               </div>
-            </article>
-          </div>
-        </section>
+            </section>
+
+            <section className="row g-4">
+              <div className="col-xl-5">
+                <article className="dashboard-panel media-panel h-100">
+                  <div className="section-head">
+                    <div>
+                      <p className="small text-uppercase text-muted fw-bold mb-2">Icon vật phẩm</p>
+                      <h4 className="fw-bold mb-0">Tiện ích đang dùng trong hệ thống</h4>
+                    </div>
+                    <Link to="/admin/items" className="btn btn-sm btn-light border rounded-pill px-3">
+                      Mở quản lý vật phẩm
+                    </Link>
+                  </div>
+
+                  <div className="item-icon-grid">
+                    {items.map((item) => (
+                      <article key={item.id} className="item-icon-card">
+                        <img src={iconUrl(item.image, '/icons/tv.png')} alt={item.name} />
+                        <div className="fw-bold small">{item.name}</div>
+                      </article>
+                    ))}
+                  </div>
+                </article>
+              </div>
+
+              <div className="col-xl-7">
+                <article className="dashboard-panel media-panel h-100">
+                  <div className="section-head">
+                    <div>
+                      <p className="small text-uppercase text-muted fw-bold mb-2">Ảnh bài viết</p>
+                      <h4 className="fw-bold mb-0">Tin tức gần đây</h4>
+                    </div>
+                    <Link to="/admin/news" className="btn btn-sm btn-light border rounded-pill px-3">
+                      Mở quản lý tin tức
+                    </Link>
+                  </div>
+
+                  <div className="row g-4">
+                    {newsList.map((news) => (
+                      <div key={news.id} className="col-md-6">
+                        <article className="news-preview-card">
+                          <img
+                            src={imageUrl(news.image, '/images/news/news-default.png')}
+                            alt={news.title}
+                          />
+                          <div className="news-preview-body">
+                            <div className="small text-muted mb-2">{formatDateValue(news.createdAt) || 'Mới cập nhật'}</div>
+                            <h5 className="fw-bold mb-2">{news.title}</h5>
+                            <p className="text-muted small mb-0">
+                              {news.summary || 'Bài viết hiện chưa có mô tả ngắn.'}
+                            </p>
+                          </div>
+                        </article>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              </div>
+            </section>
+          </>
+        )}
       </div>
     </>
   );

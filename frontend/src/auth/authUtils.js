@@ -2,14 +2,25 @@ export function isAdminRole(role) {
   return String(role || '').trim().toLowerCase() === 'admin';
 }
 
+export function isStaffRole(role) {
+  return String(role || '').trim().toLowerCase() === 'staff';
+}
+
+export function isBackofficeRole(role) {
+  return isAdminRole(role) || isStaffRole(role);
+}
+
 function normalizeAuthPayload(payload) {
   const user = payload?.user ?? null;
   const authenticated = Boolean(payload?.authenticated ?? payload?.success ?? user);
   const role = authenticated
-    ? (payload?.role || (isAdminRole(user?.role) ? 'ADMIN' : 'USER'))
+    ? (
+        payload?.role
+        || (isAdminRole(user?.role) ? 'ADMIN' : (isStaffRole(user?.role) ? 'STAFF' : 'USER'))
+      )
     : null;
   const redirectTo = authenticated
-    ? (payload?.redirectTo || (role === 'ADMIN' ? '/admin' : '/'))
+    ? (payload?.redirectTo || (role === 'ADMIN' || role === 'STAFF' ? '/admin' : '/'))
     : null;
 
   return {
@@ -57,7 +68,7 @@ export function resolvePostLoginDestination(authPayload, locationState) {
     return { to: '/login' };
   }
 
-  if (normalized.role === 'ADMIN') {
+  if (normalized.role === 'ADMIN' || normalized.role === 'STAFF') {
     return { to: '/admin' };
   }
 

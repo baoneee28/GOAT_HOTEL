@@ -96,6 +96,7 @@ export default function Users() {
         .table tbody td { padding: 15px 25px; vertical-align: middle; border-bottom: 1px solid #f0f0f0; }
         .badge-role { padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
         .role-admin { background: #fee2e2; color: #dc2626; }
+        .role-staff { background: #ede9fe; color: #6d28d9; }
         .role-customer { background: #e0e7ff; color: #4e31aa; }
         .btn-action { width: 32px; height: 32px; border-radius: 8px; border: none; font-size: 14px; }
       `}</style>
@@ -137,7 +138,7 @@ export default function Users() {
                               </td>
                               <td>{u.email}</td>
                               <td>{u.phone}</td>
-                              <td><span className={`badge-role ${u.role === 'admin' ? 'role-admin' : 'role-customer'}`}>{u.role}</span></td>
+                              <td><span className={`badge-role ${u.role === 'admin' ? 'role-admin' : (u.role === 'staff' ? 'role-staff' : 'role-customer')}`}>{u.role}</span></td>
                               <td className="text-end">
                                   <button className="btn-action bg-light text-primary me-1" onClick={() => handleEdit(u)}>✎</button>
                                   <button className="btn-action bg-light text-danger" onClick={() => handleDelete(u.id)}>🗑</button>
@@ -194,6 +195,7 @@ export default function Users() {
                                       <label className="form-label fw-bold small text-uppercase text-muted">Vai trò</label>
                                       <select className="form-select rounded-3" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
                                           <option value="customer">Customer</option>
+                                          <option value="staff">Staff</option>
                                           <option value="admin">Admin</option>
                                       </select>
                                   </div>

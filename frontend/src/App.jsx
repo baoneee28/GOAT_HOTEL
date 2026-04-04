@@ -74,18 +74,20 @@ function App() {
           </Route>
 
           {/* Admin Routes */}
-          <Route element={<ProtectedRoute adminOnly />}>
+          <Route element={<ProtectedRoute backofficeOnly />}>
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<Dashboard />} />
               <Route path="rooms" element={<Rooms />} />
-              <Route path="room-types" element={<RoomTypes />} />
-              <Route path="items" element={<Items />} />
               <Route path="bookings" element={<Bookings />} />
-              <Route path="coupons" element={<AdminCoupons />} />
-              <Route path="users" element={<Users />} />
-              <Route path="users/:id/bookings" element={<UserBookings />} />
-              <Route path="news" element={<News />} />
               <Route path="inbox" element={<Inbox />} />
+              <Route element={<ProtectedRoute adminOnly />}>
+                <Route path="room-types" element={<RoomTypes />} />
+                <Route path="items" element={<Items />} />
+                <Route path="coupons" element={<AdminCoupons />} />
+                <Route path="users" element={<Users />} />
+                <Route path="users/:id/bookings" element={<UserBookings />} />
+                <Route path="news" element={<News />} />
+              </Route>
             </Route>
           </Route>
         </Routes>

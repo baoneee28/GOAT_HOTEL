@@ -2,9 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
 import API_BASE, { calculateBookingDiscountAmount, calculateBookingDisplayTotal, calculateBookingSubtotal, calculateStayNights } from '../../config';
+import { useAuth } from '../../auth/useAuth';
 const Swal = window.Swal;
 
 export default function Bookings() {
+  const { isAdmin } = useAuth();
   const BOOKING_STATUS_LABELS = {
     pending: 'Chờ duyệt',
     confirmed: 'Đã xác nhận',
@@ -19,6 +21,8 @@ export default function Bookings() {
   
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
+  const [fromDateTime, setFromDateTime] = useState('');
+  const [toDateTime, setToDateTime] = useState('');
 
   // Modal
   const [showModal, setShowModal] = useState(false);
@@ -60,12 +64,16 @@ export default function Bookings() {
       } else {
         if (status) params.set('status', status);
         params.set('page', page);
+        if (fromDateTime && toDateTime) {
+          params.set('fromDateTime', fromDateTime);
+          params.set('toDateTime', toDateTime);
+        }
       }
       const query = params.toString();
       const res = await axios.get(`${API_BASE}/api/admin/bookings${query ? `?${query}` : ''}`, { withCredentials: true });
       setData(res.data);
     } catch (err) { console.error(err); }
-  }, [focusedBookingId, status, page]);
+  }, [focusedBookingId, fromDateTime, page, status, toDateTime]);
 
   const fetchRoomOptions = useCallback(async (checkIn = '', checkOut = '', bookingId = '') => {
     try {
@@ -83,9 +91,19 @@ export default function Bookings() {
 
   useEffect(() => {
     fetchData();
-    axios.get(`${API_BASE}/api/admin/users/all`, { withCredentials: true }).then(r => setUsers(r.data));
-    fetchRoomOptions();
-  }, [fetchData, fetchRoomOptions]);
+    if (isAdmin) {
+      axios.get(`${API_BASE}/api/admin/users/all`, { withCredentials: true })
+        .then(r => setUsers(r.data))
+        .catch(err => {
+          console.error(err);
+          setUsers([]);
+        });
+      fetchRoomOptions();
+      return;
+    }
+    setUsers([]);
+    setRooms([]);
+  }, [fetchData, fetchRoomOptions, isAdmin]);
 
   useEffect(() => {
     if (!showModal) return;
@@ -216,6 +234,7 @@ export default function Bookings() {
   };
 
   const handleEdit = (b) => {
+    if (!isAdmin) return;
     const detail = b.details?.[0] || {};
     setFormData({
       id: b.id, userId: b.user?.id || '', roomId: detail.room?.id || '', roomTypeId: detail.room?.roomType?.id || '',
@@ -227,6 +246,7 @@ export default function Bookings() {
   };
 
   const handleAddNew = () => {
+    if (!isAdmin) return;
     setFormData({ id: '', userId: '', roomId: '', roomTypeId: '', checkIn: '', checkOut: '', status: 'pending' });
     setShowModal(true);
   };
@@ -245,8 +265,15 @@ export default function Bookings() {
     setPage(1);
   };
 
+  const clearDateFilter = () => {
+    setFromDateTime('');
+    setToDateTime('');
+    setPage(1);
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!isAdmin) return;
     try {
       const res = await axios.post(`${API_BASE}/api/admin/bookings`, formData, { withCredentials: true });
       if (res.data.success) {
@@ -433,11 +460,17 @@ export default function Bookings() {
       <div className="d-flex justify-content-between align-items-center mb-4">
           <div>
               <h2 className="fw-bold mb-1">Quản lý đặt phòng</h2>
-              <p className="text-muted mb-0">Hệ thống tính tiền tự động theo đêm</p>
+              <p className="text-muted mb-0">
+                {isAdmin
+                  ? 'Hệ thống quản lý booking và lịch lưu trú theo giờ nhận, giờ trả phòng.'
+                  : 'Nhân viên có thể duyệt đơn, nhận phòng, trả phòng và xác nhận thu tiền mặt.'}
+              </p>
           </div>
-          <button className="btn btn-primary px-4 py-2 rounded-3 fw-bold shadow-sm" style={{ background: 'var(--primary-color)', border: 'none' }} onClick={handleAddNew}>
-              + Tạo đơn mới
-          </button>
+          {isAdmin && (
+            <button className="btn btn-primary px-4 py-2 rounded-3 fw-bold shadow-sm" style={{ background: 'var(--primary-color)', border: 'none' }} onClick={handleAddNew}>
+                + Tạo đơn mới
+            </button>
+          )}
       </div>
 
       <div className="card-table">
@@ -450,6 +483,39 @@ export default function Bookings() {
                   <button className={`btn btn-sm ${status === 'cancelled' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => handleStatusFilter('cancelled')}>Đã hủy</button>
                   <button className={`btn btn-sm ${status === 'expired' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => handleStatusFilter('expired')}>Hết hạn</button>
               </div>
+              {!focusedBookingId && (
+                <div className="booking-filter-group">
+                  <div>
+                    <label className="form-label small fw-bold text-uppercase text-muted mb-1">Có đơn từ</label>
+                    <input
+                      type="datetime-local"
+                      className="form-control form-control-sm rounded-3"
+                      value={fromDateTime}
+                      onChange={(e) => {
+                        setFromDateTime(e.target.value);
+                        setPage(1);
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label small fw-bold text-uppercase text-muted mb-1">Đến</label>
+                    <input
+                      type="datetime-local"
+                      className="form-control form-control-sm rounded-3"
+                      value={toDateTime}
+                      onChange={(e) => {
+                        setToDateTime(e.target.value);
+                        setPage(1);
+                      }}
+                    />
+                  </div>
+                  {(fromDateTime || toDateTime) && (
+                    <button className="btn btn-sm btn-light border rounded-pill px-3" onClick={clearDateFilter}>
+                      Xóa lọc lịch
+                    </button>
+                  )}
+                </div>
+              )}
               {focusedBookingId && (
                 <button className="btn btn-sm btn-light border rounded-pill px-3" onClick={clearFocusedBooking}>
                     Xem tất cả
@@ -578,7 +644,7 @@ export default function Bookings() {
                                               setShowInvoice(true);
                                           }}>👁</button>
                                       )}
-                                      {canEditBooking(b.status) && (
+                                      {isAdmin && canEditBooking(b.status) && (
                                           <button className="btn btn-sm btn-light text-primary border rounded-circle" style={{width:'32px', height:'32px'}} title="Sửa" onClick={() => handleEdit(b)}>✎</button>
                                       )}
                                   </div>
@@ -602,7 +668,7 @@ export default function Bookings() {
           )}
       </div>
 
-      {showModal && (
+      {showModal && isAdmin && (
           <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }} tabIndex="-1">
               <div className="modal-dialog modal-dialog-centered">
                   <div className="modal-content" style={{ borderRadius: '24px', border: 'none' }}>

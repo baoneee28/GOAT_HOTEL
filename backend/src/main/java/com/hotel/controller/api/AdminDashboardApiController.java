@@ -1,6 +1,7 @@
 package com.hotel.controller.api;
 
 import com.hotel.repository.BookingRepository;
+import com.hotel.repository.BookingDetailRepository;
 import com.hotel.repository.ContactMessageRepository;
 import com.hotel.repository.ItemRepository;
 import com.hotel.repository.NewsRepository;
@@ -32,6 +33,9 @@ public class AdminDashboardApiController {
 
     @Autowired
     private BookingRepository bookingRepository;
+
+    @Autowired
+    private BookingDetailRepository bookingDetailRepository;
 
     @Autowired
     private RoomRepository roomRepository;
@@ -87,6 +91,11 @@ public class AdminDashboardApiController {
 
             response.put("pending_count", bookingRepository.countByStatus("pending"));
             response.put("new_contacts", contactMessageRepository.countByStatus("new"));
+
+            LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+            LocalDateTime tomorrowStart = todayStart.plusDays(1);
+            response.put("today_checkins", bookingDetailRepository.countCheckInsBetween(todayStart, tomorrowStart));
+            response.put("today_checkouts", bookingDetailRepository.countCheckOutsBetween(todayStart, tomorrowStart));
 
             LocalDate today = LocalDate.now();
             LocalDate startDate = today.minusDays(6);

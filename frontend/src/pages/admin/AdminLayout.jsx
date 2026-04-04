@@ -1,25 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import React from 'react';
+import { Navigate, Outlet } from 'react-router-dom';
 import AdminSidebar from '../../components/AdminSidebar';
+import { useAuth } from '../../auth/useAuth';
 
 export default function AdminLayout() {
-  const [isAdmin, setIsAdmin] = useState(false);
-  const navigate = useNavigate();
+  const { initialized, loading, isBackoffice } = useAuth();
 
-  useEffect(() => {
-    axios.get('http://localhost:8080/api/home/', { withCredentials: true })
-      .then(res => {
-        if (!res.data.user_logged_in || res.data.user_logged_in.role?.toLowerCase() !== 'admin') {
-          navigate('/login');
-        } else {
-          setIsAdmin(true);
-        }
-      })
-      .catch(() => navigate('/login'));
-  }, [navigate]);
+  if (!initialized || loading) {
+    return <div className="text-center mt-5"><div className="spinner-border text-primary"></div></div>;
+  }
 
-  if (!isAdmin) return <div className="text-center mt-5"><div className="spinner-border text-primary"></div></div>;
+  if (!isBackoffice) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div style={{ background: '#f4f7fe', minHeight: '100vh', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>

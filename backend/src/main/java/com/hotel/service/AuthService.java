@@ -20,16 +20,38 @@ public class AuthService {
         return role != null && "admin".equalsIgnoreCase(role.trim());
     }
 
+    public boolean isStaffRole(String role) {
+        return role != null && "staff".equalsIgnoreCase(role.trim());
+    }
+
+    public boolean isBackofficeRole(String role) {
+        return isAdminRole(role) || isStaffRole(role);
+    }
+
     public boolean isAdmin(User user) {
         return user != null && isAdminRole(user.getRole());
     }
 
+    public boolean isStaff(User user) {
+        return user != null && isStaffRole(user.getRole());
+    }
+
+    public boolean isBackoffice(User user) {
+        return user != null && isBackofficeRole(user.getRole());
+    }
+
     public String resolveClientRole(User user) {
-        return isAdmin(user) ? "ADMIN" : "USER";
+        if (isAdmin(user)) {
+            return "ADMIN";
+        }
+        if (isStaff(user)) {
+            return "STAFF";
+        }
+        return "USER";
     }
 
     public String resolveDefaultRedirect(User user) {
-        return isAdmin(user) ? "/admin" : "/";
+        return isBackoffice(user) ? "/admin" : "/";
     }
 
     public User toClientUser(User source) {

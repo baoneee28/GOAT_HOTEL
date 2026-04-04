@@ -8,15 +8,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 @Service
 public class RoomStatusService {
+
+    private static final DateTimeFormatter RESERVATION_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM");
+    private static final DateTimeFormatter HOLD_UNTIL_FORMATTER = DateTimeFormatter.ofPattern("HH:mm dd/MM");
 
     @Autowired
     private RoomRepository roomRepository;
@@ -51,9 +56,19 @@ public class RoomStatusService {
     public void applyEffectiveStatuses(List<Room> rooms) {
         LocalDateTime now = LocalDateTime.now();
         Set<Integer> occupiedRoomIds = new HashSet<>(bookingDetailRepository.findOccupiedRoomIdsAt(now));
-        Set<Integer> reservedRoomIds = new HashSet<>(bookingDetailRepository.findReservedRoomIdsAfter(now));
+        Map<Integer, com.hotel.entity.BookingDetail> reservedBookingDetails = findReservedBookingDetails(rooms, now);
+        Set<Integer> reservedRoomIds = new HashSet<>(reservedBookingDetails.keySet());
         for (Room room : rooms) {
+            room.setRelatedBookingId(null);
+            room.setEffectiveStatusReason(null);
             room.setEffectiveStatus(resolveEffectiveStatus(room, occupiedRoomIds, reservedRoomIds));
+            if (room.getId() != null && "reserved".equalsIgnoreCase(room.getEffectiveStatus())) {
+                com.hotel.entity.BookingDetail reservedDetail = reservedBookingDetails.get(room.getId());
+                if (reservedDetail != null && reservedDetail.getBooking() != null) {
+                    room.setRelatedBookingId(reservedDetail.getBooking().getId());
+                    room.setEffectiveStatusReason(buildReservedStatusReason(reservedDetail, now));
+                }
+            }
         }
     }
 
@@ -141,5 +156,62 @@ public class RoomStatusService {
             }
             room.getRoomType().setItemCount(itemCountMap.getOrDefault(room.getRoomType().getId(), 0));
         }
+    }
+
+    private Map<Integer, com.hotel.entity.BookingDetail> findReservedBookingDetails(List<Room> rooms, LocalDateTime now) {
+        List<Integer> roomIds = new ArrayList<>();
+        for (Room room : rooms) {
+            if (room != null && room.getId() != null && !roomIds.contains(room.getId())) {
+                roomIds.add(room.getId());
+            }
+        }
+
+        if (roomIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Integer, com.hotel.entity.BookingDetail> reservedDetails = new LinkedHashMap<>();
+        for (com.hotel.entity.BookingDetail detail : bookingDetailRepository.findReservedBookingDetailsAfter(roomIds, now)) {
+            if (detail == null || detail.getRoom() == null || detail.getRoom().getId() == null) {
+                continue;
+            }
+            reservedDetails.putIfAbsent(detail.getRoom().getId(), detail);
+        }
+        return reservedDetails;
+    }
+
+    private String buildReservedStatusReason(com.hotel.entity.BookingDetail detail, LocalDateTime now) {
+        if (detail == null || detail.getBooking() == null) {
+            return null;
+        }
+
+        Integer bookingId = detail.getBooking().getId();
+        String prefix = bookingId == null ? "Booking liên quan" : "Booking #" + bookingId;
+        String bookingStatus = detail.getBooking().getStatus() == null
+                ? ""
+                : detail.getBooking().getStatus().trim().toLowerCase();
+
+        if ("pending".equals(bookingStatus) && detail.getBooking().getExpiresAt() != null && detail.getBooking().getExpiresAt().isAfter(now)) {
+            return prefix + ", giữ đến " + detail.getBooking().getExpiresAt().format(HOLD_UNTIL_FORMATTER);
+        }
+
+        if (detail.getCheckIn() != null && detail.getCheckOut() != null) {
+            String dateRange = detail.getCheckIn().format(RESERVATION_DATE_FORMATTER)
+                    + " - "
+                    + detail.getCheckOut().format(RESERVATION_DATE_FORMATTER);
+            if ("confirmed".equals(bookingStatus) && detail.getCheckInActual() == null) {
+                return prefix + ", " + dateRange + ", chưa check-in";
+            }
+            if ("pending".equals(bookingStatus)) {
+                return prefix + ", " + dateRange + ", chờ duyệt";
+            }
+            return prefix + ", " + dateRange;
+        }
+
+        if ("confirmed".equals(bookingStatus) && detail.getCheckInActual() == null) {
+            return prefix + ", chưa check-in";
+        }
+
+        return prefix;
     }
 }

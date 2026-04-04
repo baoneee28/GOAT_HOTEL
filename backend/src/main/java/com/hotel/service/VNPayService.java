@@ -52,52 +52,54 @@ public class VNPayService {
     @Autowired
     private PaymentService paymentService;
 
-    public String createPaymentUrl(Integer bookingId, Integer currentUserId, HttpServletRequest request) throws Exception {
+    public String createPaymentUrl(Integer bookingId,
+                                   Integer currentUserId,
+                                   String paymentMode,
+                                   HttpServletRequest request) throws Exception {
         validateConfiguration();
 
         if (bookingId == null) {
-            throw new IllegalArgumentException("Thiếu mã booking để khởi tạo thanh toán.");
+            throw new IllegalArgumentException("Thieu ma booking de khoi tao thanh toan.");
         }
         if (currentUserId == null) {
-            throw new SecurityException("Phiên đăng nhập không hợp lệ.");
+            throw new SecurityException("Phien dang nhap khong hop le.");
         }
 
+        String normalizedPaymentMode = VNPayConfig.normalizePaymentMode(paymentMode);
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn đặt phòng."));
+                .orElseThrow(() -> new IllegalArgumentException("Khong tim thay don dat phong."));
 
         if (booking.getUser() == null || !currentUserId.equals(booking.getUser().getId())) {
-            throw new SecurityException("Bạn không có quyền thanh toán đơn đặt phòng này.");
+            throw new SecurityException("Ban khong co quyen thanh toan don dat phong nay.");
         }
 
         bookingService.normalizeBookingFinancials(booking);
-        if ("expired".equalsIgnoreCase(booking.getStatus())) {
-            throw new IllegalArgumentException("Booking này đã hết thời gian giữ chỗ. Vui lòng tạo yêu cầu đặt phòng mới.");
-        }
-        if (!"pending".equalsIgnoreCase(booking.getStatus())) {
-            throw new IllegalArgumentException("Chỉ có thể thanh toán booking đang ở trạng thái chờ xử lý.");
-        }
-        if ("paid".equalsIgnoreCase(booking.getPaymentStatus())) {
-            throw new IllegalArgumentException("Booking này đã được đánh dấu đã thanh toán.");
-        }
-        double bookingTotal = paymentService.resolvePayableAmount(booking);
-        if (bookingTotal <= 0) {
-            throw new IllegalArgumentException("Đơn đặt phòng chưa có số tiền hợp lệ để thanh toán.");
+        validatePayableBooking(booking, normalizedPaymentMode);
+
+        double bookingAmount = resolveExpectedAmount(booking, normalizedPaymentMode);
+        if (bookingAmount <= 0) {
+            throw new IllegalArgumentException("Don dat phong khong con so du hop le de thanh toan.");
         }
 
-        if (!"pending_payment".equalsIgnoreCase(booking.getPaymentStatus())) {
+        if (shouldMarkPendingPayment(booking, normalizedPaymentMode)) {
             booking.setPaymentStatus("pending_payment");
             bookingRepository.save(booking);
         }
 
-        long amount = Math.round(bookingTotal * 100L);
+        long amount = Math.round(bookingAmount * 100L);
         Map<String, String> params = new HashMap<>();
         params.put("vnp_Version", "2.1.0");
         params.put("vnp_Command", "pay");
         params.put("vnp_TmnCode", vnpTmnCode.trim());
         params.put("vnp_Amount", String.valueOf(amount));
         params.put("vnp_CurrCode", "VND");
-        params.put("vnp_TxnRef", VNPayConfig.buildTxnRef(bookingId));
-        params.put("vnp_OrderInfo", "Thanh toan booking " + bookingId);
+        params.put("vnp_TxnRef", VNPayConfig.buildTxnRef(bookingId, normalizedPaymentMode));
+        params.put(
+                "vnp_OrderInfo",
+                "deposit".equals(normalizedPaymentMode)
+                        ? "Dat coc booking " + bookingId
+                        : "Thanh toan booking " + bookingId
+        );
         params.put("vnp_OrderType", "other");
         params.put("vnp_Locale", "vn");
         params.put("vnp_ReturnUrl", vnpReturnUrl.trim());
@@ -146,7 +148,7 @@ public class VNPayService {
     public String buildFrontendReturnUrl(Map<String, String> queryParams) {
         VNPayValidationResult validation = validateCallback(queryParams);
         if (validation.success() && validation.booking() != null) {
-            paymentService.confirmBookingPayment(validation.booking(), "VNPay", true);
+            confirmPaymentByMode(validation.booking(), validation.paymentMode(), "VNPay");
         }
 
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(vnpFrontendReturnUrl.trim())
@@ -155,6 +157,9 @@ public class VNPayService {
 
         if (validation.bookingId() != null) {
             builder.queryParam("bookingId", validation.bookingId());
+        }
+        if (validation.paymentMode() != null) {
+            builder.queryParam("paymentMode", validation.paymentMode());
         }
 
         return builder.build().encode().toUriString();
@@ -175,7 +180,7 @@ public class VNPayService {
         }
 
         if (validation.paymentSuccess()) {
-            paymentService.confirmBookingPayment(validation.booking(), "VNPay", true);
+            confirmPaymentByMode(validation.booking(), validation.paymentMode(), "VNPay");
             return createIpnResponse("00", "Confirm Success");
         }
 
@@ -186,7 +191,7 @@ public class VNPayService {
         Map<String, String> fields = new HashMap<>(queryParams);
         String secureHash = fields.get("vnp_SecureHash");
         if (secureHash == null || secureHash.isBlank()) {
-            return new VNPayValidationResult(false, false, false, null, null, "Thiếu chữ ký xác thực từ VNPay.");
+            return new VNPayValidationResult(false, false, false, null, null, "full", "Thieu chu ky xac thuc tu VNPay.");
         }
 
         fields.remove("vnp_SecureHashType");
@@ -214,33 +219,32 @@ public class VNPayService {
 
         String signedValue = VNPayConfig.hmacSHA512(vnpHashSecret.trim(), hashData.toString());
         if (!signedValue.equalsIgnoreCase(secureHash)) {
-            return new VNPayValidationResult(false, false, false, null, null, "Chữ ký VNPay không hợp lệ.");
+            return new VNPayValidationResult(false, false, false, null, null, "full", "Chu ky VNPay khong hop le.");
         }
 
-        Integer bookingId = VNPayConfig.extractBookingId(fields.get("vnp_TxnRef"));
-        if (bookingId == null) {
-            return new VNPayValidationResult(true, false, false, null, null, "Không xác định được booking từ giao dịch VNPay.");
+        VNPayConfig.TxnRefData txnRefData = VNPayConfig.parseTxnRef(fields.get("vnp_TxnRef"));
+        if (txnRefData == null || txnRefData.bookingId() == null) {
+            return new VNPayValidationResult(true, false, false, null, null, "full", "Khong xac dinh duoc booking tu giao dich VNPay.");
         }
 
+        Integer bookingId = txnRefData.bookingId();
+        String paymentMode = txnRefData.paymentMode();
         Booking booking = bookingRepository.findById(bookingId).orElse(null);
         if (booking == null) {
-            return new VNPayValidationResult(true, false, false, bookingId, null, "Không tìm thấy đơn đặt phòng tương ứng.");
+            return new VNPayValidationResult(true, false, false, bookingId, null, paymentMode, "Khong tim thay don dat phong tuong ung.");
         }
 
         bookingService.normalizeBookingFinancials(booking);
-        if ("expired".equalsIgnoreCase(booking.getStatus())) {
-            return new VNPayValidationResult(true, false, true, bookingId, booking, "Booking đã hết thời gian giữ chỗ nên không thể xác nhận thanh toán.");
+        try {
+            validatePayableBooking(booking, paymentMode);
+        } catch (IllegalArgumentException ex) {
+            return new VNPayValidationResult(true, false, true, bookingId, booking, paymentMode, ex.getMessage());
         }
-        if ("cancelled".equalsIgnoreCase(booking.getStatus())) {
-            return new VNPayValidationResult(true, false, true, bookingId, booking, "Booking đã bị hủy nên không thể xác nhận thanh toán.");
-        }
-        if (!"pending".equalsIgnoreCase(booking.getStatus())) {
-            return new VNPayValidationResult(true, false, true, bookingId, booking, "Chỉ có thể xác nhận thanh toán VNPay cho booking đang chờ xử lý.");
-        }
-        long expectedAmount = Math.round(paymentService.resolvePayableAmount(booking) * 100L);
+
+        long expectedAmount = Math.round(resolveExpectedAmount(booking, paymentMode) * 100L);
         boolean amountValid = String.valueOf(expectedAmount).equals(fields.get("vnp_Amount"));
         if (!amountValid) {
-            return new VNPayValidationResult(true, false, false, bookingId, booking, "Số tiền VNPay trả về không khớp với booking.");
+            return new VNPayValidationResult(true, false, false, bookingId, booking, paymentMode, "So tien VNPay tra ve khong khop voi booking.");
         }
 
         String responseCode = fields.get("vnp_ResponseCode");
@@ -248,27 +252,97 @@ public class VNPayService {
         boolean paymentSuccess = "00".equals(responseCode) && "00".equals(transactionStatus);
 
         if (paymentSuccess) {
-            return new VNPayValidationResult(true, true, true, bookingId, booking, "Thanh toán VNPay thành công.");
+            return new VNPayValidationResult(
+                    true,
+                    true,
+                    true,
+                    bookingId,
+                    booking,
+                    paymentMode,
+                    "deposit".equals(paymentMode)
+                            ? "Thanh toan dat coc VNPay thanh cong."
+                            : "Thanh toan VNPay thanh cong."
+            );
         }
 
-        return new VNPayValidationResult(true, false, true, bookingId, booking, "Thanh toán chưa thành công hoặc đã bị hủy.");
+        return new VNPayValidationResult(true, false, true, bookingId, booking, paymentMode, "Thanh toan chua thanh cong hoac da bi huy.");
+    }
+
+    private void confirmPaymentByMode(Booking booking, String paymentMode, String paymentMethod) {
+        String normalizedPaymentMode = VNPayConfig.normalizePaymentMode(paymentMode);
+        if ("deposit".equals(normalizedPaymentMode)) {
+            paymentService.confirmBookingDeposit(booking, paymentMethod, true, null);
+            return;
+        }
+        paymentService.confirmBookingPayment(booking, paymentMethod, true, null);
+    }
+
+    private double resolveExpectedAmount(Booking booking, String paymentMode) {
+        String normalizedPaymentMode = VNPayConfig.normalizePaymentMode(paymentMode);
+        if ("deposit".equals(normalizedPaymentMode)) {
+            return paymentService.resolveDepositPayableAmount(booking);
+        }
+        return paymentService.resolvePayableAmount(booking);
+    }
+
+    private boolean shouldMarkPendingPayment(Booking booking, String paymentMode) {
+        String paymentStatus = booking.getPaymentStatus() == null
+                ? ""
+                : booking.getPaymentStatus().trim().toLowerCase();
+        if ("paid".equals(paymentStatus)) {
+            return false;
+        }
+        if ("deposit".equals(VNPayConfig.normalizePaymentMode(paymentMode))) {
+            return !"deposit_paid".equals(paymentStatus);
+        }
+        return !"deposit_paid".equals(paymentStatus) && !"pending_payment".equals(paymentStatus);
+    }
+
+    private void validatePayableBooking(Booking booking, String paymentMode) {
+        if ("expired".equalsIgnoreCase(booking.getStatus())) {
+            throw new IllegalArgumentException("Booking nay da het thoi gian giu cho. Vui long tao yeu cau dat phong moi.");
+        }
+        if ("cancelled".equalsIgnoreCase(booking.getStatus())) {
+            throw new IllegalArgumentException("Booking da bi huy nen khong the tiep tuc thanh toan VNPay.");
+        }
+        if ("completed".equalsIgnoreCase(booking.getStatus())) {
+            throw new IllegalArgumentException("Booking da hoan thanh nen khong can thanh toan VNPay nua.");
+        }
+        if (!"pending".equalsIgnoreCase(booking.getStatus()) && !"confirmed".equalsIgnoreCase(booking.getStatus())) {
+            throw new IllegalArgumentException("Chi co the thanh toan VNPay cho booking dang cho xu ly hoac da xac nhan.");
+        }
+        if ("paid".equalsIgnoreCase(booking.getPaymentStatus())) {
+            throw new IllegalArgumentException("Booking nay da duoc danh dau da thanh toan.");
+        }
+
+        String normalizedPaymentMode = VNPayConfig.normalizePaymentMode(paymentMode);
+        if ("deposit".equals(normalizedPaymentMode)) {
+            if (paymentService.resolveDepositPayableAmount(booking) <= 0) {
+                throw new IllegalArgumentException("Booking nay khong con so tien dat coc hop le.");
+            }
+            return;
+        }
+
+        if (paymentService.resolvePayableAmount(booking) <= 0) {
+            throw new IllegalArgumentException("Booking nay khong con so du hop le de thanh toan.");
+        }
     }
 
     private void validateConfiguration() {
         if (vnpTmnCode == null || vnpTmnCode.isBlank()) {
-            throw new IllegalArgumentException("Thiếu cấu hình VNPay: vnp.tmnCode");
+            throw new IllegalArgumentException("Thieu cau hinh VNPay: vnp.tmnCode");
         }
         if (vnpHashSecret == null || vnpHashSecret.isBlank()) {
-            throw new IllegalArgumentException("Thiếu cấu hình VNPay: vnp.hashSecret");
+            throw new IllegalArgumentException("Thieu cau hinh VNPay: vnp.hashSecret");
         }
         if (vnpPayUrl == null || vnpPayUrl.isBlank()) {
-            throw new IllegalArgumentException("Thiếu cấu hình VNPay: vnp.url");
+            throw new IllegalArgumentException("Thieu cau hinh VNPay: vnp.url");
         }
         if (vnpReturnUrl == null || vnpReturnUrl.isBlank()) {
-            throw new IllegalArgumentException("Thiếu cấu hình VNPay: vnp.returnUrl");
+            throw new IllegalArgumentException("Thieu cau hinh VNPay: vnp.returnUrl");
         }
         if (vnpFrontendReturnUrl == null || vnpFrontendReturnUrl.isBlank()) {
-            throw new IllegalArgumentException("Thiếu cấu hình VNPay: vnp.frontendReturnUrl");
+            throw new IllegalArgumentException("Thieu cau hinh VNPay: vnp.frontendReturnUrl");
         }
     }
 
@@ -280,32 +354,24 @@ public class VNPayService {
     }
 
     @Transactional
-    public Booking confirmDemoPayment(Integer bookingId, Integer currentUserId) {
+    public Booking confirmDemoPayment(Integer bookingId, Integer currentUserId, String paymentMode) {
         if (bookingId == null) {
-            throw new IllegalArgumentException("Thiếu booking để xác nhận thanh toán demo.");
+            throw new IllegalArgumentException("Thieu booking de xac nhan thanh toan demo.");
         }
         if (currentUserId == null) {
-            throw new SecurityException("Phiên đăng nhập không hợp lệ.");
+            throw new SecurityException("Phien dang nhap khong hop le.");
         }
 
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn đặt phòng."));
+                .orElseThrow(() -> new IllegalArgumentException("Khong tim thay don dat phong."));
 
         if (booking.getUser() == null || !currentUserId.equals(booking.getUser().getId())) {
-            throw new SecurityException("Bạn không có quyền thao tác đơn đặt phòng này.");
-        }
-        bookingService.normalizeBookingFinancials(booking);
-        if ("expired".equalsIgnoreCase(booking.getStatus())) {
-            throw new IllegalArgumentException("Booking này đã hết thời gian giữ chỗ nên không thể mô phỏng thanh toán.");
-        }
-        if ("cancelled".equalsIgnoreCase(booking.getStatus())) {
-            throw new IllegalArgumentException("Booking đã bị hủy nên không thể mô phỏng thanh toán.");
-        }
-        if (!"pending".equalsIgnoreCase(booking.getStatus())) {
-            throw new IllegalArgumentException("Chỉ có thể mô phỏng thanh toán cho booking đang chờ xử lý.");
+            throw new SecurityException("Ban khong co quyen thao tac don dat phong nay.");
         }
 
-        paymentService.confirmBookingPayment(booking, "VNPay Demo", true);
+        bookingService.normalizeBookingFinancials(booking);
+        validatePayableBooking(booking, paymentMode);
+        confirmPaymentByMode(booking, paymentMode, "VNPay Demo");
         return booking;
     }
 
@@ -315,6 +381,7 @@ public class VNPayService {
             boolean amountValid,
             Integer bookingId,
             Booking booking,
+            String paymentMode,
             String message
     ) {
         private boolean success() {

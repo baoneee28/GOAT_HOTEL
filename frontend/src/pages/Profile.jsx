@@ -63,6 +63,11 @@ function getPaymentMeta(paymentStatus) {
         label: 'Đã thanh toán',
         className: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
       };
+    case 'deposit_paid':
+      return {
+        label: 'Đã đặt cọc',
+        className: 'bg-violet-50 text-violet-700 border border-violet-200',
+      };
     case 'pending_payment':
       return {
         label: 'Chờ thanh toán',

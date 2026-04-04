@@ -9,6 +9,7 @@ export default function VNPayReturn() {
   const [demoState, setDemoState] = useState(null);
 
   const bookingId = searchParams.get('bookingId');
+  const paymentMode = searchParams.get('paymentMode') === 'deposit' ? 'deposit' : 'full';
   const initialStatus = searchParams.get('status') === 'success' ? 'success' : 'error';
   const status = demoState?.status || initialStatus;
   const message = demoState?.message
@@ -22,6 +23,7 @@ export default function VNPayReturn() {
       setDemoSubmitting(true);
       const res = await axios.post(`${API_BASE}/api/vnpay/demo-success`, {
         bookingId,
+        paymentMode,
       }, {
         withCredentials: true,
       });
@@ -73,7 +75,7 @@ export default function VNPayReturn() {
 
         {status !== 'success' && bookingId && (
           <div className="mt-6 rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 text-left text-sm leading-7 text-amber-900">
-            Booking này chỉ được giữ chỗ tạm thời trong 3 phút. Nếu bạn cần demo case thành công để bảo vệ đồ án, hãy xác nhận lại khi booking vẫn còn hiệu lực hoặc tạo booking mới khi đơn cũ đã hết hạn.
+            Nếu booking vẫn còn hiệu lực, bạn có thể quay lại trang chi tiết đơn để mở lại VNPay hoặc xử lý đặt cọc 30%. Với case giữ chỗ tạm thời, thời gian demo hiện tại là 2 phút.
           </div>
         )}
 

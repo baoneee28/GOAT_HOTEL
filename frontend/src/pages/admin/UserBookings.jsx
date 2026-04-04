@@ -14,6 +14,7 @@ const STATUS_META = {
 const PAYMENT_META = {
   unpaid: { label: 'Chua thanh toan', className: 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' },
   pending_payment: { label: 'Cho thanh toan', className: 'bg-info-subtle text-info-emphasis border border-info-subtle' },
+  deposit_paid: { label: 'Da dat coc', className: 'bg-primary-subtle text-primary-emphasis border border-primary-subtle' },
   paid: { label: 'Da thanh toan', className: 'bg-success-subtle text-success-emphasis border border-success-subtle' },
   failed: { label: 'Thanh toan loi', className: 'bg-danger-subtle text-danger-emphasis border border-danger-subtle' },
 };

@@ -7,6 +7,7 @@ import com.hotel.entity.Room;
 import com.hotel.entity.User;
 import com.hotel.repository.BookingRepository;
 import com.hotel.repository.BookingDetailRepository;
+import com.hotel.repository.PaymentRepository;
 import com.hotel.repository.RoomRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,6 +38,9 @@ public class BookingService {
     @Value("${booking.pending-hold-seconds:180}")
     private long pendingHoldSeconds;
 
+    @Value("${booking.deposit-ratio:0.3}")
+    private double bookingDepositRatio;
+
     @Autowired
     private BookingRepository bookingRepository;
     
@@ -45,6 +49,9 @@ public class BookingService {
 
     @Autowired
     private RoomRepository roomRepository;
+
+    @Autowired
+    private PaymentRepository paymentRepository;
 
     @Autowired
     private CouponService couponService;
@@ -86,6 +93,78 @@ public class BookingService {
         result.put("nights", (double) totalNights);
         result.put("total", totalNights * pricePerNight);
         return result;
+    }
+
+    public double calculateDepositAmount(double bookingAmount) {
+        if (bookingAmount <= 0 || bookingDepositRatio <= 0) {
+            return 0.0;
+        }
+        return Math.round(bookingAmount * bookingDepositRatio);
+    }
+
+    public double resolveDepositRequiredAmount(Booking booking) {
+        if (booking == null) {
+            return 0.0;
+        }
+
+        double baseAmount = booking.getFinalAmount() != null && booking.getFinalAmount() > 0
+                ? booking.getFinalAmount()
+                : Math.max(0.0, (booking.getTotalPrice() != null ? booking.getTotalPrice() : 0.0)
+                - (booking.getDiscountAmount() == null ? 0.0 : booking.getDiscountAmount()));
+
+        double computedDepositAmount = calculateDepositAmount(baseAmount);
+        if (computedDepositAmount > 0) {
+            return computedDepositAmount;
+        }
+
+        return booking.getDepositAmount() == null ? 0.0 : booking.getDepositAmount();
+    }
+
+    public double resolvePaidAmount(Booking booking) {
+        if (booking == null || booking.getId() == null) {
+            return 0.0;
+        }
+
+        Double paidAmount = paymentRepository.sumPaidRevenueByBookingId(booking.getId());
+        return paidAmount != null ? paidAmount : 0.0;
+    }
+
+    public double resolveRemainingAmount(Booking booking) {
+        if (booking == null) {
+            return 0.0;
+        }
+
+        double finalAmount = booking.getFinalAmount() != null && booking.getFinalAmount() > 0
+                ? booking.getFinalAmount()
+                : Math.max(0.0, (booking.getTotalPrice() != null ? booking.getTotalPrice() : 0.0)
+                - (booking.getDiscountAmount() == null ? 0.0 : booking.getDiscountAmount()));
+        return Math.max(0.0, finalAmount - resolvePaidAmount(booking));
+    }
+
+    public double resolveDepositOutstandingAmount(Booking booking) {
+        return Math.max(0.0, resolveDepositRequiredAmount(booking) - resolvePaidAmount(booking));
+    }
+
+    public String determinePaymentStatus(Booking booking, double paidAmount) {
+        if (booking == null) {
+            return "unpaid";
+        }
+
+        double normalizedPaidAmount = Math.max(0.0, paidAmount);
+        double finalAmount = booking.getFinalAmount() != null && booking.getFinalAmount() > 0
+                ? booking.getFinalAmount()
+                : Math.max(0.0, (booking.getTotalPrice() != null ? booking.getTotalPrice() : 0.0)
+                - (booking.getDiscountAmount() == null ? 0.0 : booking.getDiscountAmount()));
+        if (normalizedPaidAmount <= 0.01) {
+            return "unpaid";
+        }
+        if (finalAmount > 0 && normalizedPaidAmount + 0.01 >= finalAmount) {
+            return "paid";
+        }
+        if (normalizedPaidAmount + 0.01 >= resolveDepositRequiredAmount(booking)) {
+            return "deposit_paid";
+        }
+        return "unpaid";
     }
 
     public LocalDateTime createPendingExpiry() {
@@ -168,24 +247,21 @@ public class BookingService {
         if (!"pending".equals(normalizedBookingStatus) && "pending_payment".equals(normalizedPaymentStatus)) {
             return "unpaid";
         }
-        if ("completed".equals(normalizedBookingStatus)) {
-            return "paid".equals(normalizedPaymentStatus) ? "paid" : "unpaid";
+
+        if ("deposit_paid".equals(normalizedPaymentStatus)) {
+            return "deposit_paid";
         }
-        if ("cancelled".equals(normalizedBookingStatus)) {
-            return "paid".equals(normalizedPaymentStatus) ? "paid" : "unpaid";
+        if ("paid".equals(normalizedPaymentStatus)) {
+            return "paid";
         }
+        if ("failed".equals(normalizedPaymentStatus)) {
+            return "failed";
+        }
+
         if ("expired".equals(normalizedBookingStatus)) {
-            if ("pending_payment".equals(normalizedPaymentStatus)) {
-                return "failed";
-            }
-            if ("paid".equals(normalizedPaymentStatus)) {
-                return "paid";
-            }
-            return "unpaid";
+            return "pending_payment".equals(normalizedPaymentStatus) ? "failed" : "unpaid";
         }
-        if (!normalizedPaymentStatus.isBlank()) {
-            return normalizedPaymentStatus;
-        }
+
         return "unpaid";
     }
 
@@ -321,9 +397,7 @@ public class BookingService {
             return null;
         }
 
-        if (synchronizeBookingState(booking)) {
-            bookingRepository.save(booking);
-        }
+        boolean changed = synchronizeBookingState(booking);
 
         if (booking.getDetails() != null) {
             for (BookingDetail detail : booking.getDetails()) {
@@ -334,6 +408,7 @@ public class BookingService {
                 double recalculatedHours = calculateHours(detail.getCheckIn(), detail.getCheckOut());
                 if (detail.getTotalHours() == null || Math.abs(detail.getTotalHours() - recalculatedHours) > 0.01) {
                     detail.setTotalHours(recalculatedHours);
+                    changed = true;
                 }
             }
         }
@@ -341,16 +416,41 @@ public class BookingService {
         double recalculatedTotal = calculateBookingTotal(booking);
         if (recalculatedTotal > 0 && (booking.getTotalPrice() == null || Math.abs(booking.getTotalPrice() - recalculatedTotal) > 0.01)) {
             booking.setTotalPrice(recalculatedTotal);
+            changed = true;
         }
 
         double discountAmount = booking.getDiscountAmount() == null ? 0.0 : booking.getDiscountAmount();
         double finalAmount = Math.max(0.0, recalculatedTotal - discountAmount);
         if (recalculatedTotal > 0 && (booking.getFinalAmount() == null || Math.abs(booking.getFinalAmount() - finalAmount) > 0.01)) {
             booking.setFinalAmount(finalAmount);
+            changed = true;
         } else if (booking.getFinalAmount() == null && booking.getTotalPrice() != null) {
             booking.setFinalAmount(Math.max(0.0, booking.getTotalPrice() - discountAmount));
+            changed = true;
         }
 
+        double depositAmount = resolveDepositRequiredAmount(booking);
+        if (booking.getDepositAmount() == null || Math.abs(booking.getDepositAmount() - depositAmount) > 0.01) {
+            booking.setDepositAmount(depositAmount);
+            changed = true;
+        }
+
+        double paidAmount = resolvePaidAmount(booking);
+        if (paidAmount > 0.01) {
+            String derivedPaymentStatus = determinePaymentStatus(booking, paidAmount);
+            if (!derivedPaymentStatus.equalsIgnoreCase(booking.getPaymentStatus())) {
+                booking.setPaymentStatus(derivedPaymentStatus);
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            bookingRepository.save(booking);
+        }
+
+        booking.setPaidAmount(paidAmount);
+        booking.setRemainingAmount(Math.max(0.0, (booking.getFinalAmount() == null ? 0.0 : booking.getFinalAmount()) - paidAmount));
+        booking.setDepositOutstandingAmount(Math.max(0.0, booking.getDepositAmount() == null ? 0.0 : booking.getDepositAmount() - paidAmount));
         return booking;
     }
 
@@ -378,12 +478,12 @@ public class BookingService {
             return booking.getPaymentStatus().trim().toLowerCase();
         }
 
-        boolean hasPaidPayment = booking.getPayments() != null
-                && booking.getPayments().stream().anyMatch(payment ->
-                payment != null && ("paid".equalsIgnoreCase(payment.getStatus())
-                        || "completed".equalsIgnoreCase(payment.getStatus())));
+        double paidAmount = resolvePaidAmount(booking);
+        if (paidAmount > 0.01) {
+            return determinePaymentStatus(booking, paidAmount);
+        }
 
-        if (hasPaidPayment || "completed".equalsIgnoreCase(booking.getStatus())) {
+        if ("completed".equalsIgnoreCase(booking.getStatus())) {
             return "paid";
         }
 
@@ -462,6 +562,7 @@ public class BookingService {
         booking.setTotalPrice((double) totalPrice);
         booking.setDiscountAmount(couponPricing.discountAmount());
         booking.setFinalAmount(couponPricing.finalAmount());
+        booking.setDepositAmount(calculateDepositAmount(couponPricing.finalAmount()));
         booking.setCouponCode(appliedCoupon != null ? appliedCoupon.getCode() : null);
         booking.setStatus("pending");
         booking.setPaymentStatus(resolveInitialPaymentStatus(paymentFlow));
@@ -540,6 +641,7 @@ public class BookingService {
         Map<String, Long> summary = new LinkedHashMap<>();
         summary.put("all", 0L);
         summary.put("pending", 0L);
+        summary.put("deposit_paid", 0L);
         summary.put("confirmed", 0L);
         summary.put("staying", 0L);
         summary.put("completed", 0L);
@@ -585,6 +687,10 @@ public class BookingService {
                 && primaryDetail.getCheckInActual() != null
                 && primaryDetail.getCheckOutActual() == null) {
             return "staying";
+        }
+
+        if ("deposit_paid".equalsIgnoreCase(booking.getPaymentStatus())) {
+            return "deposit_paid";
         }
 
         return normalizedStatus;

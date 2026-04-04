@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 import API_BASE from '../../config';
 
 const ROOM_STATUS_META = {
@@ -14,9 +15,9 @@ const ROOM_STATUS_META = {
     description: 'Phòng đang được sử dụng',
   },
   reserved: {
-    label: 'Đang giữ chỗ',
+    label: 'Có lịch sắp tới',
     className: 'room-status-reserved',
-    description: 'Đã có booking chờ check-in hoặc booking sắp tới trong một khoảng ngày',
+    description: 'Đã có booking còn hiệu lực trong tương lai hoặc booking đã xác nhận nhưng chưa check-in',
   },
   maintenance: {
     label: 'Đang sửa',
@@ -29,7 +30,7 @@ const FILTER_STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
   { value: 'available', label: 'Sẵn sàng' },
   { value: 'booked', label: 'Đang có khách' },
-  { value: 'reserved', label: 'Đang giữ chỗ' },
+  { value: 'reserved', label: 'Có lịch sắp tới' },
   { value: 'maintenance', label: 'Đang sửa' },
 ];
 
@@ -295,6 +296,31 @@ export default function Rooms() {
           background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
           border-radius: 16px;
         }
+        .room-booking-link {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 32px;
+          padding: 0 12px;
+          border-radius: 999px;
+          border: 1px solid #fde68a;
+          background: #fff7ed;
+          color: #9a3412;
+          font-size: 0.78rem;
+          font-weight: 700;
+          text-decoration: none;
+        }
+        .room-booking-link:hover {
+          color: #7c2d12;
+          background: #ffedd5;
+        }
+        .room-status-detail {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
+          margin-top: 8px;
+        }
       `}</style>
 
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -366,8 +392,8 @@ export default function Rooms() {
               ) : data.rooms?.length > 0 ? data.rooms.map((room) => {
                 const effectiveStatus = room.effectiveStatus || room.status || 'available';
                 const effectiveStatusMeta = ROOM_STATUS_META[effectiveStatus] || ROOM_STATUS_META.available;
-                const configuredStatusMeta = ROOM_STATUS_META[room.status] || ROOM_STATUS_META.available;
                 const itemCount = Number(room.roomType?.itemCount ?? room.roomType?.items?.length ?? 0);
+                const relatedBookingId = room.relatedBookingId;
 
                 return (
                   <tr key={room.id}>
@@ -391,14 +417,17 @@ export default function Rooms() {
                       <div className={`room-status-badge ${effectiveStatusMeta.className}`}>
                         {effectiveStatusMeta.label}
                       </div>
-                      {effectiveStatus !== room.status && (
-                        <div className="small text-muted mt-2">
-                          Thiết lập: {configuredStatusMeta.label}
-                        </div>
-                      )}
-                      {effectiveStatus === 'reserved' && (
-                        <div className="small text-muted mt-2">
-                          Trạng thái này phản ánh lịch booking sắp tới. User chỉ bị chặn khi chọn ngày trùng lịch đã giữ chỗ.
+                      {effectiveStatus === 'reserved' && relatedBookingId && (
+                        <div className="room-status-detail">
+                          {relatedBookingId && (
+                            <Link
+                              className="room-booking-link"
+                              to={`/admin/bookings?bookingId=${relatedBookingId}`}
+                              title={`Xem booking #${relatedBookingId}`}
+                            >
+                              Xem đơn
+                            </Link>
+                          )}
                         </div>
                       )}
                     </td>

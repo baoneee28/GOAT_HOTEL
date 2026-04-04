@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -168,6 +169,34 @@ public class BookingApiController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/bookings/{id}/deposit")
+    public ResponseEntity<Map<String, Object>> collectDepositPayment(@PathVariable("id") Integer id, HttpSession session) {
+        User currentUser = getSessionUser(session);
+        if (currentUser == null) {
+            return authRequiredResponse();
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Booking booking = paymentService.collectDepositPayment(id, currentUser.getId());
+            response.put("success", true);
+            response.put("message", "Da ghi nhan dat coc 30% va xac nhan booking.");
+            response.put("bookingId", booking.getId());
+            response.put("bookingStatus", booking.getStatus());
+            response.put("paymentStatus", booking.getPaymentStatus());
+            response.put("booking", bookingService.normalizeBookingFinancials(booking));
+            return ResponseEntity.ok(response);
+        } catch (SecurityException ex) {
+            response.put("success", false);
+            response.put("message", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        } catch (IllegalArgumentException ex) {
+            response.put("success", false);
+            response.put("message", ex.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
     @DeleteMapping("/bookings/{id}")
     public ResponseEntity<Map<String, Object>> cancelBooking(@PathVariable("id") Integer id, HttpSession session) {
         User currentUser = getSessionUser(session);
@@ -191,16 +220,29 @@ public class BookingApiController {
     @GetMapping("/admin/bookings")
     public ResponseEntity<Map<String, Object>> listAdminBookings(
             @RequestParam(value = "status", defaultValue = "") String status,
-            @RequestParam(value = "page", defaultValue = "1") int page) {
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "bookingId", required = false) Integer bookingId) {
         bookingService.expirePendingBookings();
-        
+
+        Map<String, Object> response = new HashMap<>();
+        if (bookingId != null) {
+            Optional<Booking> bookingOpt = bookingRepository.findById(bookingId);
+            List<Booking> bookings = bookingOpt
+                    .map(booking -> List.of(bookingService.normalizeBookingFinancials(booking)))
+                    .orElseGet(List::of);
+            response.put("bookings", bookings);
+            response.put("totalPages", 1);
+            response.put("currentPage", 1);
+            return ResponseEntity.ok(response);
+        }
+
         Page<Booking> bookingPage = bookingRepository.findAdminBookings(
                 status.isBlank() ? null : status,
                 PageRequest.of(page - 1, 5));
 
-        Map<String, Object> response = new HashMap<>();
         response.put("bookings", bookingService.normalizeBookingFinancials(bookingPage.getContent()));
         response.put("totalPages", bookingPage.getTotalPages());
+        response.put("currentPage", page);
         return ResponseEntity.ok(response);
     }
 
@@ -495,6 +537,7 @@ public class BookingApiController {
             response.put("bookingId", booking.getId());
             response.put("bookingStatus", booking.getStatus());
             response.put("paymentStatus", booking.getPaymentStatus());
+            response.put("booking", bookingService.normalizeBookingFinancials(booking));
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException ex) {
             response.put("success", false);

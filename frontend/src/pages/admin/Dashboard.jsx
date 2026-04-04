@@ -110,7 +110,7 @@ export default function Dashboard() {
     pieChartInstance.current = new Chart(pieChartRef.current, {
       type: 'doughnut',
       data: {
-        labels: ['Sẵn sàng', 'Đang giữ chỗ', 'Đang có khách', 'Bảo trì'],
+        labels: ['Sẵn sàng', 'Có lịch sắp tới', 'Đang có khách', 'Bảo trì'],
         datasets: [{
           data: [
             Number(stats.rooms_available || 0),

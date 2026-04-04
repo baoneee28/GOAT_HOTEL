@@ -18,4 +18,8 @@ public class Room {
     private String status = "available";
     @Transient
     private String effectiveStatus;
+    @Transient
+    private Integer relatedBookingId;
+    @Transient
+    private String effectiveStatusReason;
 }

@@ -115,8 +115,13 @@ const PAYMENT_META = {
   },
   pending_payment: {
     label: 'Chờ thanh toán',
-    summary: 'Bạn đã mở luồng VNPay demo nhưng giao dịch chưa được xác nhận thành công.',
+    summary: 'Bạn đã mở luồng VNPay nhưng giao dịch chưa được xác nhận thành công.',
     badgeClass: 'border border-sky-300/24 bg-sky-100/80 text-sky-800',
+  },
+  deposit_paid: {
+    label: 'Đã đặt cọc',
+    summary: 'Bạn đã thanh toán 30% tiền phòng và booking đang chờ thanh toán phần còn lại.',
+    badgeClass: 'border border-violet-300/24 bg-violet-100/80 text-violet-800',
   },
   paid: {
     label: 'Đã thanh toán',
@@ -191,6 +196,7 @@ export default function OrderDetail() {
   const { id } = useParams();
   const [booking, setBooking] = useState(location.state?.booking || null);
   const [cancelling, setCancelling] = useState(false);
+  const [pendingVNPayMode, setPendingVNPayMode] = useState(null);
   const [confirmingDemoPayment, setConfirmingDemoPayment] = useState(false);
   const [loading, setLoading] = useState(!location.state?.booking);
   const [hasSyncedExpiredState, setHasSyncedExpiredState] = useState(false);
@@ -252,6 +258,16 @@ export default function OrderDetail() {
     setHasSyncedExpiredState(true);
     fetchBookingDetail(false);
   }, [booking?.id, currentStatus, remainingHoldSeconds, hasSyncedExpiredState, fetchBookingDetail]);
+
+  React.useEffect(() => {
+    if (currentPaymentStatus === 'paid') {
+      setPendingVNPayMode(null);
+      return;
+    }
+    if (currentPaymentStatus === 'deposit_paid' && pendingVNPayMode === 'deposit') {
+      setPendingVNPayMode(null);
+    }
+  }, [currentPaymentStatus, pendingVNPayMode]);
 
   if (loading) {
     return (
@@ -329,7 +345,17 @@ export default function OrderDetail() {
   const subtotalLabel = roomCount > 1
     ? `Tạm tính lưu trú (${roomCount} phòng)`
     : `Giá phòng (${pricePerNight.toLocaleString('vi-VN')}đ x ${nights} đêm)`;
-  const canOpenVNPay = currentStatus === 'pending' && currentPaymentStatus !== 'paid';
+  const paidAmount = Number(booking?.paidAmount ?? 0);
+  const depositAmount = Number(booking?.depositAmount ?? Math.round(grandTotal * 0.3));
+  const remainingAmount = Number(booking?.remainingAmount ?? Math.max(0, grandTotal - paidAmount));
+  const depositOutstandingAmount = Number(booking?.depositOutstandingAmount ?? Math.max(0, depositAmount - paidAmount));
+  const canDeposit = ['pending', 'confirmed'].includes(currentStatus)
+    && !['deposit_paid', 'paid'].includes(currentPaymentStatus)
+    && depositOutstandingAmount > 0.01;
+  const canOpenVNPay = ['pending', 'confirmed'].includes(currentStatus)
+    && currentPaymentStatus !== 'paid'
+    && remainingAmount > 0.01;
+  const showDemoSuccessButton = Boolean(pendingVNPayMode) && currentPaymentStatus !== 'paid';
 
   const handleShare = async () => {
     const shareUrl = window.location.href;
@@ -366,9 +392,28 @@ export default function OrderDetail() {
     window.print();
   };
 
-  const handleVNPaySubmit = () => {
-    if (!booking?.id) return;
-    navigate(`/vnpay-launch?bookingId=${booking.id}`);
+  const handleOpenVNPay = (paymentMode) => {
+    if (!booking?.id || typeof window === 'undefined') return;
+
+    const normalizedPaymentMode = paymentMode === 'deposit' ? 'deposit' : 'full';
+    const launchUrl = `${window.location.origin}/vnpay-launch?bookingId=${booking.id}&paymentMode=${normalizedPaymentMode}`;
+    const paymentWindow = window.open(launchUrl, '_blank', 'noopener,noreferrer');
+
+    if (!paymentWindow) {
+      if (window.Swal) {
+        window.Swal.fire({
+          icon: 'warning',
+          title: 'Trình duyệt đang chặn tab mới',
+          text: 'Vui lòng cho phép mở tab mới để tiếp tục với VNPay.',
+        });
+      }
+      return;
+    }
+
+    setPendingVNPayMode(normalizedPaymentMode);
+    if (!['deposit_paid', 'paid'].includes(currentPaymentStatus)) {
+      setBooking((prev) => (prev ? { ...prev, paymentStatus: 'pending_payment' } : prev));
+    }
   };
 
   const handleDemoSuccess = async () => {
@@ -378,16 +423,18 @@ export default function OrderDetail() {
       setConfirmingDemoPayment(true);
       const res = await axios.post(`${API_BASE}/api/vnpay/demo-success`, {
         bookingId: booking.id,
+        paymentMode: pendingVNPayMode || 'full',
       }, {
         withCredentials: true,
       });
 
       if (res.data?.success) {
-        setBooking((prev) => ({
-          ...prev,
-          status: res.data?.bookingStatus || 'confirmed',
-          paymentStatus: res.data?.paymentStatus || 'paid',
-        }));
+        setPendingVNPayMode(null);
+        if (res.data?.booking) {
+          setBooking(res.data.booking);
+        } else {
+          await fetchBookingDetail(false);
+        }
         if (window.Swal) {
           window.Swal.fire({
             icon: 'success',
@@ -672,9 +719,9 @@ export default function OrderDetail() {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <p className="font-label text-[0.64rem] uppercase tracking-[0.28em] text-amber-700">Giữ chỗ tạm thời</p>
-                  <h2 className="mt-3 font-headline text-[1.8rem] leading-tight text-primary">Booking này đang được giữ chỗ theo chế độ demo</h2>
+                  <h2 className="mt-3 font-headline text-[1.8rem] leading-tight text-primary">Booking này đang được giữ chỗ trong 2 phút</h2>
                   <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">
-                    Hệ thống sẽ chỉ chặn booking mới của bạn cho đến khi thời gian giữ chỗ này kết thúc hoặc booking được xử lý tiếp.
+                    Bạn có thể đặt cọc 30% hoặc thanh toán toàn bộ trước khi hết thời gian giữ chỗ để chuyển booking sang trạng thái đã xác nhận.
                   </p>
                 </div>
                 <div className="rounded-[24px] border border-amber-300/70 bg-white/80 px-5 py-4 text-left lg:min-w-[240px] lg:text-right">
@@ -964,6 +1011,18 @@ export default function OrderDetail() {
                     <span className="font-headline text-xl text-white">{Math.round(totalFees).toLocaleString('vi-VN')}đ</span>
                   </div>
                   <div className="flex items-start justify-between gap-5 text-sm">
+                    <span className="max-w-[220px] leading-6 text-white/64">Đặt cọc 30%</span>
+                    <span className="font-headline text-xl text-white">{depositAmount.toLocaleString('vi-VN')}đ</span>
+                  </div>
+                  <div className="flex items-start justify-between gap-5 text-sm">
+                    <span className="max-w-[220px] leading-6 text-white/64">Đã thanh toán</span>
+                    <span className="font-headline text-xl text-white">{paidAmount.toLocaleString('vi-VN')}đ</span>
+                  </div>
+                  <div className="flex items-start justify-between gap-5 text-sm">
+                    <span className="max-w-[220px] leading-6 text-white/64">Còn lại</span>
+                    <span className="font-headline text-xl text-secondary-fixed">{remainingAmount.toLocaleString('vi-VN')}đ</span>
+                  </div>
+                  <div className="flex items-start justify-between gap-5 text-sm">
                     <span className="max-w-[220px] leading-6 text-white/64">Trạng thái thanh toán</span>
                     <span className="font-label text-[0.64rem] uppercase tracking-[0.22em] text-secondary-fixed">
                       {paymentMeta.label}
@@ -1004,23 +1063,32 @@ export default function OrderDetail() {
                   >
                     In chi tiết
                   </button>
+                  {canDeposit && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenVNPay('deposit')}
+                      className="inline-flex items-center justify-center rounded-[20px] border border-violet-500/28 bg-violet-50 px-5 py-4 font-label text-[0.64rem] uppercase tracking-[0.22em] text-violet-700 transition-all hover:border-violet-500/40 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Đặt cọc 30%
+                    </button>
+                  )}
                   {canOpenVNPay && (
                     <button
                       type="button"
-                      onClick={handleVNPaySubmit}
+                      onClick={() => handleOpenVNPay('full')}
                       className="inline-flex items-center justify-center rounded-[20px] border border-emerald-500/28 bg-emerald-50 px-5 py-4 font-label text-[0.64rem] uppercase tracking-[0.22em] text-emerald-700 transition-all hover:border-emerald-500/40 hover:bg-emerald-100"
                     >
-                      {currentPaymentStatus === 'pending_payment' ? 'Mở lại VNPay Demo' : 'Thanh toán VNPay Demo'}
+                      Thanh toán toàn bộ
                     </button>
                   )}
-                  {currentStatus === 'pending' && currentPaymentStatus === 'pending_payment' && (
+                  {showDemoSuccessButton && (
                     <button
                       type="button"
                       onClick={handleDemoSuccess}
                       disabled={confirmingDemoPayment}
                       className="inline-flex items-center justify-center rounded-[20px] border border-sky-500/30 bg-sky-50 px-5 py-4 font-label text-[0.64rem] uppercase tracking-[0.22em] text-sky-700 transition-all hover:border-sky-500/45 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {confirmingDemoPayment ? 'Đang xác nhận demo...' : 'Thanh toán thành công (Demo)'}
+                      {confirmingDemoPayment ? 'Đang xác nhận demo...' : 'Thanh toán VNPay demo thành công'}
                     </button>
                   )}
                   <Link

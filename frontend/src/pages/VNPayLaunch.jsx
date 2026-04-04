@@ -3,11 +3,17 @@ import { Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE from '../config';
 
+function resolvePaymentModeLabel(paymentMode) {
+  return paymentMode === 'deposit' ? 'đặt cọc 30%' : 'thanh toán toàn bộ';
+}
+
 export default function VNPayLaunch() {
   const [searchParams] = useSearchParams();
   const launchedRef = useRef(false);
+  const paymentMode = searchParams.get('paymentMode') === 'deposit' ? 'deposit' : 'full';
+  const paymentModeLabel = resolvePaymentModeLabel(paymentMode);
   const [status, setStatus] = useState('processing');
-  const [message, setMessage] = useState('Đang khởi tạo giao dịch demo và chuyển bạn tới cổng VNPay sandbox...');
+  const [message, setMessage] = useState(`Đang khởi tạo giao dịch ${paymentModeLabel} và chuyển bạn tới cổng VNPay sandbox...`);
 
   useEffect(() => {
     if (launchedRef.current) return;
@@ -22,7 +28,12 @@ export default function VNPayLaunch() {
 
     const launchPayment = async () => {
       try {
-        const res = await axios.get(`${API_BASE}/api/vnpay/create-payment?bookingId=${bookingId}`, {
+        const params = new URLSearchParams({
+          bookingId,
+          paymentMode,
+        });
+
+        const res = await axios.get(`${API_BASE}/api/vnpay/create-payment?${params.toString()}`, {
           withCredentials: true,
         });
 
@@ -44,7 +55,7 @@ export default function VNPayLaunch() {
     };
 
     launchPayment();
-  }, [searchParams]);
+  }, [paymentMode, searchParams]);
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f5efe5_0%,#fbf8f3_34%,#f9f5ee_100%)] px-6 py-24 text-on-surface">
@@ -54,6 +65,7 @@ export default function VNPayLaunch() {
             <div className="mx-auto h-14 w-14 rounded-full border-2 border-secondary border-t-transparent animate-spin"></div>
             <p className="mt-8 font-label text-[0.68rem] uppercase tracking-[0.28em] text-secondary">VNPay Gateway</p>
             <h1 className="mt-4 font-headline text-4xl text-primary">Đang mở VNPay sandbox</h1>
+            <p className="mt-3 text-sm uppercase tracking-[0.18em] text-secondary">{paymentModeLabel}</p>
             <p className="mt-5 text-sm leading-7 text-on-surface-variant">{message}</p>
           </>
         ) : (
@@ -63,6 +75,7 @@ export default function VNPayLaunch() {
             </div>
             <p className="mt-8 font-label text-[0.68rem] uppercase tracking-[0.28em] text-rose-600">VNPay Gateway</p>
             <h1 className="mt-4 font-headline text-4xl text-primary">Không thể mở VNPay sandbox</h1>
+            <p className="mt-3 text-sm uppercase tracking-[0.18em] text-secondary">{paymentModeLabel}</p>
             <p className="mt-5 text-sm leading-7 text-on-surface-variant">{message}</p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Link

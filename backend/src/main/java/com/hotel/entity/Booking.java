@@ -18,8 +18,10 @@ public class Booking {
     private Double totalPrice;
     @Column(name = "coupon_code")
     private String couponCode;
-    @Column(name = "discount_amount", nullable = false)
+    @Column(name = "discount_amount")
     private Double discountAmount = 0.0;
+    @Column(name = "deposit_amount")
+    private Double depositAmount = 0.0;
     @Column(name = "final_amount")
     private Double finalAmount;
     @Column(name = "status", length = 20)
@@ -43,10 +45,20 @@ public class Booking {
     @com.fasterxml.jackson.annotation.JsonIgnoreProperties("booking")
     private List<Payment> payments;
 
+    @Transient
+    private Double paidAmount = 0.0;
+
+    @Transient
+    private Double remainingAmount = 0.0;
+
+    @Transient
+    private Double depositOutstandingAmount = 0.0;
+
     @PrePersist
     @PreUpdate
     protected void onCreate() {
         if (discountAmount == null) discountAmount = 0.0;
+        if (depositAmount == null) depositAmount = 0.0;
         if (finalAmount == null && totalPrice != null) finalAmount = totalPrice;
         if (status == null || status.isBlank()) status = "pending";
         if (paymentStatus == null || paymentStatus.isBlank()) paymentStatus = "unpaid";

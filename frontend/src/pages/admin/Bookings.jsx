@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { useSearchParams } from 'react-router-dom';
 import API_BASE, { calculateBookingDiscountAmount, calculateBookingDisplayTotal, calculateBookingSubtotal, calculateStayNights } from '../../config';
 const Swal = window.Swal;
 
@@ -14,6 +15,7 @@ export default function Bookings() {
   const [data, setData] = useState({ bookings: [], totalPages: 1, currentPage: 1 });
   const [users, setUsers] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [searchParams, setSearchParams] = useSearchParams();
   
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
@@ -26,6 +28,7 @@ export default function Bookings() {
   const [formData, setFormData] = useState({
     id: '', userId: '', roomId: '', roomTypeId: '', checkIn: '', checkOut: '', status: 'pending'
   });
+  const focusedBookingId = String(searchParams.get('bookingId') || '').trim();
 
   const getErrorMessage = (error, fallback = 'Có lỗi xảy ra') => {
     const payload = error?.response?.data;
@@ -51,10 +54,18 @@ export default function Bookings() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await axios.get(`${API_BASE}/api/admin/bookings?status=${status}&page=${page}`, { withCredentials: true });
+      const params = new URLSearchParams();
+      if (focusedBookingId) {
+        params.set('bookingId', focusedBookingId);
+      } else {
+        if (status) params.set('status', status);
+        params.set('page', page);
+      }
+      const query = params.toString();
+      const res = await axios.get(`${API_BASE}/api/admin/bookings${query ? `?${query}` : ''}`, { withCredentials: true });
       setData(res.data);
     } catch (err) { console.error(err); }
-  }, [status, page]);
+  }, [focusedBookingId, status, page]);
 
   const fetchRoomOptions = useCallback(async (checkIn = '', checkOut = '', bookingId = '') => {
     try {
@@ -220,6 +231,20 @@ export default function Bookings() {
     setShowModal(true);
   };
 
+  const clearFocusedBooking = () => {
+    setSearchParams({}, { replace: true });
+    setStatus('');
+    setPage(1);
+  };
+
+  const handleStatusFilter = (nextStatus) => {
+    if (focusedBookingId) {
+      setSearchParams({}, { replace: true });
+    }
+    setStatus(nextStatus);
+    setPage(1);
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     try {
@@ -276,12 +301,31 @@ export default function Bookings() {
     const nights = calculateStayNights(checkIn, checkOut);
     return nights > 0 ? `${nights} đêm` : 'Chưa cập nhật';
   };
+  const splitPoetryLines = (value, maxLines = 2) => {
+    const normalized = String(value || '').trim();
+    if (!normalized) return [];
+
+    const words = normalized.split(/\s+/);
+    if (words.length <= maxLines) return words;
+
+    const remainingWords = [...words];
+    const lines = [];
+
+    for (let index = 0; index < maxLines - 1; index += 1) {
+      const wordsForLine = Math.ceil(remainingWords.length / (maxLines - index));
+      lines.push(remainingWords.splice(0, wordsForLine).join(' '));
+    }
+
+    lines.push(remainingWords.join(' '));
+    return lines.filter(Boolean);
+  };
   const isTerminalStatus = (value) => ['completed', 'cancelled', 'expired'].includes(String(value || '').toLowerCase());
   const canEditBooking = (value) => ['pending', 'confirmed'].includes(String(value || '').toLowerCase());
   const getBookingStatusLabel = (value) => BOOKING_STATUS_LABELS[String(value || '').toLowerCase()] || value || 'pending';
   const getPaymentStatusLabel = (value) => ({
     unpaid: 'Chưa thanh toán',
     pending_payment: 'Chờ thanh toán',
+    deposit_paid: 'Đã đặt cọc',
     paid: 'Đã thanh toán',
     failed: 'Thanh toán lỗi',
   }[String(value || '').toLowerCase()] || value || 'unpaid');
@@ -303,7 +347,7 @@ export default function Bookings() {
   return (
     <>
       <style>{`
-        .st-badge { padding: 5px 10px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; white-space: nowrap; display: inline-block; }
+        .st-badge { padding: 3px 8px; border-radius: 8px; font-size: 0.58rem; font-weight: 700; text-transform: uppercase; white-space: normal; display: inline-block; text-align: center; line-height: 1.2; max-width: 92px; }
         .st-confirmed { background: #e0f2fe; color: #0369a1; }
         .st-pending { background: #fef3c7; color: #92400e; }
         .st-completed { background: #dcfce7; color: #166534; }
@@ -311,11 +355,75 @@ export default function Bookings() {
         .st-expired { background: #e5e7eb; color: #334155; }
         .st-pay-unpaid { background: #fef3c7; color: #92400e; }
         .st-pay-pending_payment { background: #e0f2fe; color: #075985; }
+        .st-pay-deposit_paid { background: #ede9fe; color: #6d28d9; }
         .st-pay-paid { background: #dcfce7; color: #166534; }
         .st-pay-failed { background: #fee2e2; color: #991b1b; }
         .btn-check-action { width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; border: none; transition: 0.2s; }
         .btn-check-early { background: #fff7ed; color: #ea580c; border: 1px solid #fed7aa; }
         .btn-check-early:hover { background: #ea580c; color: white; }
+        .booking-filters {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+        .booking-filter-group {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .booking-table th {
+          padding: 16px 22px;
+          font-weight: 700;
+          color: #64748b;
+          vertical-align: middle;
+          font-size: 0.9rem;
+        }
+        .booking-table td {
+          padding: 20px 22px;
+          vertical-align: middle;
+          font-size: 0.88rem;
+        }
+        .booking-heading-stack,
+        .booking-text-stack {
+          display: inline-flex;
+          flex-direction: column;
+          gap: 2px;
+          line-height: 1.18;
+        }
+        .booking-heading-stack {
+          font-weight: 700;
+        }
+        .booking-customer-name {
+          font-size: 0.86rem;
+          color: #1f2937;
+        }
+        .booking-room-block {
+          display: inline-flex;
+          flex-direction: column;
+          gap: 3px;
+        }
+        .booking-table th:first-child,
+        .booking-table td:first-child {
+          padding-left: 12px;
+        }
+        .booking-table th:last-child,
+        .booking-table td:last-child {
+          padding-right: 12px;
+        }
+        .booking-room-name {
+          font-size: 0.86rem;
+        }
+        .booking-room-price,
+        .booking-time-meta,
+        .booking-stay-chip {
+          font-size: 0.76rem;
+        }
+        .booking-total {
+          font-size: 0.9rem;
+        }
         .invoice-box { padding: 20px; border: 1px solid #eee; border-radius: 16px; background: #fff; }
         .invoice-header { border-bottom: 2px dashed #eee; padding-bottom: 20px; margin-bottom: 20px; }
         .invoice-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.95rem; }
@@ -333,26 +441,68 @@ export default function Bookings() {
       </div>
 
       <div className="card-table">
-          <div className="p-4 border-bottom d-flex gap-2">
-              <button className={`btn btn-sm ${!status ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => { setStatus(''); setPage(1); }}>Tất cả</button>
-              <button className={`btn btn-sm ${status === 'pending' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => { setStatus('pending'); setPage(1); }}>Chờ duyệt</button>
-              <button className={`btn btn-sm ${status === 'confirmed' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => { setStatus('confirmed'); setPage(1); }}>Đã xác nhận</button>
-              <button className={`btn btn-sm ${status === 'completed' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => { setStatus('completed'); setPage(1); }}>Hoàn thành</button>
-              <button className={`btn btn-sm ${status === 'cancelled' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => { setStatus('cancelled'); setPage(1); }}>Đã hủy</button>
-              <button className={`btn btn-sm ${status === 'expired' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => { setStatus('expired'); setPage(1); }}>Hết hạn</button>
+          <div className="p-4 border-bottom booking-filters">
+              <div className="booking-filter-group">
+                  <button className={`btn btn-sm ${!status ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => handleStatusFilter('')}>Tất cả</button>
+                  <button className={`btn btn-sm ${status === 'pending' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => handleStatusFilter('pending')}>Chờ duyệt</button>
+                  <button className={`btn btn-sm ${status === 'confirmed' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => handleStatusFilter('confirmed')}>Đã xác nhận</button>
+                  <button className={`btn btn-sm ${status === 'completed' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => handleStatusFilter('completed')}>Hoàn thành</button>
+                  <button className={`btn btn-sm ${status === 'cancelled' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => handleStatusFilter('cancelled')}>Đã hủy</button>
+                  <button className={`btn btn-sm ${status === 'expired' ? 'btn-dark' : 'btn-light border'} rounded-pill px-3`} onClick={() => handleStatusFilter('expired')}>Hết hạn</button>
+              </div>
+              {focusedBookingId && (
+                <button className="btn btn-sm btn-light border rounded-pill px-3" onClick={clearFocusedBooking}>
+                    Xem tất cả
+                </button>
+              )}
           </div>
 
           <div className="p-0" style={{ width: '100%', overflowX: 'hidden' }}>
-              <table className="table mb-0 align-middle table-hover" style={{ tableLayout: 'fixed', width: '100%' }}>
+              <table className="table booking-table mb-0 align-middle table-hover" style={{ tableLayout: 'fixed', width: '100%' }}>
                   <thead className="table-light">
                       <tr>
-                          <th className="px-3" style={{ width: '19%' }}>Khách hàng</th>
-                          <th style={{ width: '13%' }}>Phòng & Giá</th>
-                          <th style={{ width: '19%' }}>Thời gian</th>
-                          <th style={{ width: '14%' }}>Tổng tiền</th>
-                          <th className="text-nowrap" style={{ width: '11%' }}>Booking</th>
-                          <th className="text-nowrap" style={{ width: '12%' }}>Thanh toán</th>
-                          <th className="text-end px-3" style={{ width: '12%' }}>Hành động</th>
+                          <th style={{ width: '20%' }}>
+                            <span className="booking-heading-stack">
+                              <span>Khách</span>
+                              <span>hàng</span>
+                            </span>
+                          </th>
+                          <th style={{ width: '15%' }}>
+                            <span className="booking-heading-stack">
+                              <span>Phòng</span>
+                              <span>& giá</span>
+                            </span>
+                          </th>
+                          <th style={{ width: '20%' }}>
+                            <span className="booking-heading-stack">
+                              <span>Thời</span>
+                              <span>gian</span>
+                            </span>
+                          </th>
+                          <th style={{ width: '14%' }}>
+                            <span className="booking-heading-stack">
+                              <span>Tổng</span>
+                              <span>tiền</span>
+                            </span>
+                          </th>
+                          <th style={{ width: '11%' }}>
+                            <span className="booking-heading-stack">
+                              <span>Đơn</span>
+                              <span>đặt</span>
+                            </span>
+                          </th>
+                          <th style={{ width: '12%' }}>
+                            <span className="booking-heading-stack">
+                              <span>Thanh</span>
+                              <span>toán</span>
+                            </span>
+                          </th>
+                          <th className="text-end" style={{ width: '8%' }}>
+                            <span className="booking-heading-stack text-end">
+                              <span>Hành</span>
+                              <span>động</span>
+                            </span>
+                          </th>
                       </tr>
                   </thead>
                   <tbody>
@@ -364,18 +514,32 @@ export default function Bookings() {
                           const normalizedPaymentStatus = String(b.paymentStatus || '').toLowerCase();
                           return (
                           <tr key={b.id}>
-                              <td className="fw-bold px-3 text-wrap text-break">{b.user?.fullName}</td>
+                              <td>
+                                <div className="booking-text-stack booking-customer-name fw-bold text-wrap text-break">
+                                  {splitPoetryLines(b.user?.fullName || 'Chưa cập nhật').map((line, index) => (
+                                    <span key={`${b.id}-customer-line-${index}`}>{line}</span>
+                                  ))}
+                                </div>
+                              </td>
                               <td>
                                   {b.details?.map((d, i) => (
                                     <div key={`rm-${i}`} className="mb-2">
-                                      <div className="fw-bold text-primary">Phòng {d.room?.roomNumber}</div>
-                                      <small className="text-muted">{d.room?.roomType?.pricePerNight.toLocaleString('vi-VN')}đ/đêm</small>
+                                      <div className="booking-room-block">
+                                        <div className="fw-bold text-primary booking-text-stack booking-room-name">
+                                          <span>Phòng</span>
+                                          <span>{d.room?.roomNumber}</span>
+                                        </div>
+                                        <small className="text-muted booking-text-stack booking-room-price">
+                                          <span>{d.room?.roomType?.pricePerNight.toLocaleString('vi-VN')}đ</span>
+                                          <span>/ đêm</span>
+                                        </small>
+                                      </div>
                                     </div>
                                   ))}
                               </td>
                               <td className="small">
                                   {b.details?.map((d, i) => (
-                                    <div key={`time-${i}`} className="mb-1 text-wrap">
+                                    <div key={`time-${i}`} className="mb-1 text-wrap booking-time-meta">
                                       <div className="text-muted">In: <b className="text-dark">{formatBookingDate(d.checkIn)}</b></div>
                                       <div className="text-muted">Out: <b className="text-dark">{formatBookingDate(d.checkOut)}</b></div>
                                       {d.checkInActual && <div className="text-success">Nhận phòng: <b>{formatBookingDate(d.checkInActual)}</b></div>}
@@ -384,15 +548,17 @@ export default function Bookings() {
                                     </div>
                                   ))}
                               </td>
-                              <td className="fw-bold text-primary">
-                                  {displayTotal.toLocaleString('vi-VN')}đ<br />
-                                  <span className="badge bg-light text-dark fw-normal border">
+                              <td>
+                                  <div className="fw-bold text-primary booking-text-stack booking-total">
+                                    <span>{displayTotal.toLocaleString('vi-VN')}đ</span>
+                                    <span className="badge bg-light text-dark fw-normal border booking-stay-chip">
                                       {getStayNightsLabel(b.details?.[0]?.checkIn, b.details?.[0]?.checkOut)}
-                                  </span>
+                                    </span>
+                                  </div>
                               </td>
-                              <td className="text-nowrap"><span className={`st-badge st-${b.status}`}>{getBookingStatusLabel(b.status)}</span></td>
-                              <td className="text-nowrap"><span className={`st-badge st-pay-${b.paymentStatus || 'unpaid'}`}>{getPaymentStatusLabel(b.paymentStatus)}</span></td>
-                              <td className="text-end px-3">
+                              <td><span className={`st-badge st-${b.status}`}>{getBookingStatusLabel(b.status)}</span></td>
+                              <td><span className={`st-badge st-pay-${b.paymentStatus || 'unpaid'}`}>{getPaymentStatusLabel(b.paymentStatus)}</span></td>
+                              <td className="text-end">
                                   <div className="d-flex flex-wrap justify-content-end gap-1">
                                       {b.status === 'pending' && (
                                           <button className="btn btn-sm btn-light text-success border rounded-circle" style={{width:'32px', height:'32px'}} title="Duyệt đơn" onClick={() => handleApprove(b.id)}>✓</button>

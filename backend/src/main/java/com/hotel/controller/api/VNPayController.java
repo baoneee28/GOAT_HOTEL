@@ -1,6 +1,8 @@
 package com.hotel.controller.api;
 
+import com.hotel.config.VNPayConfig;
 import com.hotel.entity.User;
+import com.hotel.service.BookingService;
 import com.hotel.service.VNPayService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -25,6 +27,9 @@ public class VNPayController {
     @Autowired
     private VNPayService vnPayService;
 
+    @Autowired
+    private BookingService bookingService;
+
     private User getSessionUser(HttpSession session) {
         Object userObj = session.getAttribute("user");
         return userObj instanceof User ? (User) userObj : null;
@@ -33,13 +38,14 @@ public class VNPayController {
     private ResponseEntity<Map<String, Object>> authRequiredResponse() {
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
-        response.put("message", "Vui lòng đăng nhập để tiếp tục.");
+        response.put("message", "Vui long dang nhap de tiep tuc.");
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
 
     @GetMapping("/create-payment")
     public ResponseEntity<?> createPayment(
             @RequestParam("bookingId") Integer bookingId,
+            @RequestParam(value = "paymentMode", required = false) String paymentMode,
             HttpServletRequest request,
             HttpSession session
     ) {
@@ -50,9 +56,11 @@ public class VNPayController {
 
         Map<String, Object> response = new HashMap<>();
         try {
-            String paymentUrl = vnPayService.createPaymentUrl(bookingId, currentUser.getId(), request);
+            String normalizedPaymentMode = VNPayConfig.normalizePaymentMode(paymentMode);
+            String paymentUrl = vnPayService.createPaymentUrl(bookingId, currentUser.getId(), normalizedPaymentMode, request);
             response.put("success", true);
             response.put("paymentUrl", paymentUrl);
+            response.put("paymentMode", normalizedPaymentMode);
             return ResponseEntity.ok(response);
         } catch (SecurityException ex) {
             response.put("success", false);
@@ -95,16 +103,24 @@ public class VNPayController {
         Map<String, Object> response = new HashMap<>();
         try {
             Integer bookingId = Integer.parseInt(payload.get("bookingId"));
-            var booking = vnPayService.confirmDemoPayment(bookingId, currentUser.getId());
+            String paymentMode = VNPayConfig.normalizePaymentMode(payload.get("paymentMode"));
+            var booking = vnPayService.confirmDemoPayment(bookingId, currentUser.getId(), paymentMode);
             response.put("success", true);
-            response.put("message", "Đã mô phỏng thanh toán thành công. Booking được chuyển sang trạng thái đã xác nhận.");
+            response.put(
+                    "message",
+                    "deposit".equals(paymentMode)
+                            ? "Da mo phong thanh toan dat coc thanh cong. Booking da duoc xac nhan."
+                            : "Da mo phong thanh toan toan bo thanh cong. Booking da duoc xac nhan."
+            );
             response.put("bookingId", booking.getId());
             response.put("bookingStatus", booking.getStatus());
             response.put("paymentStatus", booking.getPaymentStatus());
+            response.put("paymentMode", paymentMode);
+            response.put("booking", bookingService.normalizeBookingFinancials(booking));
             return ResponseEntity.ok(response);
         } catch (NumberFormatException ex) {
             response.put("success", false);
-            response.put("message", "Mã booking không hợp lệ.");
+            response.put("message", "Ma booking khong hop le.");
             return ResponseEntity.badRequest().body(response);
         } catch (SecurityException ex) {
             response.put("success", false);

@@ -3,8 +3,8 @@ import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE, { calculateBookingDisplayTotal, calculateStayNights, imageUrl, uploadedImageUrl } from '../config';
 
-const FILTERS = ['all', 'pending', 'confirmed', 'staying', 'completed', 'cancelled', 'expired'];
-const EMPTY_STATUS_SUMMARY = { all: 0, pending: 0, confirmed: 0, staying: 0, completed: 0, cancelled: 0, expired: 0 };
+const FILTERS = ['all', 'pending', 'deposit_paid', 'confirmed', 'staying', 'completed', 'cancelled', 'expired'];
+const EMPTY_STATUS_SUMMARY = { all: 0, pending: 0, deposit_paid: 0, confirmed: 0, staying: 0, completed: 0, cancelled: 0, expired: 0 };
 
 const STATUS_STYLES = {
   pending: {
@@ -18,6 +18,12 @@ const STATUS_STYLES = {
     pill: 'border border-emerald-400/25 bg-emerald-500/8 text-emerald-200',
     label: 'Đã xác nhận',
     summary: 'Kỳ nghỉ sắp tới',
+  },
+  deposit_paid: {
+    badge: 'border border-violet-400/25 bg-violet-500/10 text-violet-200',
+    pill: 'border border-violet-400/25 bg-violet-500/8 text-violet-200',
+    label: 'Đã đặt cọc',
+    summary: 'Đã cọc 30%, chờ thanh toán phần còn lại',
   },
   staying: {
     badge: 'border border-cyan-400/25 bg-cyan-500/10 text-cyan-200',
@@ -55,6 +61,11 @@ const PAYMENT_STYLES = {
     badge: 'border border-sky-300/24 bg-sky-100/80 text-sky-800',
     pill: 'border border-sky-300/24 bg-sky-100/80 text-sky-800',
     label: 'Chờ thanh toán',
+  },
+  deposit_paid: {
+    badge: 'border border-violet-300/24 bg-violet-100/80 text-violet-800',
+    pill: 'border border-violet-300/24 bg-violet-100/80 text-violet-800',
+    label: 'Đã đặt cọc',
   },
   paid: {
     badge: 'border border-emerald-300/24 bg-emerald-100/80 text-emerald-800',
@@ -122,6 +133,10 @@ function resolveHistoryStatus(booking) {
   const detail = booking?.details?.[0];
   if (detail?.checkInActual && !detail?.checkOutActual) {
     return 'staying';
+  }
+
+  if (String(booking?.paymentStatus || '').toLowerCase() === 'deposit_paid') {
+    return 'deposit_paid';
   }
 
   return normalizedStatus;

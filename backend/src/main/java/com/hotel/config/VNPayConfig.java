@@ -9,6 +9,9 @@ import java.util.Random;
 
 public class VNPayConfig {
 
+    public record TxnRefData(Integer bookingId, String paymentMode) {
+    }
+
     public static String hmacSHA512(final String key, final String data) {
         try {
             if (key == null || data == null) {
@@ -61,22 +64,37 @@ public class VNPayConfig {
         return builder.toString();
     }
 
-    public static String buildTxnRef(Integer bookingId) {
-        return "B" + bookingId + "R" + getRandomNumber(8);
+    public static String normalizePaymentMode(String paymentMode) {
+        return "deposit".equalsIgnoreCase(paymentMode) ? "deposit" : "full";
+    }
+
+    public static String buildTxnRef(Integer bookingId, String paymentMode) {
+        String normalizedMode = normalizePaymentMode(paymentMode);
+        String modeToken = "deposit".equals(normalizedMode) ? "D" : "F";
+        return "B" + bookingId + "M" + modeToken + "R" + getRandomNumber(8);
     }
 
     public static Integer extractBookingId(String txnRef) {
+        TxnRefData txnRefData = parseTxnRef(txnRef);
+        return txnRefData == null ? null : txnRefData.bookingId();
+    }
+
+    public static TxnRefData parseTxnRef(String txnRef) {
         if (txnRef == null || !txnRef.startsWith("B")) {
             return null;
         }
 
-        int separatorIndex = txnRef.indexOf('R', 1);
-        if (separatorIndex <= 1) {
+        int modeIndex = txnRef.indexOf('M', 1);
+        int randomIndex = txnRef.indexOf('R', 1);
+        if (modeIndex <= 1 || randomIndex <= modeIndex + 1) {
             return null;
         }
 
         try {
-            return Integer.parseInt(txnRef.substring(1, separatorIndex));
+            Integer bookingId = Integer.parseInt(txnRef.substring(1, modeIndex));
+            String modeToken = txnRef.substring(modeIndex + 1, randomIndex);
+            String paymentMode = "D".equalsIgnoreCase(modeToken) ? "deposit" : "full";
+            return new TxnRefData(bookingId, paymentMode);
         } catch (NumberFormatException ex) {
             return null;
         }

@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import NotificationBell from './NotificationBell';
 
 const NAV_LINKS = [
   { to: '/', label: 'TRANG CHỦ' },
@@ -168,7 +169,11 @@ export default function Navbar({ user, onLogout, variant }) {
 
       <div className="flex items-center gap-6">
         {user ? (
-          /* ── USER DROPDOWN ── */
+          <>
+            {/* ── NOTIFICATION BELL ── */}
+            <NotificationBell user={user} />
+            
+            {/* ── USER DROPDOWN ── */}
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(prev => !prev)}
@@ -263,6 +268,7 @@ export default function Navbar({ user, onLogout, variant }) {
               </div>
             )}
           </div>
+          </>
         ) : (
           <>
             <span className="text-white font-medium text-[13px] font-label tracking-wide">Xin Chào Khách</span>

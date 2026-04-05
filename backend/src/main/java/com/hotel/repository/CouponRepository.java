@@ -12,6 +12,7 @@ import java.util.Optional;
 public interface CouponRepository extends JpaRepository<Coupon, Integer> {
 
     Optional<Coupon> findByCodeIgnoreCase(String code);
+    List<Coupon> findByIsActiveTrue();
 
     List<Coupon> findAll(Sort sort);
 }

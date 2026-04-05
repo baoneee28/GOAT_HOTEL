@@ -337,6 +337,7 @@ public class BookingService {
 
         if (!changedBookings.isEmpty()) {
             bookingRepository.saveAll(changedBookings);
+            couponService.synchronizeCouponAssignments(changedBookings);
         }
 
         return changedBookings.size();
@@ -446,6 +447,7 @@ public class BookingService {
 
         if (changed) {
             bookingRepository.save(booking);
+            couponService.synchronizeCouponAssignment(booking);
         }
 
         booking.setPaidAmount(paidAmount);
@@ -460,6 +462,10 @@ public class BookingService {
         }
         bookings.forEach(this::normalizeBookingFinancials);
         return bookings;
+    }
+
+    public void synchronizeCouponAssignment(Booking booking) {
+        couponService.synchronizeCouponAssignment(booking);
     }
 
     public String resolveInitialPaymentStatus(String paymentFlow) {
@@ -492,7 +498,7 @@ public class BookingService {
 
     @Transactional
     public Booking createBooking(User user, Integer roomId, LocalDateTime checkIn, LocalDateTime checkOut, String paymentFlow) {
-        return createBooking(user, roomId, checkIn, checkOut, paymentFlow, null);
+        return createBooking(user, roomId, checkIn, checkOut, paymentFlow, null, null);
     }
 
     @Transactional
@@ -502,6 +508,17 @@ public class BookingService {
                                  LocalDateTime checkOut,
                                  String paymentFlow,
                                  String couponCode) {
+        return createBooking(user, roomId, checkIn, checkOut, paymentFlow, couponCode, null);
+    }
+
+    @Transactional
+    public Booking createBooking(User user,
+                                 Integer roomId,
+                                 LocalDateTime checkIn,
+                                 LocalDateTime checkOut,
+                                 String paymentFlow,
+                                 String couponCode,
+                                 Integer userCouponId) {
         if (user == null || user.getId() == null) {
             throw new IllegalArgumentException("Phiên người dùng không hợp lệ.");
         }
@@ -548,11 +565,13 @@ public class BookingService {
                 room,
                 checkIn,
                 checkOut,
+                user,
+                userCouponId,
                 couponCode,
                 LocalDateTime.now(),
                 false
         );
-        if (couponCode != null && !couponCode.isBlank() && !couponPricing.valid()) {
+        if (((couponCode != null && !couponCode.isBlank()) || userCouponId != null) && !couponPricing.valid()) {
             throw new IllegalArgumentException(couponPricing.message());
         }
         Coupon appliedCoupon = couponPricing.coupon();
@@ -577,6 +596,7 @@ public class BookingService {
         detail.setCheckOut(checkOut);
         detail.setTotalHours(totalHours);
         bookingDetailRepository.save(detail);
+        couponService.reserveUserCouponForBooking(couponPricing.userCouponId(), booking, user.getId());
 
         return booking;
     }
@@ -584,7 +604,7 @@ public class BookingService {
     @Transactional
     public String bookRoom(User user, Integer roomId, LocalDateTime checkIn, LocalDateTime checkOut) {
         try {
-            createBooking(user, roomId, checkIn, checkOut, "standard_request", null);
+            createBooking(user, roomId, checkIn, checkOut, "standard_request", null, null);
             return null;
         } catch (IllegalArgumentException ex) {
             return ex.getMessage();
@@ -608,6 +628,7 @@ public class BookingService {
             booking.setPaymentStatus("unpaid");
         }
         bookingRepository.save(booking);
+        couponService.synchronizeCouponAssignment(booking);
 
         return true;
     }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import API_BASE from '../config';
+import { useAuth } from '../auth/useAuth';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -9,6 +10,14 @@ const FILTERS = [
   { id: 'all', label: 'Tất cả' },
   { id: 'active', label: 'Đang áp dụng' },
   { id: 'expiring', label: 'Sắp hết hạn' },
+];
+
+const MY_FILTERS = [
+  { id: 'available', label: 'Còn hạn' },
+  { id: 'reserved', label: 'Đang giữ chỗ' },
+  { id: 'used', label: 'Đã dùng' },
+  { id: 'expired', label: 'Hết hạn' },
+  { id: 'all', label: 'Tất cả' },
 ];
 
 const COUPON_COPY_FALLBACKS = {
@@ -212,59 +221,92 @@ function getCouponBenefit(coupon) {
   return `Giảm ${formatCurrency(coupon.discountValue)}đ`;
 }
 
+function getOwnedCouponStatusMeta(status) {
+  switch (String(status || '').toLowerCase()) {
+    case 'used':
+      return {
+        label: 'Đã dùng',
+        className: 'border border-slate-300/22 bg-slate-900/82 text-white',
+      };
+    case 'reserved':
+      return {
+        label: 'Đang giữ chỗ',
+        className: 'border border-sky-400/24 bg-sky-400/10 text-sky-200',
+      };
+    case 'expired':
+      return {
+        label: 'Hết hạn',
+        className: 'border border-rose-400/24 bg-rose-400/10 text-rose-200',
+      };
+    default:
+      return {
+        label: 'Còn hạn',
+        className: 'border border-emerald-400/24 bg-emerald-400/10 text-emerald-200',
+      };
+  }
+}
+
 export default function Coupons() {
-  const [coupons, setCoupons] = useState([]);
-  const [activeFilter, setActiveFilter] = useState('all');
+  const { isAuthenticated } = useAuth();
   const [copiedCode, setCopiedCode] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [myCoupons, setMyCoupons] = useState([]);
+  const [myFilter, setMyFilter] = useState('available');
+  const [mySummary, setMySummary] = useState({ all: 0, available: 0, reserved: 0, used: 0, expired: 0 });
+  const [loadingMyCoupons, setLoadingMyCoupons] = useState(false);
+  const [myCouponsError, setMyCouponsError] = useState('');
+
 
   useEffect(() => {
-    let isMounted = true;
+    let active = true;
 
-    const fetchCoupons = async () => {
-      setLoading(true);
-      setError('');
+    const fetchMyCoupons = async () => {
+      if (!isAuthenticated) {
+        if (active) {
+          setMyCoupons([]);
+          setMySummary({ all: 0, available: 0, reserved: 0, used: 0, expired: 0 });
+          setLoadingMyCoupons(false);
+          setMyCouponsError('');
+        }
+        return;
+      }
 
+      setLoadingMyCoupons(true);
+      setMyCouponsError('');
       try {
-        const res = await axios.get(`${API_BASE}/api/coupons`, {
-          params: { status: 'all' },
+        const res = await axios.get(`${API_BASE}/api/coupons/my`, {
+          params: { status: myFilter },
           withCredentials: true,
         });
 
-        if (isMounted) {
-          const normalizedCoupons = Array.isArray(res.data?.coupons)
-            ? res.data.coupons.map(normalizeCouponCopy)
-            : [];
-          setCoupons(normalizedCoupons);
+        if (!active) {
+          return;
         }
+
+        setMyCoupons(Array.isArray(res.data?.coupons) ? res.data.coupons : []);
+        setMySummary(res.data?.summary || { all: 0, available: 0, reserved: 0, used: 0, expired: 0 });
       } catch (fetchError) {
-        console.error('Fetch coupons failed:', fetchError);
-        if (isMounted) {
-          setError('Không thể tải danh sách mã giảm giá lúc này.');
+        console.error('Fetch my coupons failed:', fetchError);
+        if (!active) {
+          return;
         }
+        setMyCoupons([]);
+        setMySummary({ all: 0, available: 0, reserved: 0, used: 0, expired: 0 });
+        setMyCouponsError('Không thể tải danh sách coupon cá nhân lúc này.');
       } finally {
-        if (isMounted) {
-          setLoading(false);
+        if (active) {
+          setLoadingMyCoupons(false);
         }
       }
     };
 
-    fetchCoupons();
+    fetchMyCoupons();
 
     return () => {
-      isMounted = false;
+      active = false;
     };
-  }, []);
+  }, [isAuthenticated, myFilter]);
 
-  const filteredCoupons = coupons.filter((coupon) => {
-    if (activeFilter === 'active') return isActiveCoupon(coupon);
-    if (activeFilter === 'expiring') return isExpiringSoon(coupon);
-    return true;
-  });
 
-  const activeCount = coupons.filter(isActiveCoupon).length;
-  const expiringCount = coupons.filter(isExpiringSoon).length;
 
   const handleCopyCode = async (code) => {
     try {
@@ -333,165 +375,212 @@ export default function Coupons() {
 
       <main className="relative z-10 mx-auto mt-12 max-w-7xl px-6 pb-24 sm:px-8 lg:mt-16 lg:px-10">
         <section className="coupon-panel rounded-[32px] p-6 sm:p-8">
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] lg:items-center">
-            <div>
-              <p className="font-label text-[0.64rem] uppercase tracking-[0.28em] text-secondary">
-                Chỉ dành cho booking phòng
-              </p>
-              <h2 className="mt-3 font-headline text-[2rem] leading-tight text-primary">
-                Ưu đãi gọn, đúng trọng tâm, dùng được ở checkout
+          {!isAuthenticated ? (
+            <div className="text-center py-6">
+              <h2 className="font-headline text-[2rem] leading-tight text-primary">
+                Đăng nhập để xem coupon của bạn
               </h2>
+              <p className="mt-3 text-sm leading-7 text-on-surface-variant max-w-2xl mx-auto">
+                Sau khi đăng nhập, hệ thống sẽ hiển thị các mã ưu đãi được admin hoặc staff cấp riêng cho bạn.
+              </p>
+              <Link
+                to="/login"
+                className="mt-6 inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 font-label text-[0.64rem] uppercase tracking-[0.22em] text-on-primary transition-all hover:brightness-105"
+              >
+                Đăng nhập ngay
+              </Link>
             </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="font-label text-[0.64rem] uppercase tracking-[0.28em] text-secondary">
+                    Coupon của tôi
+                  </p>
+                  <h2 className="mt-3 font-headline text-[2rem] leading-tight text-primary">
+                    Danh sách coupon cá nhân
+                  </h2>
+                  <p className="mt-3 max-w-3xl text-sm leading-7 text-on-surface-variant">
+                    Mỗi lần staff hoặc admin phát coupon cho bạn, hệ thống sẽ tạo một lượt coupon riêng biệt. 
+                  </p>
+                </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-[24px] border border-outline-variant/14 bg-white/75 p-4">
-                <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Tổng mã</p>
-                <p className="mt-3 font-headline text-3xl text-primary">{coupons.length}</p>
+                <div className="grid gap-4 sm:grid-cols-4">
+                  <div className="rounded-[24px] border border-outline-variant/14 bg-white/75 p-4">
+                    <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Còn hạn</p>
+                    <p className="mt-3 font-headline text-3xl text-primary">{mySummary.available || 0}</p>
+                  </div>
+                  <div className="rounded-[24px] border border-outline-variant/14 bg-white/75 p-4">
+                    <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Giữ chỗ</p>
+                    <p className="mt-3 font-headline text-3xl text-primary">{mySummary.reserved || 0}</p>
+                  </div>
+                  <div className="rounded-[24px] border border-outline-variant/14 bg-white/75 p-4">
+                    <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Đã dùng</p>
+                    <p className="mt-3 font-headline text-3xl text-primary">{mySummary.used || 0}</p>
+                  </div>
+                  <div className="rounded-[24px] border border-outline-variant/14 bg-white/75 p-4">
+                    <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Hết hạn</p>
+                    <p className="mt-3 font-headline text-3xl text-primary">{mySummary.expired || 0}</p>
+                  </div>
+                </div>
               </div>
-              <div className="rounded-[24px] border border-outline-variant/14 bg-white/75 p-4">
-                <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Đang áp dụng</p>
-                <p className="mt-3 font-headline text-3xl text-primary">{activeCount}</p>
-              </div>
-              <div className="rounded-[24px] border border-outline-variant/14 bg-white/75 p-4">
-                <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Sắp hết hạn</p>
-                <p className="mt-3 font-headline text-3xl text-primary">{expiringCount}</p>
-              </div>
-            </div>
-          </div>
 
-          <div className="mt-8 flex flex-wrap gap-3">
-            {FILTERS.map((filter) => {
-              const isSelected = activeFilter === filter.id;
-              return (
-                <button
-                  key={filter.id}
-                  type="button"
-                  onClick={() => setActiveFilter(filter.id)}
-                  className={`rounded-full px-4 py-3 font-label text-[0.64rem] uppercase tracking-[0.22em] transition-all ${
-                    isSelected
-                      ? 'bg-secondary text-slate-950 shadow-[0_14px_30px_-18px_rgba(212,175,55,0.8)]'
-                      : 'border border-outline-variant/20 bg-white/70 text-primary/72 hover:border-secondary/35 hover:text-secondary'
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              );
-            })}
-          </div>
+              <div className="mt-8 flex flex-wrap gap-3">
+                {MY_FILTERS.map((filter) => {
+                  const isSelected = myFilter === filter.id;
+                  const count = mySummary[filter.id] ?? mySummary.all ?? 0;
+                  return (
+                    <button
+                      key={filter.id}
+                      type="button"
+                      onClick={() => setMyFilter(filter.id)}
+                      className={`rounded-full px-4 py-3 font-label text-[0.64rem] uppercase tracking-[0.22em] transition-all ${
+                        isSelected
+                          ? 'bg-secondary text-slate-950 shadow-[0_14px_30px_-18px_rgba(212,175,55,0.8)]'
+                          : 'border border-outline-variant/20 bg-white/70 text-primary/72 hover:border-secondary/35 hover:text-secondary'
+                      }`}
+                    >
+                      {filter.label} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </section>
 
         <section className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_320px]">
           <div className="space-y-5">
-            {loading ? (
+            {!isAuthenticated ? null : loadingMyCoupons ? (
               <div className="coupon-panel rounded-[28px] px-6 py-16 text-center">
-                <h3 className="font-headline text-3xl text-primary">Đang tải mã giảm giá</h3>
-                <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-on-surface-variant">
-                  Hệ thống đang lấy danh sách coupon cho booking phòng.
+                <h3 className="font-headline text-3xl text-primary">Đang tải mã giảm giá...</h3>
+              </div>
+            ) : myCouponsError ? (
+              <div className="coupon-panel rounded-[28px] px-6 py-16 text-center">
+                <h3 className="font-headline text-3xl text-primary">Có lỗi xảy ra</h3>
+                <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-rose-500">
+                  {myCouponsError}
                 </p>
               </div>
-            ) : error ? (
-              <div className="coupon-panel rounded-[28px] px-6 py-16 text-center">
-                <h3 className="font-headline text-3xl text-primary">Không tải được dữ liệu</h3>
-                <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-on-surface-variant">
-                  {error}
-                </p>
-              </div>
-            ) : filteredCoupons.length > 0 ? filteredCoupons.map((coupon) => {
-              const status = getCouponStatus(coupon);
-              return (
-                <article key={coupon.id} className="coupon-card overflow-hidden rounded-[28px] p-6 sm:p-7">
-                  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <span className={`rounded-full px-4 py-2 font-label text-[0.6rem] uppercase tracking-[0.22em] ${status.className}`}>
-                          {status.label}
-                        </span>
-                        <span className="rounded-full border border-outline-variant/16 bg-white/70 px-3 py-2 font-label text-[0.56rem] uppercase tracking-[0.22em] text-primary/54">
-                          {getCouponBenefit(coupon)}
-                        </span>
+            ) : myCoupons.length > 0 ? (
+              <>
+                {myCoupons.map((item) => {
+                  const statusMeta = getOwnedCouponStatusMeta(item.status);
+                  const coupon = normalizeCouponCopy(item.coupon || {});
+
+                  return (
+                    <article key={`owned-${item.id}`} className="coupon-card overflow-hidden rounded-[28px] p-6 sm:p-7">
+                      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <span className={`rounded-full px-4 py-2 font-label text-[0.6rem] uppercase tracking-[0.22em] ${statusMeta.className}`}>
+                              {statusMeta.label}
+                            </span>
+                            <span className="rounded-full border border-secondary/28 bg-secondary/10 px-3 py-2 font-label text-[0.56rem] uppercase tracking-[0.22em] text-secondary">
+                              Coupon của tôi
+                            </span>
+                            <span className="rounded-full border border-outline-variant/16 bg-white/70 px-3 py-2 font-label text-[0.56rem] uppercase tracking-[0.22em] text-primary/54">
+                              Lượt #{item.id}
+                            </span>
+                          </div>
+
+                          <h3 className="mt-5 font-headline text-[2rem] leading-tight text-primary">
+                            {coupon.name}
+                          </h3>
+                          <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">
+                            {coupon.description || 'Coupon cá nhân dành riêng cho tài khoản của bạn.'}
+                          </p>
+                        </div>
+
+                        <div className="rounded-[22px] border border-outline-variant/12 bg-[linear-gradient(180deg,rgba(8,19,37,0.96)_0%,rgba(15,31,56,0.92)_100%)] px-5 py-4 text-white lg:min-w-[220px]">
+                          <p className="font-label text-[0.56rem] uppercase tracking-[0.22em] text-secondary/80">
+                            Coupon code
+                          </p>
+                          <p className="mt-3 font-headline text-3xl tracking-[0.08em] text-secondary">
+                            {coupon.code}
+                          </p>
+                          <p className="mt-3 text-[0.72rem] uppercase tracking-[0.22em] text-white/70">
+                            {getCouponBenefit(coupon)}
+                          </p>
+                        </div>
                       </div>
 
-                      <h3 className="mt-5 font-headline text-[2rem] leading-tight text-primary">
-                        {coupon.name}
-                      </h3>
-                      <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">
-                        {coupon.description || 'Ưu đãi dành riêng cho đặt phòng khách sạn tại GOAT HOTEL.'}
-                      </p>
-                    </div>
+                      <div className="mt-6 grid gap-4 rounded-[24px] border border-outline-variant/12 bg-white/76 p-5 md:grid-cols-3">
+                        <div>
+                          <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">
+                            Được cấp lúc
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-on-surface-variant">
+                            {formatDate(item.assignedAt)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">
+                            Hạn dùng
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-on-surface-variant">
+                            {formatDate(item.expiresAt)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">
+                            Đơn tối thiểu
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-on-surface-variant">
+                            {formatCurrency(coupon.minOrderValue)}đ
+                          </p>
+                        </div>
+                      </div>
 
-                    <div className="rounded-[22px] border border-outline-variant/12 bg-[linear-gradient(180deg,rgba(8,19,37,0.96)_0%,rgba(15,31,56,0.92)_100%)] px-5 py-4 text-white lg:min-w-[220px]">
-                      <p className="font-label text-[0.56rem] uppercase tracking-[0.22em] text-secondary/80">
-                        Coupon code
-                      </p>
-                      <p className="mt-3 font-headline text-3xl tracking-[0.08em] text-secondary">
-                        {coupon.code}
-                      </p>
-                    </div>
-                  </div>
+                      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm leading-7 text-on-surface-variant">
+                          {item.bookingId
+                            ? `Đang gắn với booking #${item.bookingId}.`
+                            : 'Sẵn sàng để dùng ở bước xác nhận giữ chỗ.'}
+                        </p>
 
-                  <div className="mt-6 grid gap-4 rounded-[24px] border border-outline-variant/12 bg-white/76 p-5 md:grid-cols-3">
-                    <div>
-                      <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">
-                        Đơn tối thiểu
-                      </p>
-                      <p className="mt-2 font-headline text-xl text-primary">
-                        {formatCurrency(coupon.minOrderValue)}đ
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">
-                        Thời gian áp dụng
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-                        {formatDateRange(coupon.startDate, coupon.endDate)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">
-                        Lượt sử dụng
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-                        {coupon.usedCount || 0} / {coupon.usageLimit || 'Không giới hạn'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm leading-7 text-on-surface-variant">
-                      Hệ thống vẫn sẽ kiểm tra lại điều kiện mã ở bước checkout trước khi tạo booking.
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={() => handleCopyCode(coupon.code)}
-                      className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 font-label text-[0.64rem] uppercase tracking-[0.22em] text-on-primary transition-all hover:brightness-105"
-                    >
-                      {copiedCode === coupon.code ? 'Đã sao chép' : 'Sao chép mã'}
-                    </button>
-                  </div>
-                </article>
-              );
-            }) : (
+                        <div className="flex flex-wrap gap-3">
+                          {item.bookingId && (
+                            <Link
+                              to={`/booking/${item.bookingId}`}
+                              className="inline-flex items-center justify-center rounded-full border border-outline-variant/18 bg-white/70 px-5 py-3 font-label text-[0.64rem] uppercase tracking-[0.22em] text-primary transition-all hover:border-secondary/35 hover:text-secondary"
+                            >
+                              Xem booking
+                            </Link>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleCopyCode(coupon.code)}
+                            className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 font-label text-[0.64rem] uppercase tracking-[0.22em] text-on-primary transition-all hover:brightness-105"
+                          >
+                            {copiedCode === coupon.code ? 'Đã sao chép' : 'Sao chép mã'}
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </>
+            ) : (
               <div className="coupon-panel rounded-[28px] px-6 py-16 text-center">
-                <h3 className="font-headline text-3xl text-primary">Không có mã phù hợp</h3>
+                <h3 className="font-headline text-3xl text-primary">Không có phiếu giảm giá tương ứng</h3>
                 <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-on-surface-variant">
-                  Bộ lọc hiện tại chưa có coupon tương ứng. Bạn có thể quay lại “Tất cả” để xem toàn bộ ưu đãi
-                  dành cho booking phòng tại GOAT HOTEL.
+                  Hiện tại bạn không có coupon nào trong trạng thái này.
                 </p>
               </div>
             )}
           </div>
 
-          <aside className="space-y-5">
+          <aside className="space-y-5 sticky top-28 self-start transition-all duration-300">
             <section className="coupon-panel rounded-[28px] p-6">
               <p className="font-label text-[0.64rem] uppercase tracking-[0.28em] text-secondary">
                 Cách dùng nhanh
               </p>
               <div className="mt-5 space-y-4">
                 {[
-                  'Xem điều kiện và thời gian áp dụng của coupon phù hợp.',
+                  'Xem điều kiện và thời gian áp dụng của phiếu cấp riêng.',
                   'Sao chép mã bạn muốn dùng cho booking phòng.',
-                  'Dán mã vào bước checkout và bấm áp dụng.',
+                  'Dán mã vào bước đặt phòng và nhận ưu đãi.',
                 ].map((step, index) => (
                   <div key={step} className="flex gap-3">
                     <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-[0.72rem] font-bold text-slate-950">
@@ -511,8 +600,7 @@ export default function Coupons() {
                 Chọn phòng và áp dụng mã ngay
               </h3>
               <p className="mt-3 text-sm leading-7 text-on-surface-variant">
-                Sau khi chọn phòng và ngày lưu trú, bạn có thể nhập coupon ở bước booking confirmation để
-                backend tính lại discount amount và final amount.
+                Sau khi chọn phòng và ngày lưu trú, bạn có thể nhập coupon ở bước xác nhận để nhận mức giảm tương ứng định mức cấp phát tư admin.
               </p>
               <Link
                 to="/collections"

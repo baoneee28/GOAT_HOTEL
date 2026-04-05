@@ -11,15 +11,15 @@ public class Review {
     private Integer id;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
-    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "password"})
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "password", "bookings", "reviews", "notifications"})
     private User user;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_type_id")
-    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "items"})
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "items", "reviews", "bookings"})
     private RoomType roomType;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "booking_id")
-    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"details", "services", "payments"})
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"details", "services", "payments", "user"})
     private Booking booking;
     @Column(name = "rating", nullable = false)
     private Integer rating;

@@ -10,6 +10,7 @@ import com.hotel.repository.RoomRepository;
 import com.hotel.repository.UserRepository;
 import com.hotel.service.AuthService;
 import com.hotel.service.BookingService;
+import com.hotel.service.NotificationService;
 import com.hotel.service.PaymentService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +51,9 @@ public class BookingApiController {
 
     @Autowired
     private AuthService authService;
+
+    @Autowired
+    private NotificationService notificationService;
 
     private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
@@ -485,6 +489,10 @@ public class BookingApiController {
         if(room != null) {
             room.setStatus("available");
             roomRepository.save(room);
+        }
+
+        if (booking.getUser() != null) {
+            notificationService.sendReviewPrompt(booking);
         }
 
         response.put("success", true);

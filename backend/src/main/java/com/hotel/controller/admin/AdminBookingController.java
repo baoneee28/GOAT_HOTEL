@@ -9,6 +9,7 @@ import com.hotel.repository.BookingDetailRepository;
 import com.hotel.repository.RoomRepository;
 import com.hotel.repository.UserRepository;
 import com.hotel.service.BookingService;
+import com.hotel.service.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -42,6 +43,9 @@ public class AdminBookingController {
 
     @Autowired
     private BookingService bookingService;
+
+    @Autowired
+    private NotificationService notificationService;
 
     private static final int PAGE_SIZE = 5;
 
@@ -198,6 +202,10 @@ public class AdminBookingController {
         if(room != null){
             room.setStatus("available");
             roomRepository.save(room);
+        }
+
+        if (booking.getUser() != null) {
+            notificationService.sendReviewPrompt(booking);
         }
 
         return "redirect:/admin/bookings";

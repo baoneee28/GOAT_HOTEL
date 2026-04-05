@@ -142,6 +142,7 @@ public class PaymentService {
         double depositAmount = booking.getDepositAmount() == null ? 0.0 : booking.getDepositAmount();
         booking.setPaymentStatus(bookingService.determinePaymentStatus(booking, paidAmountAfter));
         bookingRepository.save(booking);
+        bookingService.synchronizeCouponAssignment(booking);
         booking.setPaidAmount(paidAmountAfter);
         booking.setRemainingAmount(Math.max(0.0, finalAmount - paidAmountAfter));
         booking.setDepositOutstandingAmount(Math.max(0.0, depositAmount - paidAmountAfter));
@@ -187,6 +188,7 @@ public class PaymentService {
         double requiredDepositAmount = booking.getDepositAmount() == null ? 0.0 : booking.getDepositAmount();
         booking.setPaymentStatus(bookingService.determinePaymentStatus(booking, paidAmountAfter));
         bookingRepository.save(booking);
+        bookingService.synchronizeCouponAssignment(booking);
         booking.setPaidAmount(paidAmountAfter);
         booking.setRemainingAmount(Math.max(0.0, finalAmount - paidAmountAfter));
         booking.setDepositOutstandingAmount(Math.max(0.0, requiredDepositAmount - paidAmountAfter));

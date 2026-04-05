@@ -250,6 +250,70 @@ BEGIN
 END
 GO
 
+IF OBJECT_ID(N'dbo.coupons', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.coupons (
+        id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        code NVARCHAR(50) NOT NULL UNIQUE,
+        description NVARCHAR(MAX) NULL,
+        discount_type NVARCHAR(20) NOT NULL,
+        discount_value FLOAT NOT NULL,
+        max_uses INT NULL,
+        current_uses INT NOT NULL CONSTRAINT DF_coupons_current_uses DEFAULT 0,
+        start_date DATETIME2 NULL,
+        end_date DATETIME2 NULL,
+        min_booking_value FLOAT NULL,
+        is_active BIT NOT NULL CONSTRAINT DF_coupons_is_active DEFAULT 1,
+        target_event NVARCHAR(50) NULL,
+        created_at DATETIME2 NULL CONSTRAINT DF_coupons_created_at DEFAULT SYSDATETIME()
+    );
+END
+GO
+
+IF OBJECT_ID(N'dbo.user_coupons', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.user_coupons (
+        id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        user_id INT NOT NULL,
+        coupon_id INT NOT NULL,
+        is_used BIT NOT NULL CONSTRAINT DF_user_coupons_is_used DEFAULT 0,
+        granted_at DATETIME2 NULL CONSTRAINT DF_user_coupons_granted_at DEFAULT SYSDATETIME(),
+        used_at DATETIME2 NULL,
+        CONSTRAINT FK_user_coupons_user FOREIGN KEY (user_id) REFERENCES dbo.users(id),
+        CONSTRAINT FK_user_coupons_coupon FOREIGN KEY (coupon_id) REFERENCES dbo.coupons(id)
+    );
+END
+GO
+
+IF OBJECT_ID(N'dbo.notifications', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.notifications (
+        id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        user_id INT NOT NULL,
+        title NVARCHAR(255) NOT NULL,
+        message NVARCHAR(MAX) NOT NULL,
+        type NVARCHAR(50) NOT NULL CONSTRAINT DF_notifications_type DEFAULT N'SYSTEM',
+        related_id INT NULL,
+        is_read BIT NOT NULL CONSTRAINT DF_notifications_is_read DEFAULT 0,
+        created_at DATETIME2 NULL CONSTRAINT DF_notifications_created_at DEFAULT SYSDATETIME(),
+        CONSTRAINT FK_notifications_user FOREIGN KEY (user_id) REFERENCES dbo.users(id)
+    );
+END
+GO
+
+IF OBJECT_ID(N'dbo.password_reset_codes', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.password_reset_codes (
+        id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        email NVARCHAR(100) NOT NULL,
+        code NVARCHAR(10) NOT NULL,
+        expires_at DATETIME2 NOT NULL,
+        is_used BIT NOT NULL CONSTRAINT DF_password_reset_codes_is_used DEFAULT 0,
+        created_at DATETIME2 NULL CONSTRAINT DF_password_reset_codes_created_at DEFAULT SYSDATETIME()
+    );
+END
+GO
+
 /* =========================================================
    INDEXES
    ========================================================= */

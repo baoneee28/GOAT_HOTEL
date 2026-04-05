@@ -17,7 +17,7 @@ const SIDEBAR_GROUPS = [
     key: 'system',
     label: 'Hệ thống',
     items: [
-      { to: '/admin/coupons', label: 'Mã giảm giá', icon: 'bi bi-ticket-perforated-fill', access: 'admin' },
+      { to: '/admin/coupons', label: 'Mã giảm giá', icon: 'bi bi-ticket-perforated-fill', access: 'backoffice' },
       { to: '/admin/news', label: 'Tin tức & Sự kiện', icon: 'bi bi-newspaper', access: 'admin' },
       { to: '/admin/room-types', label: 'Loại phòng', icon: 'bi bi-collection-fill', access: 'admin' },
       { to: '/admin/items', label: 'Vật phẩm', icon: 'bi bi-box-seam-fill', access: 'admin' },

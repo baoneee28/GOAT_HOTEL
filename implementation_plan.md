@@ -1,60 +1,42 @@
-# Complete Frontend React Migration Plan
+# Tính năng: Quên mật khẩu & Gửi mã xác thực qua Email
 
-## Goal Description
-The objective is to entirely replace the remaining `frontend-html` Thymeleaf templates with a modern React SPA using React Router, preserving 100% of the UI design and integrating with the existing `*ApiController.java` endpoints.
+Tính năng này yêu cầu người dùng phải nhận được một mã xác thực (OTP Code) gửi tới địa chỉ Email của họ. Sau khi nhập đúng mã OTP này cùng với mật khẩu mới, hệ thống mới cho phép đổi mật khẩu.
 
-This will decouple the entire project frontend-to-backend.
+## User Review Required
+
+> [!IMPORTANT]
+> Việc gửi Email bắt buộc phải có thông tin cấu hình **Máy Chủ Gửi Mail (SMTP)**.
+> Hiện tại ứng dụng chưa có thư viện gửi mail (`spring-boot-starter-mail`) và chưa có cấu hình tài khoản Gmail để gửi mailable.
+
+Tôi cần bạn xác nhận một quyết định cốt lõi:
+1. **Lựa chọn 1 (Hoàn thiện - Cần App Password):** Cài đặt đầy đủ tính năng gửi Email thật bằng dịch vụ Gmail SMTP. Backend sẽ cấu hình tự động gửi mail. BẠN sẽ phải tạo một mật khẩu ứng dụng Gmail (App Password) và cung cấp cho tôi hoặc dán vào file `application.properties`.
+2. **Lựa chọn 2 (Mô phỏng - Demo Console):** Cài đặt logic và Database đầy đủ để tạo mã OTP. Giao diện Frontend vẫn yêu cầu nhập OTP đàng hoàng. Tuy nhiên Backend sẽ chỉ "in tạm mã OTP đó ra cửa sổ Console màu đen" thay vì thực sự gửi đi để bạn có thể test luồng chức năng một cách nhanh chóng mà không phải vất vả cấu hình Gmail.
+
+Vui lòng cho tôi biết bạn muốn đi theo hướng **Lựa chọn 1** hay **Lựa chọn 2**?
 
 ## Proposed Changes
 
-### 1. Reusable Layout Components
-- **[NEW]** `frontend/src/components/Navbar.jsx`: Extract the navigation bar logic into a reusable component.
-- **[NEW]** `frontend/src/components/Footer.jsx`: Extract the footer.
-- **[NEW]** `frontend/src/components/AdminSidebar.jsx`: The side navigation for Admin pages.
+### Thay đổi Backend
+- Cập nhật file `pom.xml` bổ sung dependency `spring-boot-starter-mail` (NẾU chọn cách 1 gửi mail thật).
+- Tạo Entity mới `PasswordResetCode` để lưu tạm thời các mã OTP gồm: Email, Code (Mã số 6 chữ số), Thời hạn (Ví dụ hiệu lực trong 10 phút) và trạng thái (đã dùng / chưa dùng).
+- Thêm các API Endpoint mới tại `AuthApiController.java`:
+  - `POST /api/auth/forgot-password`: Nhận email -> sinh mã OTP -> Lưu vào DB -> Gọi `EmailService` để gửi mail (hoặc in log).
+  - `POST /api/auth/reset-password`: Nhận email, mã OTP, và mật khẩu mới -> Xác thực mã OTP trong DB -> Nếu đúng, đổi mật khẩu và lưu lịch sử.
 
-### 2. Client Pages
-- **[NEW]** `frontend/src/pages/Profile.jsx`: Replicates [profile.html](file:///d:/webProject/GOAT_HOTEL/frontend-html/templates/profile.html). Fetches from `/api/profile`. Allows users to update their details and password.
-- **[NEW]** `frontend/src/pages/History.jsx`: Replicates [history.html](file:///d:/webProject/GOAT_HOTEL/frontend-html/templates/history.html). Fetches booking history from `/api/bookings/my-bookings`. Allows cancellation.
-- **[NEW]** `frontend/src/pages/NewsDetail.jsx`: Replicates [news-detail.html](file:///d:/webProject/GOAT_HOTEL/frontend-html/templates/news-detail.html). Fetches detailed news content from `/api/news/{id}`.
+### Thay đổi Frontend
+- Làm mới cơ chế hiện tại của nút "Quên mật khẩu" trong trang `Login.jsx` hoặc tạo hẳn một trang `/forgot-password` hoàn chỉnh.
+- Làm giao diện nhập Email để lấy mã -> Khi bấm thì loading chờ gửi.
+- Nếu thành công, hiện ra form nhập **Mã OTP** và **Mật khẩu Mới** cùng nút **Đặt Lại Mật Khẩu**.
 
-### 3. Admin Pages
-- **[NEW]** `frontend/src/pages/admin/AdminLayout.jsx`: A wrapper component containing the Sidebar and a content area (`<Outlet />`).
-- **[NEW]** `frontend/src/pages/admin/Dashboard.jsx` (`admin/index.html`): Displays stats and charts.
-- **[NEW]** `frontend/src/pages/admin/Rooms.jsx` (`admin/rooms.html`): CRUD for rooms via `/api/rooms/admin`.
-- **[NEW]** `frontend/src/pages/admin/RoomTypes.jsx` (`admin/room-types.html`): CRUD for room categories.
-- **[NEW]** `frontend/src/pages/admin/Items.jsx` (`admin/items.html`): CRUD for room amenities.
-- **[NEW]** `frontend/src/pages/admin/Bookings.jsx` (`admin/bookings.html`): Manage all bookings.
-- **[NEW]** `frontend/src/pages/admin/Users.jsx` (`admin/users.html`): Manage system users.
-- **[NEW]** `frontend/src/pages/admin/News.jsx` (`admin/news.html`): Manage blog posts natively.
+## Open Questions
 
-### 4. Routing Changes
-- **[MODIFY]** [frontend/src/App.jsx](file:///d:/webProject/GOAT_HOTEL/frontend/src/App.jsx): Setup complete Nested Routing.
-
-```jsx
-<Routes>
-  {/* Client Routes */}
-  <Route path="/" element={<Home />} />
-  <Route path="/login" element={<Login initialTab="login" />} />
-  <Route path="/register" element={<Login initialTab="register" />} />
-  <Route path="/profile" element={<Profile />} />
-  <Route path="/history" element={<History />} />
-  <Route path="/news/:id" element={<NewsDetail />} />
-
-  {/* Admin Routes */}
-  <Route path="/admin" element={<AdminLayout />}>
-    <Route index element={<Dashboard />} />
-    <Route path="rooms" element={<Rooms />} />
-    <Route path="room-types" element={<RoomTypes />} />
-    <Route path="items" element={<Items />} />
-    <Route path="bookings" element={<Bookings />} />
-    <Route path="users" element={<Users />} />
-    <Route path="news" element={<News />} />
-  </Route>
-</Routes>
-```
+- Trong thư mục `/pages` hiện chưa có `ForgotPassword.jsx`. Bạn muốn tôi hiển thị form Quên mật khẩu này trên một cái Popup Modal ngay trong màn hình đăng nhập, hay tạo một trang riêng (URL `http://localhost:5173/forgot-password`) theo kiểu truyền thống?
 
 ## Verification Plan
+
+### Automated Tests
+- Gọi thử API `POST /api/auth/forgot-password` với Postman hoặc cURL ở console để kiểm tra mã tạo và mail được gửi đi (hoặc in ra console).
+- Làm giả sai mã OTP để xem hệ thống có chặn lại báo lỗi đúng không.
+
 ### Manual Verification
-1. Each React component will be strictly compared frame-by-frame horizontally against the `frontend-html` equivalent UI layout.
-2. The CRUD admin functionality and filtering will be triggered via Axios. Network calls will be monitored.
-3. Protected routes (like `/admin/*` and `/profile`) will redirect to `/login` if `user_logged_in` is missing or insufficient role.
+- Bạn sẽ đi vào giao diện người dùng, thử tìm 1 tải khoản có mail hợp lệ, nhấn Quên Mật Khẩu, chép lấy đoạn mã OTP 6 số để xác nhận lệnh đổi pass.

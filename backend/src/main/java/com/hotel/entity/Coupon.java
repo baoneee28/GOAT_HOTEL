@@ -47,7 +47,10 @@ public class Coupon {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    @Column(name = "created_at", updatable = false)
+    @Column(name = "target_event", length = 50)
+    private String targetEvent = "DEFAULT";
+
+@Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
@@ -55,6 +58,15 @@ public class Coupon {
 
     @Transient
     private Long usedCount = 0L;
+
+    @Transient
+    private Long assignedCount = 0L;
+
+    @Transient
+    private Long availableAssignedCount = 0L;
+
+    @Transient
+    private Long usedAssignedCount = 0L;
 
     @PrePersist
     protected void onCreate() {

@@ -15,12 +15,10 @@ public class AdminInterceptor implements HandlerInterceptor {
 
     private static final String[] ADMIN_ONLY_PREFIXES = {
             "/admin/users",
-            "/admin/coupons",
             "/admin/news",
             "/admin/room-types",
             "/admin/items",
             "/api/admin/users",
-            "/api/admin/coupons",
             "/api/news/admin",
             "/api/room-types/admin",
             "/api/admin/items",

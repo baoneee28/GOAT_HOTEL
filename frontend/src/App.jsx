@@ -1,14 +1,15 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 
-// Scroll lên đầu trang mỗi khi chuyển route — fix chuẩn cho React Router SPA
 function ScrollToTop() {
   const { pathname } = useLocation();
   React.useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [pathname]);
   return null;
 }
+
 import Home from './pages/Home';
 import AuthPage from './pages/AuthPage';
+import ForgotPassword from './pages/ForgotPassword';
 import Profile from './pages/Profile';
 import History from './pages/History';
 import OrderDetail from './pages/OrderDetail';
@@ -36,7 +37,6 @@ import Collections from './pages/Collections';
 import MainLayout from './components/MainLayout';
 import { AuthProvider, ProtectedRoute, PublicOnlyRoute } from './auth/AuthContext';
 import './App.css';
-
 
 function App() {
   return (
@@ -72,6 +72,9 @@ function App() {
             <Route path="/login" element={<AuthPage />} />
             <Route path="/register" element={<AuthPage />} />
           </Route>
+
+          {/* Quên mật khẩu - không yêu cầu đăng nhập */}
+          <Route path="/forgot-password" element={<ForgotPassword />} />
 
           {/* Admin Routes */}
           <Route element={<ProtectedRoute backofficeOnly />}>

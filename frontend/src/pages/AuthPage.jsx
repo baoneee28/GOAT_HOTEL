@@ -268,9 +268,12 @@ export default function AuthPage() {
                           <p className="max-w-xs text-xs leading-6 text-on-surface-variant">
                             Sử dụng email đã đăng ký để truy cập nhanh vào lịch sử đặt phòng và hồ sơ lưu trú của bạn.
                           </p>
-                          <span className="font-label text-[10px] uppercase tracking-[0.22em] text-on-surface-variant/70">
-                            Quên mật khẩu
-                          </span>
+                          <Link
+                            to="/forgot-password"
+                            className="font-label text-[10px] uppercase tracking-[0.22em] text-secondary hover:text-primary transition-colors whitespace-nowrap"
+                          >
+                            Quên mật khẩu?
+                          </Link>
                         </div>
 
                         <button

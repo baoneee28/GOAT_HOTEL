@@ -26,7 +26,14 @@ export default function NotificationBell({ user }) {
       fetchNotifications();
       // Optional: interval to poll for new notifications every minute
       const interval = setInterval(fetchNotifications, 60000);
-      return () => clearInterval(interval);
+      
+      const forceFetchListener = () => fetchNotifications();
+      document.addEventListener('forceFetchNotifications', forceFetchListener);
+      
+      return () => {
+        clearInterval(interval);
+        document.removeEventListener('forceFetchNotifications', forceFetchListener);
+      };
     }
   }, [user]);
 
@@ -53,11 +60,32 @@ export default function NotificationBell({ user }) {
     }
 
     if (notification.type === 'REVIEW_PROMPT') {
+      // Check if already reviewed before opening modal
+      if (notification.relatedId) {
+        try {
+          const res = await axios.get(`${API_BASE}/api/reviews/booking/${notification.relatedId}`, { withCredentials: true });
+          const existing = res.data?.reviews;
+          if (existing && existing.length > 0) {
+            window.Swal?.fire({
+              icon: 'info',
+              title: 'Bạn đã đánh giá rồi!',
+              text: 'Cảm ơn bạn đã dành thời gian để lại đánh giá cho chuyến lưu trú này.',
+              confirmButtonText: 'OK',
+              confirmButtonColor: '#f59e0b',
+            });
+            setIsOpen(false);
+            return;
+          }
+        } catch (err) {
+          console.error('Lỗi kiểm tra đánh giá:', err);
+        }
+      }
       setSelectedNotification(notification);
       setReviewModalOpen(true);
       setIsOpen(false);
     }
   };
+
 
   const handleMarkAllRead = async () => {
     try {

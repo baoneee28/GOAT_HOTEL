@@ -15,7 +15,7 @@ public class CouponEventType {
     @Column(name = "event_key", nullable = false, unique = true, length = 50)
     private String eventKey;
 
-    @Column(name = "label", nullable = false, length = 100)
+    @Column(name = "label", nullable = false, columnDefinition = "NVARCHAR(100)")
     private String label;
 
     @Column(name = "icon", length = 50)

@@ -162,6 +162,7 @@ export default function Bookings() {
       const res = await axios.post(`${API_BASE}/api/admin/bookings/${id}/checkout`, { checkoutType: type }, { withCredentials: true });
       if (res.data.success) {
         Swal.fire({ icon: 'success', title: 'Đã hoàn tất checkout', timer: 1500, showConfirmButton: false });
+        document.dispatchEvent(new Event('forceFetchNotifications'));
         fetchData();
       }
     } catch (e) {

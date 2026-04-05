@@ -112,7 +112,13 @@ public class ReviewApiController {
     @GetMapping("/booking/{bookingId}")
     public ResponseEntity<?> getReviewByBooking(@PathVariable Integer bookingId, HttpSession session) {
         List<Review> list = reviewRepository.findByBookingId(bookingId);
-        return ResponseEntity.ok(Map.of("reviews", list));
+        List<Map<String, Object>> resList = list.stream().map(r -> {
+            Map<String, Object> map = new java.util.HashMap<>();
+            map.put("id", r.getId());
+            map.put("rating", r.getRating());
+            return map;
+        }).toList();
+        return ResponseEntity.ok(Map.of("reviews", resList));
     }
 
     @GetMapping("/room/{roomId}")

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import API_BASE from '../config';
 const Swal = window.Swal;
@@ -52,31 +53,16 @@ export default function ReviewModal({ notification, isOpen, onClose, onSuccess }
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative">
-        <div className="p-6">
+  return createPortal(
+    <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', padding: '16px' }}>
+      <div style={{ background: '#fff', borderRadius: '20px', boxShadow: '0 25px 60px rgba(0,0,0,0.4)', width: '100%', maxWidth: '440px', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ padding: '24px' }}>
           <h3 className="text-xl font-bold font-headline mb-1 text-slate-800">Đánh giá Trải nghiệm</h3>
           <p className="text-sm text-slate-500 mb-6 font-label">{notification.message}</p>
           
           <form onSubmit={handleSubmit}>
-            <div className="mb-6 flex justify-center gap-2">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  type="button"
-                  key={star}
-                  onClick={() => setRating(star)}
-                  className={`material-symbols-outlined text-4xl transition-all ${
-                    star <= rating ? 'text-amber-400 fill-amber-400' : 'text-slate-200'
-                  }`}
-                  style={{ fontVariationSettings: star <= rating ? "'FILL' 1" : "'FILL' 0" }}
-                >
-                  star
-                </button>
-              ))}
-            </div>
-
-            <div className="mb-6">
+            {/* Comment textarea - above */}
+            <div className="mb-5">
               <label className="block text-sm font-bold text-slate-700 mb-2">Bình luận của bạn (Không bắt buộc)</label>
               <textarea
                 className="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
@@ -85,6 +71,38 @@ export default function ReviewModal({ notification, isOpen, onClose, onSuccess }
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
               />
+            </div>
+
+            {/* Star rating - below */}
+            <div className="mb-5">
+              <p className="text-sm font-bold text-slate-700 mb-3 text-center">Đánh giá của bạn</p>
+              <div className="flex justify-center gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    type="button"
+                    key={star}
+                    onClick={() => setRating(star)}
+                    style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', lineHeight: 1 }}
+                    title={['', 'Tệ', 'Không tốt', 'Bình thường', 'Tốt', 'Tuyệt vời'][star]}
+                  >
+                    <span
+                      className="material-symbols-outlined"
+                      style={{
+                        fontSize: '38px',
+                        display: 'block',
+                        color: star <= rating ? '#f59e0b' : '#cbd5e1',
+                        fontVariationSettings: star <= rating ? "'FILL' 1" : "'FILL' 0",
+                        pointerEvents: 'none',
+                        userSelect: 'none',
+                        transition: 'color 0.15s',
+                      }}
+                    >star</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-center text-xs font-semibold mt-2" style={{ color: '#f59e0b', minHeight: '18px' }}>
+                {['', '😞 Tệ', '😐 Không tốt', '🙂 Bình thường', '😊 Tốt', '🤩 Tuyệt vời!'][rating]}
+              </p>
             </div>
 
             <div className="flex gap-3 mt-4">
@@ -106,6 +124,7 @@ export default function ReviewModal({ notification, isOpen, onClose, onSuccess }
           </form>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

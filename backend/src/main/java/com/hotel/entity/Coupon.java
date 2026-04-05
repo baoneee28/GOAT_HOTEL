@@ -17,7 +17,7 @@ public class Coupon {
     @Column(name = "code", nullable = false, unique = true, length = 50)
     private String code;
 
-    @Column(name = "name", nullable = false, length = 150)
+    @Column(name = "name", nullable = false, columnDefinition = "NVARCHAR(150)")
     private String name;
 
     @Column(name = "description", columnDefinition = "NVARCHAR(MAX)")
@@ -47,10 +47,10 @@ public class Coupon {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    @Column(name = "target_event", length = 50)
+    @Column(name = "target_event", columnDefinition = "NVARCHAR(150)")
     private String targetEvent = "DEFAULT";
 
-@Column(name = "created_at", updatable = false)
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at")

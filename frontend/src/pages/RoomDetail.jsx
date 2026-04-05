@@ -307,24 +307,66 @@ export default function RoomDetail() {
           <h2 className="font-headline text-3xl text-on-surface mb-8">Đánh giá của khách hàng</h2>
           
           {reviews.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {reviews.map((r) => (
-                <div key={r.id} className="bg-surface-container-lowest p-6 rounded-3xl border border-outline-variant/20 shadow-sm">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h4 className="font-bold text-on-surface">{r.user?.fullName || 'Khách hàng'}</h4>
-                      <p className="text-xs text-on-surface-variant">{formatDate(r.createdAt.split('T')[0])}</p>
-                    </div>
-                    <div className="flex text-secondary">
-                      {[...Array(5)].map((_, i) => (
-                        <span key={i} className="material-symbols-outlined text-sm" style={{ fontVariationSettings: i < r.rating ? "'FILL' 1" : "'FILL' 0" }}>star</span>
-                      ))}
-                    </div>
+            <>
+              {/* Average rating summary */}
+              <div className="flex items-center gap-4 mb-8 p-5 bg-surface-container-lowest rounded-3xl border border-outline-variant/20 shadow-sm w-fit">
+                <div className="text-center">
+                  <div className="text-5xl font-headline font-bold text-secondary leading-none">
+                    {(reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length).toFixed(1)}
                   </div>
-                  <p className="text-on-surface-variant italic font-light">"{r.comment || 'Không có nhận xét'}"</p>
+                  <div className="flex justify-center mt-2 gap-0.5">
+                    {[...Array(5)].map((_, i) => {
+                      const avg = reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length;
+                      return (
+                        <span key={i} className="material-symbols-outlined text-base" style={{
+                          color: i < Math.round(avg) ? '#f59e0b' : '#d1d5db',
+                          fontVariationSettings: i < Math.round(avg) ? "'FILL' 1" : "'FILL' 0"
+                        }}>star</span>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-on-surface-variant mt-1">{reviews.length} đánh giá</p>
                 </div>
-              ))}
-            </div>
+                <div className="hidden md:flex flex-col gap-1">
+                  {[5,4,3,2,1].map(star => {
+                    const count = reviews.filter(r => r.rating === star).length;
+                    const pct = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
+                    return (
+                      <div key={star} className="flex items-center gap-2 text-xs">
+                        <span className="text-on-surface-variant w-3">{star}</span>
+                        <span className="material-symbols-outlined text-xs" style={{ color: '#f59e0b', fontVariationSettings: "'FILL' 1" }}>star</span>
+                        <div className="w-28 h-1.5 rounded-full bg-outline-variant/30">
+                          <div className="h-full rounded-full bg-secondary" style={{ width: `${pct}%` }}></div>
+                        </div>
+                        <span className="text-on-surface-variant w-4 text-right">{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {reviews.map((r) => (
+                  <div key={r.id} className="bg-surface-container-lowest p-6 rounded-3xl border border-outline-variant/20 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h4 className="font-bold text-on-surface">{r.user?.fullName || 'Khách hàng'}</h4>
+                        <p className="text-xs text-on-surface-variant">{r.createdAt ? formatDate(r.createdAt.split('T')[0]) : ''}</p>
+                      </div>
+                      <div className="flex gap-0.5">
+                        {[...Array(5)].map((_, i) => (
+                          <span key={i} className="material-symbols-outlined text-base" style={{
+                            color: i < (r.rating || 0) ? '#f59e0b' : '#d1d5db',
+                            fontVariationSettings: i < (r.rating || 0) ? "'FILL' 1" : "'FILL' 0"
+                          }}>star</span>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-on-surface-variant italic font-light">"{r.comment || 'Không có nhận xét'}"</p>
+                  </div>
+                ))}
+              </div>
+            </>
           ) : (
             <div className="text-center py-10 bg-surface-container-lowest rounded-3xl border border-outline-variant/20">
               <span className="material-symbols-outlined text-outline text-4xl mb-2">reviews</span>

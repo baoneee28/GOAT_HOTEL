@@ -2,6 +2,7 @@ package com.hotel.controller.admin;
 
 import com.hotel.entity.User;
 import com.hotel.repository.UserRepository;
+import com.hotel.service.AuthService;
 import com.hotel.service.FileUploadService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -24,6 +25,9 @@ public class AdminUserController {
 
     @Autowired
     private FileUploadService fileUploadService;
+
+    @Autowired
+    private AuthService authService;
 
     private static final int PAGE_SIZE = 5;
 
@@ -77,7 +81,7 @@ public class AdminUserController {
         user.setRole(role);
         // Nếu Form có gõ Mật khẩu mới thì Set vào, không thì giữ nguyên mật khẩu cũ
         if (!password.isBlank()) {
-            user.setPassword(password);
+            user.setPassword(authService.encodePassword(password));
         }
 
         // Tải ảnh đại diện (avatar) của họ lên host

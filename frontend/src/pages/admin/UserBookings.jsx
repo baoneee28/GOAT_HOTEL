@@ -37,14 +37,17 @@ function formatDate(value) {
 }
 
 async function fetchAllAdminBookings() {
+  const pageSize = 100;
   let page = 1;
   let totalPages = 1;
   const collected = [];
 
   while (page <= totalPages) {
-    const res = await axios.get(`${API_BASE}/api/admin/bookings?page=${page}`, { withCredentials: true });
-    collected.push(...(res.data?.bookings || []));
-    totalPages = Math.max(Number(res.data?.totalPages || 1), 1);
+    const res = await axios.get(`${API_BASE}/api/admin/bookings?page=${page}&pageSize=${pageSize}`, { withCredentials: true });
+    const payload = res.data || {};
+    const meta = payload.meta || {};
+    collected.push(...(payload.data || []));
+    totalPages = Math.max(Number(meta.totalPages || 1), 1);
     page += 1;
   }
 

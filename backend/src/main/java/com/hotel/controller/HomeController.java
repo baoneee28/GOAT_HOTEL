@@ -1,5 +1,7 @@
 package com.hotel.controller;
 
+import com.hotel.dto.BookingResponse;
+import com.hotel.dto.UserResponse;
 import com.hotel.entity.User;
 import com.hotel.repository.FeaturedRoomTypeRepository;
 import com.hotel.repository.FeaturedNewsRepository;
@@ -39,8 +41,8 @@ public class HomeController {
         Map<String, Object> response = new HashMap<>();
         if (session.getAttribute("user") != null) {
             User user = (User) session.getAttribute("user");
-            response.put("active_booking", bookingService.getActiveBooking(user.getId()));
-            response.put("user_logged_in", authService.toClientUser(user));
+            response.put("active_booking", BookingResponse.from(bookingService.getActiveBooking(user.getId())));
+            response.put("user_logged_in", UserResponse.from(user));
         }
 
         response.put("featured_rooms", featuredRoomTypeRepository.findAllByOrderByDisplayOrderAsc());

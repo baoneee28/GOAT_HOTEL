@@ -53,7 +53,6 @@ public class AdminBookingController {
     public String listBookings(@RequestParam(defaultValue = "") String status,
                                @RequestParam(defaultValue = "1") int page,
                                Model model) {
-        bookingService.expirePendingBookings();
         Page<Booking> bookingPage = bookingRepository.findAdminBookings(
                 status.isBlank() ? null : status,
                 PageRequest.of(page - 1, PAGE_SIZE));
@@ -171,7 +170,6 @@ public class AdminBookingController {
         if (booking.getDetails() == null || booking.getDetails().isEmpty()) return "redirect:/admin/bookings";
         
         BookingDetail detail = booking.getDetails().get(0);
-        Room room = detail.getRoom();
         if (!"confirmed".equalsIgnoreCase(booking.getStatus())) return "redirect:/admin/bookings?error=checkout-status";
         if (detail.getCheckInActual() == null) return "redirect:/admin/bookings?error=checkout-checkin-required";
         if (detail.getCheckOutActual() != null) return "redirect:/admin/bookings?error=checkout-duplicated";
@@ -198,11 +196,6 @@ public class AdminBookingController {
         }
 
         bookingRepository.save(booking);
-
-        if(room != null){
-            room.setStatus("available");
-            roomRepository.save(room);
-        }
 
         if (booking.getUser() != null) {
             notificationService.sendReviewPrompt(booking);

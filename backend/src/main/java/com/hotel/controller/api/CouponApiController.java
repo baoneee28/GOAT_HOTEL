@@ -1,5 +1,9 @@
 package com.hotel.controller.api;
 
+import com.hotel.dto.CouponApplyRequest;
+import com.hotel.dto.CouponAssignmentRequest;
+import com.hotel.dto.CouponEventTypeCreateRequest;
+import com.hotel.dto.CouponUpsertRequest;
 import com.hotel.entity.Coupon;
 import com.hotel.entity.CouponEventType;
 import com.hotel.entity.User;
@@ -8,12 +12,15 @@ import com.hotel.service.AuthService;
 import com.hotel.service.CouponService;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -27,7 +34,8 @@ public class CouponApiController {
     private final CouponService couponService;
     private final AuthService authService;
     private final CouponEventTypeRepository eventTypeRepository;
-    private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final LocalTime DEFAULT_CHECK_IN_TIME = LocalTime.of(14, 0);
+    private static final LocalTime DEFAULT_CHECK_OUT_TIME = LocalTime.of(12, 0);
 
     public CouponApiController(CouponService couponService, AuthService authService, CouponEventTypeRepository eventTypeRepository) {
         this.couponService = couponService;
@@ -59,7 +67,9 @@ public class CouponApiController {
     @GetMapping("/coupons")
     public ResponseEntity<Map<String, Object>> listCoupons(
             @RequestParam(defaultValue = "active") String status) {
-        return ResponseEntity.ok(couponService.buildPublicCouponResponse(status));
+        Map<String, Object> response = new HashMap<>(couponService.buildPublicCouponResponse(status));
+        response.put("success", true);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/coupons/my")
@@ -70,27 +80,29 @@ public class CouponApiController {
         if (currentUser == null) {
             return authRequiredResponse();
         }
-        return ResponseEntity.ok(couponService.buildMyCouponResponse(currentUser, status));
+        Map<String, Object> response = new HashMap<>(couponService.buildMyCouponResponse(currentUser, status));
+        response.put("success", true);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/coupons/apply")
-    public ResponseEntity<Map<String, Object>> applyCoupon(@RequestBody Map<String, String> payload, HttpSession session) {
+    public ResponseEntity<Map<String, Object>> applyCoupon(@Valid @RequestBody CouponApplyRequest request, HttpSession session) {
         Map<String, Object> response = new HashMap<>();
         try {
-            Integer roomId = Integer.parseInt(requireField(payload, "roomId", "Phong"));
-            LocalDateTime checkIn = parseDate(requireField(payload, "checkIn", "Ngay nhan phong"));
-            LocalDateTime checkOut = parseDate(requireField(payload, "checkOut", "Ngay tra phong"));
-            Integer userCouponId = parseOptionalInteger(payload.get("userCouponId"));
-            String couponCode = payload.get("couponCode");
+            LocalDateTime checkIn = parseStayDate(request.checkIn(), DEFAULT_CHECK_IN_TIME, "Ngay nhan phong");
+            LocalDateTime checkOut = parseStayDate(request.checkOut(), DEFAULT_CHECK_OUT_TIME, "Ngay tra phong");
             User currentUser = getSessionUser(session);
+            boolean couponRequired = request.userCouponId() != null
+                    || (request.couponCode() != null && !request.couponCode().isBlank());
 
             CouponService.CouponPricingResult result = couponService.previewCouponSelection(
                     currentUser,
-                    roomId,
+                    request.roomId(),
                     checkIn,
                     checkOut,
-                    userCouponId,
-                    couponCode
+                    request.userCouponId(),
+                    request.couponCode(),
+                    couponRequired
             );
             response.put("success", true);
             response.put("valid", result.valid());
@@ -113,7 +125,9 @@ public class CouponApiController {
             @RequestParam(defaultValue = "") String q,
             @RequestParam(defaultValue = "all") String status,
             @RequestParam(defaultValue = "1") int page) {
-        return ResponseEntity.ok(couponService.buildAdminCouponPage(q, status, Math.max(1, page), 8));
+        Map<String, Object> response = new HashMap<>(couponService.buildAdminCouponPage(q, status, Math.max(1, page), 8));
+        response.put("success", true);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/admin/coupons/{id}")
@@ -160,7 +174,7 @@ public class CouponApiController {
     @PostMapping("/admin/coupons/{id}/assignments")
     public ResponseEntity<Map<String, Object>> assignCouponToUser(
             @PathVariable Integer id,
-            @RequestBody Map<String, String> payload,
+            @Valid @RequestBody CouponAssignmentRequest request,
             HttpSession session) {
         User currentUser = getSessionUser(session);
         if (!authService.isBackoffice(currentUser)) {
@@ -168,10 +182,8 @@ public class CouponApiController {
         }
 
         try {
-            Integer userId = Integer.parseInt(requireField(payload, "userId", "Nguoi dung"));
-            LocalDateTime expiresAt = parseOptionalDate(payload.get("expiresAt"));
-            String note = payload.get("note");
-            var assignedCoupon = couponService.assignCouponToUser(id, userId, currentUser, expiresAt, note);
+            LocalDateTime expiresAt = parseOptionalDate(request.expiresAt());
+            var assignedCoupon = couponService.assignCouponToUser(id, request.userId(), currentUser, expiresAt, request.note());
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
@@ -187,24 +199,24 @@ public class CouponApiController {
     }
 
     @PostMapping("/admin/coupons")
-    public ResponseEntity<Map<String, Object>> createCoupon(@RequestBody Map<String, Object> payload,
+    public ResponseEntity<Map<String, Object>> createCoupon(@Valid @RequestBody CouponUpsertRequest request,
                                                             HttpSession session) {
         User currentUser = getSessionUser(session);
         if (!authService.isAdmin(currentUser)) {
             return forbiddenResponse("Chi admin moi duoc tao coupon mau.");
         }
-        return saveCoupon(payload, null, true);
+        return saveCoupon(request, null, true);
     }
 
     @PutMapping("/admin/coupons/{id}")
     public ResponseEntity<Map<String, Object>> updateCoupon(@PathVariable Integer id,
-                                                            @RequestBody Map<String, Object> payload,
+                                                            @Valid @RequestBody CouponUpsertRequest request,
                                                             HttpSession session) {
         User currentUser = getSessionUser(session);
         if (!authService.isAdmin(currentUser)) {
             return forbiddenResponse("Chi admin moi duoc cap nhat coupon mau.");
         }
-        return saveCoupon(payload, id, false);
+        return saveCoupon(request, id, false);
     }
 
     @PatchMapping("/admin/coupons/{id}/toggle-active")
@@ -250,9 +262,9 @@ public class CouponApiController {
         }
     }
 
-    private ResponseEntity<Map<String, Object>> saveCoupon(Map<String, Object> payload, Integer id, boolean createMode) {
+    private ResponseEntity<Map<String, Object>> saveCoupon(CouponUpsertRequest request, Integer id, boolean createMode) {
         try {
-            Coupon coupon = couponService.saveCoupon(payload, id);
+            Coupon coupon = couponService.saveCoupon(toCouponPayload(request), id);
             return ResponseEntity.ok(Map.of(
                     "success", true,
                     "message", createMode ? "Da tao coupon thanh cong." : "Da cap nhat coupon.",
@@ -285,31 +297,26 @@ public class CouponApiController {
         ));
     }
 
-    private String requireField(Map<String, String> payload, String key, String label) {
-        String value = payload.get(key);
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(label + " khong duoc de trong.");
-        }
-        return value.trim();
-    }
-
-    private Integer parseOptionalInteger(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
+    private LocalDateTime parseStayDate(String raw, LocalTime defaultTime, String label) {
+        String normalized = raw == null ? "" : raw.trim();
+        if (normalized.isBlank()) {
+            throw new IllegalArgumentException(label + " khong hop le.");
         }
         try {
-            return Integer.parseInt(raw.trim());
-        } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException("Ma coupon ca nhan khong hop le.");
+            if (normalized.length() == 10) {
+                return LocalDate.parse(normalized).atTime(defaultTime);
+            }
+            if (normalized.contains(" ")) {
+                normalized = normalized.replace(" ", "T");
+            }
+            return LocalDateTime.parse(normalized);
+        } catch (DateTimeParseException ex) {
+            throw new IllegalArgumentException(label + " khong hop le.");
         }
     }
 
     private LocalDateTime parseDate(String raw) {
-        String normalized = raw.contains("T") ? raw.replace("T", " ") : raw;
-        if (normalized.length() == 10) {
-            normalized += " 12:00";
-        }
-        return LocalDateTime.parse(normalized, formatter);
+        return parseStayDate(raw, LocalTime.of(12, 0), "Thoi diem");
     }
 
     private LocalDateTime parseOptionalDate(String raw) {
@@ -328,16 +335,13 @@ public class CouponApiController {
     }
 
     @PostMapping("/admin/coupon-events")
-    public ResponseEntity<Map<String, Object>> createEventType(@RequestBody Map<String, String> payload, HttpSession session) {
+    public ResponseEntity<Map<String, Object>> createEventType(@Valid @RequestBody CouponEventTypeCreateRequest request, HttpSession session) {
         User currentUser = getSessionUser(session);
         if (!authService.isAdmin(currentUser)) {
             return forbiddenResponse("Chi admin moi duoc tao nhom su kien.");
         }
-        String label = payload.get("label");
-        if (label == null || label.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Ten nhom khong duoc de trong."));
-        }
-        String key = payload.get("eventKey");
+        String label = request.label().trim();
+        String key = request.eventKey();
         if (key == null || key.isBlank()) {
             key = label.trim().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]+", "_").replaceAll("^_|_$", "");
         } else {
@@ -346,8 +350,8 @@ public class CouponApiController {
         if (eventTypeRepository.findByEventKeyIgnoreCase(key).isPresent()) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Ma nhom su kien da ton tai: " + key));
         }
-        String icon = payload.getOrDefault("icon", "category");
-        String color = payload.getOrDefault("color", "#6b7280");
+        String icon = request.icon().trim();
+        String color = request.color().trim();
         int maxOrder = eventTypeRepository.findAllByOrderBySortOrderAscIdAsc().stream().mapToInt(e -> e.getSortOrder() == null ? 0 : e.getSortOrder()).max().orElse(0);
 
         CouponEventType eventType = new CouponEventType();
@@ -376,5 +380,22 @@ public class CouponApiController {
         }
         eventTypeRepository.delete(eventType);
         return ResponseEntity.ok(Map.of("success", true, "message", "Da xoa nhom su kien."));
+    }
+
+    private Map<String, Object> toCouponPayload(CouponUpsertRequest request) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("code", request.code());
+        payload.put("name", request.name());
+        payload.put("description", request.description());
+        payload.put("discountType", request.discountType());
+        payload.put("targetEvent", request.targetEvent());
+        payload.put("discountValue", request.discountValue());
+        payload.put("minOrderValue", request.minOrderValue());
+        payload.put("maxDiscountAmount", request.maxDiscountAmount());
+        payload.put("startDate", request.startDate());
+        payload.put("endDate", request.endDate());
+        payload.put("usageLimit", request.usageLimit());
+        payload.put("isActive", request.isActive());
+        return payload;
     }
 }

@@ -49,12 +49,12 @@ public class ProfileController {
         user.setFullName(full_name);
         user.setPhone(phone);
 
-        // 4. Xử lý ảnh đại diện nếu người dùng có chọn upload file mới
+        // 4. Xu ly anh dai dien neu nguoi dung co tai file moi
         if (avatar != null && !avatar.isEmpty()) {
             try {
-                // Đẩy file lên thư mục tĩnh, hàm uploadUserAvatar tự thu dọn file cũ và trả về tên file mới
+                // File duoc luu vao thu muc uploads ngoai classpath, sau do tra ve duong dan moi
                 String fileName = fileUploadService.uploadUserAvatar(avatar, user.getId());
-                user.setImage(fileName); // Gắn tên file vừa lưu thẳng vào Entity để lưu DB
+                user.setImage(fileName); // Gan ten file moi vao entity de luu DB
             } catch (Exception e) {
                 model.addAttribute("error", "Lỗi upload ảnh: " + e.getMessage());
                 return "profile";

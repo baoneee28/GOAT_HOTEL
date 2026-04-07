@@ -1,5 +1,6 @@
 package com.hotel.controller.api;
 
+import com.hotel.dto.AdminRoomUpsertRequest;
 import com.hotel.entity.Room;
 import com.hotel.entity.User;
 import com.hotel.repository.BookingDetailRepository;
@@ -7,6 +8,7 @@ import com.hotel.repository.RoomRepository;
 import com.hotel.service.AuthService;
 import com.hotel.service.RoomStatusService;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
@@ -19,8 +21,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +36,8 @@ import java.util.Set;
 public class RoomApiController {
 
     private static final Set<String> ALLOWED_ROOM_STATUSES = Set.of("available", "booked", "maintenance");
+    private static final LocalTime DEFAULT_CHECK_IN_TIME = LocalTime.of(14, 0);
+    private static final LocalTime DEFAULT_CHECK_OUT_TIME = LocalTime.of(12, 0);
 
     @Autowired
     private RoomRepository roomRepository;
@@ -55,8 +61,8 @@ public class RoomApiController {
             @RequestParam(value = "excludeBookingId", required = false) Integer excludeBookingId) {
         if (hasDateRange(checkIn, checkOut)) {
             try {
-                LocalDateTime start = parseDateTimeParam(checkIn);
-                LocalDateTime end = parseDateTimeParam(checkOut);
+                LocalDateTime start = parseCheckInDate(checkIn);
+                LocalDateTime end = parseCheckOutDate(checkOut);
                 List<Room> availableRooms = roomRepository.findAvailableRoomsForDate(
                         start,
                         end,
@@ -89,8 +95,8 @@ public class RoomApiController {
 
         if (hasDateRange(checkIn, checkOut)) {
             try {
-                LocalDateTime start = parseDateTimeParam(checkIn);
-                LocalDateTime end = parseDateTimeParam(checkOut);
+                LocalDateTime start = parseCheckInDate(checkIn);
+                LocalDateTime end = parseCheckOutDate(checkOut);
                 List<Room> availableRooms = roomRepository.findAvailableRoomsByDate(
                         typeId,
                         start,
@@ -114,24 +120,27 @@ public class RoomApiController {
             @RequestParam(value = "availableFrom", required = false) String availableFrom,
             @RequestParam(value = "availableTo", required = false) String availableTo) {
         try {
-            return ResponseEntity.ok(
-                    roomStatusService.buildAdminRoomPage(q, status, Math.max(1, page), 5, availableFrom, availableTo)
+            Map<String, Object> response = new HashMap<>(
+                    roomStatusService.buildAdminRoomPage(q, status, normalizePage(page), 5, availableFrom, availableTo)
             );
+            response.put("success", true);
+            return ResponseEntity.ok(response);
         } catch (IllegalArgumentException ex) {
             return badRequest(ex.getMessage());
         }
     }
 
     @PostMapping("/admin")
-    public ResponseEntity<Map<String, Object>> saveRoom(@RequestBody Map<String, Object> payload, HttpSession session) {
+    public ResponseEntity<Map<String, Object>> saveRoom(@Valid @RequestBody AdminRoomUpsertRequest request, HttpSession session) {
         try {
             User currentUser = getSessionUser(session);
             boolean isAdmin = authService.isAdmin(currentUser);
 
-            Integer roomId = parseNullableInteger(payload.get("id"), "Ma phong");
-            Integer typeId = parseRequiredInteger(payload.get("typeId"), "Loai phong");
-            String status = normalizeRoomStatus(payload.get("status"));
-            String roomNumber = normalizeRoomNumber(payload.get("roomNumber"));
+            Integer roomId = request.id();
+            Integer typeId = request.typeId();
+            String status = normalizeRoomStatus(request.status());
+            String roomNumber = normalizeRoomNumber(request.roomNumber());
+            boolean updating = roomId != null && roomId > 0;
 
             if (!isAdmin && (roomId == null || roomId <= 0)) {
                 return forbidden("Nhan vien chi duoc cap nhat trang thai van hanh cua phong hien co.");
@@ -180,7 +189,7 @@ public class RoomApiController {
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("message", room.getId() != null && roomId != null ? "Da cap nhat thong tin phong." : "Da them phong moi.");
+            response.put("message", updating ? "Da cap nhat thong tin phong." : "Da them phong moi.");
             response.put("room", room);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException ex) {
@@ -243,28 +252,6 @@ public class RoomApiController {
         return ResponseEntity.status(403).body(response);
     }
 
-    private Integer parseRequiredInteger(Object value, String label) {
-        if (value == null || value.toString().isBlank()) {
-            throw new IllegalArgumentException(label + " khong duoc de trong.");
-        }
-        try {
-            return Integer.parseInt(value.toString());
-        } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException(label + " khong hop le.");
-        }
-    }
-
-    private Integer parseNullableInteger(Object value, String label) {
-        if (value == null || value.toString().isBlank()) {
-            return null;
-        }
-        try {
-            return Integer.parseInt(value.toString());
-        } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException(label + " khong hop le.");
-        }
-    }
-
     private String normalizeRoomStatus(Object value) {
         String normalized = value == null ? "" : value.toString().trim().toLowerCase();
         if (!ALLOWED_ROOM_STATUSES.contains(normalized)) {
@@ -273,20 +260,39 @@ public class RoomApiController {
         return normalized;
     }
 
-    private LocalDateTime parseDateTimeParam(String value) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private LocalDateTime parseDateTimeParam(String value, LocalTime defaultTime) {
         String normalized = value == null ? "" : value.trim();
-        if (normalized.contains("T")) {
-            normalized = normalized.replace("T", " ");
+        if (normalized.isBlank()) {
+            throw new IllegalArgumentException("Thời gian tìm phòng không hợp lệ.");
         }
-        if (normalized.length() == 10) {
-            normalized += " 12:00";
+
+        try {
+            if (normalized.length() == 10) {
+                return LocalDate.parse(normalized).atTime(defaultTime);
+            }
+            if (normalized.contains(" ")) {
+                normalized = normalized.replace(" ", "T");
+            }
+            return LocalDateTime.parse(normalized);
+        } catch (DateTimeParseException ex) {
+            throw new IllegalArgumentException("Thời gian tìm phòng không hợp lệ.");
         }
-        return LocalDateTime.parse(normalized, formatter);
+    }
+
+    private LocalDateTime parseCheckInDate(String value) {
+        return parseDateTimeParam(value, DEFAULT_CHECK_IN_TIME);
+    }
+
+    private LocalDateTime parseCheckOutDate(String value) {
+        return parseDateTimeParam(value, DEFAULT_CHECK_OUT_TIME);
     }
 
     private boolean hasDateRange(String checkIn, String checkOut) {
         return checkIn != null && !checkIn.isBlank() && checkOut != null && !checkOut.isBlank();
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(1, page);
     }
 
     private List<Room> sanitizePublicRooms(List<Room> rooms) {

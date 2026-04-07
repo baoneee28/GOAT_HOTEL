@@ -3,18 +3,27 @@ package com.hotel.service;
 import com.hotel.entity.User;
 import com.hotel.repository.UserRepository;
 import jakarta.servlet.http.HttpSession;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 
 // Service xử lý toàn bộ nghiệp vụ Xác thực người dùng (Đăng nhập, Đăng ký, Đăng xuất)
 @Service
 public class AuthService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private static final Pattern BCRYPT_PATTERN = Pattern.compile("^\\$2[aby]\\$\\d{2}\\$[./A-Za-z0-9]{53}$");
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
 
     public boolean isAdminRole(String role) {
         return role != null && "admin".equalsIgnoreCase(role.trim());
@@ -71,19 +80,41 @@ public class AuthService {
     }
 
     
-    // Hàm xử lý Đăng nhập: Gọi xuống DB xem có ông nào khớp email & password không
+    // Hàm xử lý Đăng nhập: Tìm user theo email rồi so mật khẩu đã băm bằng PasswordEncoder
+    @Transactional
     public User login(String email, String password, HttpSession session) {
-        Optional<User> optUser = userRepository.findByEmailAndPassword(email, password);
-        // Nếu DB trả về có người dùng (isPresent)
-        if (optUser.isPresent()) {
-            User user = optUser.get();
-            // Ném user vào Session để nhớ mặt (nếu được truyền vào session)
-            if (session != null) {
-                session.setAttribute("user", user);
-            }
-            return user;
+        if (email == null || password == null) {
+            return null;
         }
-        return null; // Tịt -> Sai email hoặc password
+
+        Optional<User> optUser = userRepository.findByEmailIgnoreCase(email.trim());
+        if (optUser.isEmpty()) {
+            return null;
+        }
+
+        User user = optUser.get();
+        String storedPassword = user.getPassword();
+        if (storedPassword == null || storedPassword.isBlank()) {
+            return null;
+        }
+
+        boolean authenticated = isPasswordHashed(storedPassword)
+                ? passwordEncoder.matches(password, storedPassword)
+                : password.equals(storedPassword);
+
+        if (!authenticated) {
+            return null;
+        }
+
+        if (!isPasswordHashed(storedPassword)) {
+            user.setPassword(encodePassword(storedPassword));
+            user = userRepository.save(user);
+        }
+
+        if (session != null) {
+            session.setAttribute("user", user);
+        }
+        return user;
     }
 
     
@@ -100,7 +131,7 @@ public class AuthService {
         User newUser = new User();
         newUser.setFullName(fullName);
         newUser.setEmail(email);
-        newUser.setPassword(password); // Thực tế sinh viên có thể dùng PasswordEncoder, nhưng đồ án nhỏ thì để thẳng
+        newUser.setPassword(encodePassword(password));
         newUser.setPhone(phone);
         newUser.setRole("customer"); // Mặc định tự đăng ký thì chỉ là Khách hàng (customer) thôi
         
@@ -113,5 +144,13 @@ public class AuthService {
     
     public void logout(HttpSession session) {
         session.invalidate();
+    }
+
+    public String encodePassword(String rawPassword) {
+        return passwordEncoder.encode(rawPassword);
+    }
+
+    public boolean isPasswordHashed(String password) {
+        return password != null && BCRYPT_PATTERN.matcher(password).matches();
     }
 }

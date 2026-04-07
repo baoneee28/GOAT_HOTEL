@@ -20,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -57,41 +56,29 @@ public class BookingService {
     private CouponService couponService;
 
     public long calculateStayNights(LocalDateTime checkIn, LocalDateTime checkOut) {
-        if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
-            return 0;
-        }
-
-        long nights = ChronoUnit.DAYS.between(checkIn.toLocalDate(), checkOut.toLocalDate());
-        return Math.max(1, nights);
+        return BookingPricingCalculator.calculateStayNights(checkIn, checkOut);
     }
 
     public long calculatePriceIndex(LocalDateTime checkIn, LocalDateTime checkOut, double pricePerNight) {
-        long nights = calculateStayNights(checkIn, checkOut);
-        return Math.round(nights * pricePerNight);
+        return Math.round(calculateBookingSubtotal(checkIn, checkOut, pricePerNight));
     }
 
     public double calculateHours(LocalDateTime checkIn, LocalDateTime checkOut) {
-        long totalSeconds = ChronoUnit.SECONDS.between(checkIn, checkOut);
-        double hours = totalSeconds / 3600.0;
-        return Math.round(hours * 100.0) / 100.0;
+        return BookingPricingCalculator.calculateHours(checkIn, checkOut);
+    }
+
+    public double calculateBookingSubtotal(LocalDateTime checkIn, LocalDateTime checkOut, double pricePerNight) {
+        return BookingPricingCalculator.summarize(checkIn, checkOut, pricePerNight).total();
     }
 
     public Map<String, Double> calculateBookingPriceAdmin(LocalDateTime checkIn, LocalDateTime checkOut, double pricePerNight) {
-        if (!checkOut.isAfter(checkIn)) {
-            Map<String, Double> zero = new HashMap<>();
-            zero.put("hours", 0.0);
-            zero.put("nights", 0.0);
-            zero.put("total", 0.0);
-            return zero;
-        }
-
-        double totalHours = calculateHours(checkIn, checkOut);
-        long totalNights = calculateStayNights(checkIn, checkOut);
+        BookingPricingCalculator.BookingPricingSummary pricingSummary =
+                BookingPricingCalculator.summarize(checkIn, checkOut, pricePerNight);
 
         Map<String, Double> result = new HashMap<>();
-        result.put("hours", totalHours);
-        result.put("nights", (double) totalNights);
-        result.put("total", totalNights * pricePerNight);
+        result.put("hours", pricingSummary.hours());
+        result.put("nights", (double) pricingSummary.nights());
+        result.put("total", pricingSummary.total());
         return result;
     }
 
@@ -388,7 +375,7 @@ public class BookingService {
                     || detail.getCheckOut() == null) {
                 continue;
             }
-            total += calculatePriceIndex(detail.getCheckIn(), detail.getCheckOut(), detail.getPriceAtBooking());
+            total += calculateBookingSubtotal(detail.getCheckIn(), detail.getCheckOut(), detail.getPriceAtBooking());
         }
         return total;
     }
@@ -612,16 +599,25 @@ public class BookingService {
     }
 
     @Transactional
-    public boolean cancelBooking(Integer bookingId, Integer userId) {
+    public void cancelBooking(Integer bookingId, Integer userId) {
         Optional<Booking> bookingOpt = bookingRepository.findById(bookingId);
-        if (bookingOpt.isEmpty()) return false;
+        if (bookingOpt.isEmpty()) {
+            throw new IllegalArgumentException("Không tìm thấy đơn đặt phòng.");
+        }
 
         Booking booking = bookingOpt.get();
         if (synchronizeBookingState(booking)) {
             bookingRepository.save(booking);
         }
-        if (!booking.getUser().getId().equals(userId)) return false;
-        if (!"pending".equals(booking.getStatus())) return false;
+        if (booking.getUser() == null || !booking.getUser().getId().equals(userId)) {
+            throw new SecurityException("Bạn không có quyền hủy đơn đặt phòng này.");
+        }
+        if (!"pending".equalsIgnoreCase(booking.getStatus())) {
+            throw new IllegalStateException("Chỉ có thể hủy booking đang chờ xác nhận.");
+        }
+        if (hasRecordedPayment(booking)) {
+            throw new IllegalStateException("Booking đã có thanh toán hoặc đặt cọc, vui lòng liên hệ khách sạn để được hỗ trợ.");
+        }
 
         booking.setStatus("cancelled");
         if (!"paid".equalsIgnoreCase(booking.getPaymentStatus())) {
@@ -629,8 +625,22 @@ public class BookingService {
         }
         bookingRepository.save(booking);
         couponService.synchronizeCouponAssignment(booking);
+    }
 
-        return true;
+    private boolean hasRecordedPayment(Booking booking) {
+        if (booking == null) {
+            return false;
+        }
+
+        double paidAmount = resolvePaidAmount(booking);
+        if (paidAmount > 0.01) {
+            return true;
+        }
+
+        String paymentStatus = booking.getPaymentStatus() == null
+                ? ""
+                : booking.getPaymentStatus().trim().toLowerCase();
+        return "deposit_paid".equals(paymentStatus) || "paid".equals(paymentStatus);
     }
 
     public Page<Booking> getHistory(Integer userId, String status, int page) {
@@ -643,8 +653,9 @@ public class BookingService {
                 .filter(booking -> matchesHistoryFilter(booking, normalizedFilter))
                 .toList();
 
-        int safePage = Math.max(1, page);
         int totalItems = filteredBookings.size();
+        int totalPages = Math.max(1, (int) Math.ceil((double) totalItems / HISTORY_PAGE_SIZE));
+        int safePage = Math.min(Math.max(1, page), totalPages);
         int fromIndex = Math.min((safePage - 1) * HISTORY_PAGE_SIZE, totalItems);
         int toIndex = Math.min(fromIndex + HISTORY_PAGE_SIZE, totalItems);
 

@@ -192,7 +192,7 @@ export default function Items() {
                                   <input type="text" className="form-control rounded-3" value={formData.image} onChange={e => setFormData({...formData, image: e.target.value})} placeholder="/icons/tv.png hoặc https://..." required />
                                   <div className="form-text">Có thể dùng icon có sẵn trong dự án hoặc chọn file mới ở ô bên dưới.</div>
                                   <input type="file" ref={fileInputRef} className="form-control rounded-3 mt-3" accept="image/*" />
-                                  <div className="form-text">Nếu tải file mới, hệ thống sẽ lưu vào `backend/static/uploads/items`.</div>
+                                  <div className="form-text">Nếu tải file mới, hệ thống sẽ lưu vào `backend/uploads/items`.</div>
                                   {formData.image && (
                                       <div className="d-flex align-items-center gap-3 mt-3 p-3 bg-light rounded-3">
                                           <img src={iconUrl(formData.image)} alt="Icon preview" className="item-icon-img" onError={(e)=>{e.target.onerror=null; e.target.src='/icons/tv.png';}} />

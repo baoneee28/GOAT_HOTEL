@@ -1,10 +1,13 @@
 package com.hotel.controller.api;
 
+import com.hotel.dto.ProfileUpdateRequest;
+import com.hotel.dto.UserResponse;
 import com.hotel.entity.User;
 import com.hotel.repository.UserRepository;
 import com.hotel.service.AuthService;
 import com.hotel.service.FileUploadService;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -66,7 +69,7 @@ public class ProfileApiController {
         }
         
         response.put("success", true);
-        response.put("user", authService.toClientUser(user));
+        response.put("user", UserResponse.from(user));
         return ResponseEntity.ok(response);
     }
 
@@ -74,7 +77,7 @@ public class ProfileApiController {
     @PostMapping("/{userId}")
     public ResponseEntity<Map<String, Object>> updateProfile(
             @PathVariable("userId") Integer userId,
-            @RequestBody Map<String, String> payload,
+            @Valid @RequestBody ProfileUpdateRequest request,
             HttpSession session) {
         User currentUser = getSessionUser(session);
         if (currentUser == null) {
@@ -91,18 +94,18 @@ public class ProfileApiController {
             return ResponseEntity.badRequest().body(response);
         }
 
-        user.setFullName(payload.get("fullName"));
-        user.setPhone(payload.get("phone"));
+        user.setFullName(request.fullName().trim());
+        user.setPhone(request.phone() == null || request.phone().isBlank() ? null : request.phone().trim());
         
         // Nếu FE truyền chuỗi avatar lên thì gắn đổi Avatar ở Database
-        if (payload.get("avatar") != null && !payload.get("avatar").isBlank()) {
-            user.setImage(payload.get("avatar"));
+        if (request.avatar() != null && !request.avatar().isBlank()) {
+            user.setImage(request.avatar().trim());
         }
         userRepository.save(user);
         session.setAttribute("user", user);
 
         response.put("success", true);
-        response.put("user", authService.toClientUser(user));
+        response.put("user", UserResponse.from(user));
         return ResponseEntity.ok(response);
     }
 

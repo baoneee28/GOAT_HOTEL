@@ -383,7 +383,7 @@ export default function News() {
                   <div className="mb-3">
                     <label className="form-label fw-bold">Hoặc tải ảnh mới</label>
                     <input type="file" ref={fileInputRef} name="image" className="form-control rounded-3" accept="image/*" />
-                    <div className="form-text">Ảnh tải lên sẽ được lưu vào `backend/static/uploads/news`.</div>
+                    <div className="form-text">Ảnh tải lên sẽ được lưu vào `backend/uploads/news`.</div>
                     <div className="mt-3">
                       <img src={uploadedImageUrl(formData.image, '/images/news/news-default.png')} className="news-img" alt="Xem trước ảnh bìa" />
                     </div>

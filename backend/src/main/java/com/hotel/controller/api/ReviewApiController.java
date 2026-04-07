@@ -1,5 +1,6 @@
 package com.hotel.controller.api;
 
+import com.hotel.dto.ReviewSubmitRequest;
 import com.hotel.entity.Booking;
 import com.hotel.entity.Coupon;
 import com.hotel.entity.Review;
@@ -8,6 +9,9 @@ import com.hotel.repository.BookingRepository;
 import com.hotel.repository.CouponRepository;
 import com.hotel.repository.ReviewRepository;
 import com.hotel.service.CouponService;
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +27,8 @@ import java.util.Optional;
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class ReviewApiController {
 
+    private static final Logger log = LoggerFactory.getLogger(ReviewApiController.class);
+
     @Autowired
     private ReviewRepository reviewRepository;
 
@@ -36,22 +42,15 @@ public class ReviewApiController {
     private CouponService couponService;
 
     @PostMapping
-    public ResponseEntity<?> submitReview(@RequestBody Map<String, Object> payload, HttpSession session) {
+    public ResponseEntity<?> submitReview(@Valid @RequestBody ReviewSubmitRequest request, HttpSession session) {
         User user = (User) session.getAttribute("user");
         if (user == null) {
             return ResponseEntity.status(401).body(Map.of("message", "Unauthorized"));
         }
 
-        Integer bookingId = null;
-        if (payload.get("bookingId") != null) {
-            bookingId = Integer.valueOf(payload.get("bookingId").toString());
-        }
-        Integer rating = payload.get("rating") == null ? 5 : Integer.valueOf(payload.get("rating").toString());
-        String comment = payload.get("comment") == null ? "" : payload.get("comment").toString();
-
-        if (bookingId == null || rating < 1 || rating > 5) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Dữ liệu không hợp lệ"));
-        }
+        Integer bookingId = request.bookingId();
+        Integer rating = request.rating();
+        String comment = request.comment() == null ? "" : request.comment().trim();
 
         Optional<Booking> bookingOpt = bookingRepository.findById(bookingId);
         if (bookingOpt.isEmpty()) {
@@ -101,8 +100,7 @@ public class ReviewApiController {
                 couponService.assignCouponToUser(reward.getId(), user.getId(), null, null, "Thưởng đánh giá trải nghiệm");
                 response.put("rewardCoupon", reward);
             } catch (Exception e) {
-                // Ignore conflict if user already has it
-                System.out.println("Could not auto-assign review coupon: " + e.getMessage());
+                log.warn("Could not auto-assign review coupon for userId={} bookingId={}", user.getId(), bookingId, e);
             }
         }
 

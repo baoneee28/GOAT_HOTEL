@@ -24,7 +24,7 @@ public class User {
     @Column(name = "email", nullable = false, unique = true, length = 100)
     private String email;
 
-    // Cột Password (Nên nhớ đây là đồ án mã nguồn mở sinh viên nên ko dùng Bcrypt mã hóa cho ae dễ test)
+    // Cột Password lưu chuỗi đã được băm bằng BCrypt
     @Column(name = "password", nullable = false, length = 255)
     private String password;
 

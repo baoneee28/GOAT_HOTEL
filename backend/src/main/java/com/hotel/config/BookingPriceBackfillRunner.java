@@ -5,6 +5,7 @@ import com.hotel.entity.BookingDetail;
 import com.hotel.repository.BookingRepository;
 import com.hotel.service.BookingService;
 import jakarta.transaction.Transactional;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -12,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
+@ConditionalOnProperty(name = "app.backfill-booking-prices-on-startup", havingValue = "true")
 public class BookingPriceBackfillRunner implements CommandLineRunner {
 
     private final BookingRepository bookingRepository;

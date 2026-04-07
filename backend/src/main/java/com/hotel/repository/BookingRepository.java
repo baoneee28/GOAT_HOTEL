@@ -77,13 +77,19 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
            "ORDER BY b.id DESC", countQuery = "SELECT COUNT(b) FROM Booking b WHERE (:status IS NULL OR :status = '' OR b.status = :status)")
     Page<Booking> findAdminBookings(@Param("status") String status, Pageable pageable);
 
-    @Query("SELECT DISTINCT b FROM Booking b JOIN FETCH b.user u " +
-           "LEFT JOIN FETCH b.details bd " +
-           "LEFT JOIN FETCH bd.room r " +
-           "LEFT JOIN FETCH r.roomType rt " +
+    @Query(value = "SELECT DISTINCT b FROM Booking b JOIN FETCH b.user u " +
+           "LEFT JOIN b.details bd " +
            "WHERE (:status IS NULL OR :status = '' OR b.status = :status) " +
-           "ORDER BY b.id DESC")
-    List<Booking> findAllAdminBookings(@Param("status") String status);
+           "AND (:fromDateTime IS NULL OR :toDateTime IS NULL OR (bd.checkIn < :toDateTime AND bd.checkOut > :fromDateTime)) " +
+           "ORDER BY b.id DESC",
+           countQuery = "SELECT COUNT(DISTINCT b) FROM Booking b " +
+                   "LEFT JOIN b.details bd " +
+                   "WHERE (:status IS NULL OR :status = '' OR b.status = :status) " +
+                   "AND (:fromDateTime IS NULL OR :toDateTime IS NULL OR (bd.checkIn < :toDateTime AND bd.checkOut > :fromDateTime))")
+    Page<Booking> findAdminBookingsByFilters(@Param("status") String status,
+                                             @Param("fromDateTime") LocalDateTime fromDateTime,
+                                             @Param("toDateTime") LocalDateTime toDateTime,
+                                             Pageable pageable);
 
     @Query(value = "SELECT b FROM Booking b JOIN FETCH b.user u " +
            "WHERE b.user.id = :userId AND (:status IS NULL OR :status = '' OR b.status = :status) " +

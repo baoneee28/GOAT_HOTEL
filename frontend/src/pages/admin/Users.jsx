@@ -204,7 +204,7 @@ export default function Users() {
                                   <label className="form-label fw-bold small text-uppercase text-muted">Ảnh đại diện</label>
                                   <input type="text" className="form-control rounded-3 mb-2" value={formData.image} onChange={e => setFormData({...formData, image: e.target.value})} placeholder="/uploads/users/... hoặc https://..." />
                                   <input type="file" ref={fileInputRef} name="image" className="form-control rounded-3" accept="image/*" />
-                                  <small className="text-muted d-block mt-1">Ảnh tải lên sẽ được lưu trong `backend/static/uploads/users`.</small>
+                                  <small className="text-muted d-block mt-1">Ảnh tải lên sẽ được lưu trong `backend/uploads/users`.</small>
                                   <div className="mt-3 d-flex align-items-center gap-3">
                                       <img src={uploadedImageUrl(formData.image, `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.fullName || 'GOAT User')}`)} className="user-avatar" alt="Avatar preview" />
                                       <span className="text-muted small">Xem trước ảnh đại diện</span>

@@ -229,7 +229,7 @@ export default function RoomTypes() {
                                       <label className="form-label fw-bold">Ảnh đại diện</label>
                                       <input type="file" ref={fileInputRef} className="form-control rounded-3" accept="image/*" />
                                       {formData.currentImage && <small className="text-muted d-block mt-1">Hiện tại: {formData.currentImage}</small>}
-                                      <small className="text-muted d-block mt-1">Ảnh tải lên sẽ được lưu trong `backend/static/uploads/room_types`.</small>
+                                      <small className="text-muted d-block mt-1">Ảnh tải lên sẽ được lưu trong `backend/uploads/room_types`.</small>
                                   </div>
                                   <div className="col-md-6 mb-3">
                                       <label className="form-label fw-bold">Mô tả ngắn</label>

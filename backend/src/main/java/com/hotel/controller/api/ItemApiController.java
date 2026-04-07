@@ -40,14 +40,16 @@ public class ItemApiController {
             @RequestParam(defaultValue = "1") int page) {
         
         int pageSize = 10;
+        int safePage = Math.max(1, page);
         Page<Item> itemPage = itemRepository.findWithSearch(
                 q.isBlank() ? null : q,
-                PageRequest.of(page - 1, pageSize, Sort.by("id").descending()));
+                PageRequest.of(safePage - 1, pageSize, Sort.by("id").descending()));
 
         Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
         response.put("items", itemPage.getContent());
         response.put("totalPages", itemPage.getTotalPages());
-        response.put("currentPage", page);
+        response.put("currentPage", safePage);
         response.put("search", q);
 
         return ResponseEntity.ok(response);

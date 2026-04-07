@@ -12,8 +12,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.List;
 
-
-// Service dùng để đẩy file ảnh vật lý lên backend static/uploads/<table>
+// Service ghi file upload vao thu muc backend/uploads/<category>
 @Service
 public class FileUploadService {
 
@@ -88,12 +87,12 @@ public class FileUploadService {
         return "/uploads/" + normalizedCategory + "/" + fileName;
     }
 
-    // Hàm "cơ bắp" thực hiện việc ghi luồng bit từ Form vào ổ cứng vật lý
+    // Ham ghi file xuong o dia
     private void saveFile(MultipartFile file, String category, String fileName) throws IOException {
         Path uploadPath = resolveUploadRoot().resolve(category);
         Files.createDirectories(uploadPath);
 
-        // Gắn tên file vào đuôi đường dẫn và GHI NHÚNG FILE VÀO. REPLACE_EXISTING giúp đè bẹp ảnh trùng tên
+        // REPLACE_EXISTING giup cap nhat lai file cung ten neu can
         Path filePath = uploadPath.resolve(fileName);
         Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
     }

@@ -1,5 +1,6 @@
 package com.hotel.controller.api;
 
+import com.hotel.dto.FeaturedNewsReorderRequest;
 import com.hotel.entity.FeaturedNews;
 import com.hotel.entity.News;
 import com.hotel.repository.FeaturedNewsRepository;
@@ -8,6 +9,7 @@ import com.hotel.service.FileUploadService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -70,14 +72,16 @@ public class NewsApiController {
             @RequestParam(value = "q", defaultValue = "") String q,
             @RequestParam(value = "page", defaultValue = "1") int page) {
         int pageSize = 5;
+        int safePage = Math.max(1, page);
         org.springframework.data.domain.Page<News> newsPage = newsRepository.findWithSearch(
                 q.isBlank() ? null : q,
-                org.springframework.data.domain.PageRequest.of(page - 1, pageSize, org.springframework.data.domain.Sort.by("id").descending())
+                org.springframework.data.domain.PageRequest.of(safePage - 1, pageSize, org.springframework.data.domain.Sort.by("id").descending())
         );
         java.util.Map<String, Object> response = new java.util.HashMap<>();
+        response.put("success", true);
         response.put("newsList", newsPage.getContent());
         response.put("totalPages", newsPage.getTotalPages());
-        response.put("currentPage", page);
+        response.put("currentPage", safePage);
         response.put("featuredNews", featuredNewsRepository.findAllByOrderByDisplayOrderAsc());
         return org.springframework.http.ResponseEntity.ok(response);
     }
@@ -156,15 +160,9 @@ public class NewsApiController {
 
     @PatchMapping("/admin/featured/reorder")
     @Transactional
-    public ResponseEntity<Map<String, Object>> reorderFeaturedNews(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<Map<String, Object>> reorderFeaturedNews(@Valid @RequestBody FeaturedNewsReorderRequest request) {
         Map<String, Object> response = new HashMap<>();
-        Object featuredIdsRaw = payload.get("featuredIds");
-
-        if (!(featuredIdsRaw instanceof List<?> featuredIdsList)) {
-            response.put("success", false);
-            response.put("message", "Danh sách thứ tự nổi bật không hợp lệ.");
-            return ResponseEntity.badRequest().body(response);
-        }
+        List<Integer> featuredIdsList = request.featuredIds();
 
         List<FeaturedNews> currentFeatured = featuredNewsRepository.findAllByOrderByDisplayOrderAsc();
         if (featuredIdsList.size() != currentFeatured.size()) {
@@ -178,8 +176,7 @@ public class NewsApiController {
 
         List<FeaturedNews> reordered = new ArrayList<>();
         Set<Integer> seenFeaturedIds = new HashSet<>();
-        for (Object featuredIdValue : featuredIdsList) {
-            Integer featuredId = parseInteger(featuredIdValue);
+        for (Integer featuredId : featuredIdsList) {
             if (featuredId == null || !featuredById.containsKey(featuredId) || !seenFeaturedIds.add(featuredId)) {
                 response.put("success", false);
                 response.put("message", "Danh sách thứ tự có chứa mục không tồn tại.");
@@ -239,17 +236,6 @@ public class NewsApiController {
         }
         if (!featuredNewsList.isEmpty()) {
             featuredNewsRepository.saveAll(featuredNewsList);
-        }
-    }
-
-    private Integer parseInteger(Object value) {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return Integer.parseInt(value.toString());
-        } catch (NumberFormatException ignored) {
-            return null;
         }
     }
 }

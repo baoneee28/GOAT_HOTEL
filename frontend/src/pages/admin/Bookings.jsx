@@ -7,6 +7,7 @@ const Swal = window.Swal;
 
 export default function Bookings() {
   const { isAdmin } = useAuth();
+  const PAGE_SIZE = 5;
   const BOOKING_STATUS_LABELS = {
     pending: 'Chờ duyệt',
     confirmed: 'Đã xác nhận',
@@ -64,6 +65,7 @@ export default function Bookings() {
       } else {
         if (status) params.set('status', status);
         params.set('page', page);
+        params.set('pageSize', PAGE_SIZE);
         if (fromDateTime && toDateTime) {
           params.set('fromDateTime', fromDateTime);
           params.set('toDateTime', toDateTime);
@@ -71,7 +73,17 @@ export default function Bookings() {
       }
       const query = params.toString();
       const res = await axios.get(`${API_BASE}/api/admin/bookings${query ? `?${query}` : ''}`, { withCredentials: true });
-      setData(res.data);
+      const payload = res.data || {};
+      const meta = payload.meta || {};
+      const nextData = {
+        bookings: payload.data || [],
+        totalPages: Number(meta.totalPages || 1),
+        currentPage: Number(meta.currentPage || page),
+      };
+      setData(nextData);
+      if (nextData.currentPage !== page) {
+        setPage(nextData.currentPage);
+      }
     } catch (err) { console.error(err); }
   }, [focusedBookingId, fromDateTime, page, status, toDateTime]);
 

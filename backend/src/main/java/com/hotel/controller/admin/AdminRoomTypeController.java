@@ -68,11 +68,11 @@ public class AdminRoomTypeController {
         roomType.setDescription(description);
 
 
-        // Tương tự xử lý Update ảnh nếu có thư mục mới tải lên
+        // Cap nhat anh neu nguoi dung tai file moi len
         String imgName = current_image;
         if (image != null && !image.isEmpty()) {
             try {
-                // Đẩy ảnh vào mục tĩnh static/uploads
+                // Anh duoc luu qua FileUploadService vao thu muc uploads ngoai classpath
                 imgName = fileUploadService.uploadGeneral(image, "");
             } catch (Exception e) {
 

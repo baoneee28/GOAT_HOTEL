@@ -1,12 +1,5 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-
-function ScrollToTop() {
-  const { pathname } = useLocation();
-  React.useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [pathname]);
-  return null;
-}
-
 import Home from './pages/Home';
 import AuthPage from './pages/AuthPage';
 import ForgotPassword from './pages/ForgotPassword';
@@ -35,67 +28,76 @@ import Inbox from './pages/admin/Inbox';
 import UserBookings from './pages/admin/UserBookings';
 import Collections from './pages/Collections';
 import MainLayout from './components/MainLayout';
+import AppErrorBoundary from './components/AppErrorBoundary';
 import { AuthProvider, ProtectedRoute, PublicOnlyRoute } from './auth/AuthContext';
 import './App.css';
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  React.useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [pathname]);
+  return null;
+}
+
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <ScrollToTop />
-        <Routes>
-          {/* Frontend Public Routes - with shared Navbar + Footer */}
-          <Route element={<MainLayout />}>
-            <Route path="/" element={<Home />} />
-            <Route path="/collections" element={<Collections />} />
-            <Route path="/coupons" element={<Coupons />} />
-            <Route path="/news" element={<NewsPage />} />
-            <Route path="/news/:id" element={<NewsDetail />} />
-            <Route path="/contact" element={<ContactPage />} />
-            <Route path="/rooms/:id" element={<RoomDetail />} />
-            <Route path="/rooms/:id/available" element={<AvailableRooms />} />
-            <Route path="/vnpay-return" element={<VNPayReturn />} />
-          </Route>
-
-          <Route element={<ProtectedRoute />}>
+    <AppErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <ScrollToTop />
+          <Routes>
+            {/* Frontend Public Routes - with shared Navbar + Footer */}
             <Route element={<MainLayout />}>
-              <Route path="/booking/confirmation" element={<BookingConfirmation />} />
-              <Route path="/vnpay-launch" element={<VNPayLaunch />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/history" element={<History />} />
-              <Route path="/booking/:id" element={<OrderDetail />} />
+              <Route path="/" element={<Home />} />
+              <Route path="/collections" element={<Collections />} />
+              <Route path="/coupons" element={<Coupons />} />
+              <Route path="/news" element={<NewsPage />} />
+              <Route path="/news/:id" element={<NewsDetail />} />
+              <Route path="/contact" element={<ContactPage />} />
+              <Route path="/rooms/:id" element={<RoomDetail />} />
+              <Route path="/rooms/:id/available" element={<AvailableRooms />} />
+              <Route path="/vnpay-return" element={<VNPayReturn />} />
             </Route>
-          </Route>
 
-          {/* Standalone auth pages */}
-          <Route element={<PublicOnlyRoute />}>
-            <Route path="/login" element={<AuthPage />} />
-            <Route path="/register" element={<AuthPage />} />
-          </Route>
-
-          {/* Quên mật khẩu - không yêu cầu đăng nhập */}
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-
-          {/* Admin Routes */}
-          <Route element={<ProtectedRoute backofficeOnly />}>
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="rooms" element={<Rooms />} />
-              <Route path="bookings" element={<Bookings />} />
-              <Route path="inbox" element={<Inbox />} />
-              <Route path="coupons" element={<AdminCoupons />} />
-              <Route element={<ProtectedRoute adminOnly />}>
-                <Route path="room-types" element={<RoomTypes />} />
-                <Route path="items" element={<Items />} />
-                <Route path="users" element={<Users />} />
-                <Route path="users/:id/bookings" element={<UserBookings />} />
-                <Route path="news" element={<News />} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<MainLayout />}>
+                <Route path="/booking/confirmation" element={<BookingConfirmation />} />
+                <Route path="/vnpay-launch" element={<VNPayLaunch />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/history" element={<History />} />
+                <Route path="/booking/:id" element={<OrderDetail />} />
               </Route>
             </Route>
-          </Route>
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+
+            {/* Standalone auth pages */}
+            <Route element={<PublicOnlyRoute />}>
+              <Route path="/login" element={<AuthPage />} />
+              <Route path="/register" element={<AuthPage />} />
+            </Route>
+
+            {/* Quên mật khẩu - không yêu cầu đăng nhập */}
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+
+            {/* Admin Routes */}
+            <Route element={<ProtectedRoute backofficeOnly />}>
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="rooms" element={<Rooms />} />
+                <Route path="bookings" element={<Bookings />} />
+                <Route path="inbox" element={<Inbox />} />
+                <Route path="coupons" element={<AdminCoupons />} />
+                <Route element={<ProtectedRoute adminOnly />}>
+                  <Route path="room-types" element={<RoomTypes />} />
+                  <Route path="items" element={<Items />} />
+                  <Route path="users" element={<Users />} />
+                  <Route path="users/:id/bookings" element={<UserBookings />} />
+                  <Route path="news" element={<News />} />
+                </Route>
+              </Route>
+            </Route>
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
+    </AppErrorBoundary>
   );
 }
 

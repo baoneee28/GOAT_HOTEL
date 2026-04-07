@@ -1,23 +1,26 @@
-/*
+﻿/*
 GOAT HOTEL - SQL Server Full Setup Script
-Nguon su that cua schema la entity JPA trong backend/src/main/java/com/hotel/entity.
-Script nay duoc viet de ca nhom co the tao DB moi va seed du lieu demo de chay project.
+Nguồn sự thật của schema là entity JPA trong backend/src/main/java/com/hotel/entity.
+Script này được viết để cả nhóm có thể tạo DB mới và seed dữ liệu demo để chạy project.
 
-Ghi chu:
-- Public data duoi day da duoc canh theo snapshot project dang chay ngay 01/04/2026:
+Ghi chú:
+- Public data dưới đây đã được canh theo snapshot project đang chạy ngày 01/04/2026:
   room types, room inventory, featured rooms, featured news, news content.
-- Cac du lieu private nhu user noi bo, booking lich su, inbox admin van duoc giu o muc demo an toan
-  vi khong dump truc tiep DB live vao repo.
-- De mirror du lieu demo sat nhat, nen chay tren DB moi / DB da xoa seed cu.
+- Các dữ liệu private như user nội bộ, booking lịch sử, inbox admin vẫn được giữ ở mức demo an toàn
+  vì không dump trực tiếp DB live vào repo.
+- Để mirror dữ liệu demo sát nhất, nên chạy trên DB mới / DB đã xóa seed cũ.
 
-Huong dan:
-1. Mo script trong SSMS / Azure Data Studio / sqlcmd.
-2. Chay toan bo file.
-3. Start lai backend neu can.
+Hướng dẫn:
+1. Mở script trong SSMS / Azure Data Studio / sqlcmd.
+2. Chạy toàn bộ file.
+3. Start lại backend nếu cần.
 
-Tai khoan demo:
-- Admin: admin@goathotel.local / admin123
-- User : customer@goathotel.local / customer123
+Tài khoản demo:
+- Admin: admin@goathotel.local
+- User : customer@goathotel.local
+
+Ghi chú bảo mật:
+- Password seed trong file này đã được lưu dưới dạng BCrypt hash để khớp với backend.
 */
 
 SET NOCOUNT ON;
@@ -59,7 +62,7 @@ BEGIN
     CREATE TABLE dbo.room_types (
         id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         type_name NVARCHAR(100) NOT NULL,
-        price_per_night FLOAT NOT NULL,
+        price_per_night DECIMAL(15,2) NOT NULL,
         capacity INT NOT NULL,
         room_size NVARCHAR(50) NULL,
         beds NVARCHAR(100) NULL,
@@ -110,7 +113,11 @@ BEGIN
     CREATE TABLE dbo.bookings (
         id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         user_id INT NULL,
-        total_price FLOAT NULL,
+        total_price DECIMAL(15,2) NULL,
+        coupon_code NVARCHAR(50) NULL,
+        discount_amount DECIMAL(15,2) NOT NULL CONSTRAINT DF_bookings_discount_amount DEFAULT 0,
+        deposit_amount DECIMAL(15,2) NOT NULL CONSTRAINT DF_bookings_deposit_amount DEFAULT 0,
+        final_amount DECIMAL(15,2) NULL,
         status NVARCHAR(20) NOT NULL CONSTRAINT DF_bookings_status DEFAULT N'pending',
         payment_status NVARCHAR(30) NOT NULL CONSTRAINT DF_bookings_payment_status DEFAULT N'unpaid',
         created_at DATETIME2 NULL CONSTRAINT DF_bookings_created_at DEFAULT SYSDATETIME(),
@@ -126,7 +133,7 @@ BEGIN
         id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         booking_id INT NOT NULL,
         room_id INT NULL,
-        price_at_booking FLOAT NOT NULL,
+        price_at_booking DECIMAL(15,2) NOT NULL,
         check_in DATETIME2 NULL,
         check_out DATETIME2 NULL,
         check_in_actual DATETIME2 NULL,
@@ -143,7 +150,7 @@ BEGIN
     CREATE TABLE dbo.services (
         id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         name NVARCHAR(100) NOT NULL,
-        price FLOAT NOT NULL,
+        price DECIMAL(15,2) NOT NULL,
         description NVARCHAR(MAX) NULL,
         image NVARCHAR(255) NULL
     );
@@ -157,7 +164,7 @@ BEGIN
         booking_id INT NOT NULL,
         service_id INT NULL,
         quantity INT NOT NULL CONSTRAINT DF_booking_services_quantity DEFAULT 1,
-        price_at_booking FLOAT NOT NULL,
+        price_at_booking DECIMAL(15,2) NOT NULL,
         created_at DATETIME2 NULL CONSTRAINT DF_booking_services_created_at DEFAULT SYSDATETIME(),
         CONSTRAINT FK_booking_services_booking FOREIGN KEY (booking_id) REFERENCES dbo.bookings(id),
         CONSTRAINT FK_booking_services_service FOREIGN KEY (service_id) REFERENCES dbo.services(id)
@@ -170,7 +177,7 @@ BEGIN
     CREATE TABLE dbo.payments (
         id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         booking_id INT NOT NULL,
-        amount FLOAT NOT NULL,
+        amount DECIMAL(15,2) NOT NULL,
         payment_method NVARCHAR(50) NOT NULL,
         payment_date DATETIME2 NOT NULL,
         status NVARCHAR(20) NOT NULL CONSTRAINT DF_payments_status DEFAULT N'paid',
@@ -243,6 +250,7 @@ BEGIN
         rating INT NOT NULL,
         comment NVARCHAR(MAX) NULL,
         created_at DATETIME2 NULL CONSTRAINT DF_reviews_created_at DEFAULT SYSDATETIME(),
+        CONSTRAINT CK_reviews_rating_range CHECK (rating BETWEEN 1 AND 5),
         CONSTRAINT FK_reviews_user FOREIGN KEY (user_id) REFERENCES dbo.users(id),
         CONSTRAINT FK_reviews_room_type FOREIGN KEY (room_type_id) REFERENCES dbo.room_types(id),
         CONSTRAINT FK_reviews_booking FOREIGN KEY (booking_id) REFERENCES dbo.bookings(id)
@@ -255,17 +263,19 @@ BEGIN
     CREATE TABLE dbo.coupons (
         id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         code NVARCHAR(50) NOT NULL UNIQUE,
+        name NVARCHAR(150) NOT NULL,
         description NVARCHAR(MAX) NULL,
         discount_type NVARCHAR(20) NOT NULL,
-        discount_value FLOAT NOT NULL,
-        max_uses INT NULL,
-        current_uses INT NOT NULL CONSTRAINT DF_coupons_current_uses DEFAULT 0,
+        discount_value DECIMAL(15,2) NOT NULL,
         start_date DATETIME2 NULL,
         end_date DATETIME2 NULL,
-        min_booking_value FLOAT NULL,
+        min_order_value DECIMAL(15,2) NOT NULL CONSTRAINT DF_coupons_min_order_value DEFAULT 0,
+        max_discount_amount DECIMAL(15,2) NULL,
+        usage_limit INT NULL,
         is_active BIT NOT NULL CONSTRAINT DF_coupons_is_active DEFAULT 1,
-        target_event NVARCHAR(50) NULL,
-        created_at DATETIME2 NULL CONSTRAINT DF_coupons_created_at DEFAULT SYSDATETIME()
+        target_event NVARCHAR(150) NULL,
+        created_at DATETIME2 NULL CONSTRAINT DF_coupons_created_at DEFAULT SYSDATETIME(),
+        updated_at DATETIME2 NULL
     );
 END
 GO
@@ -276,11 +286,33 @@ BEGIN
         id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         user_id INT NOT NULL,
         coupon_id INT NOT NULL,
-        is_used BIT NOT NULL CONSTRAINT DF_user_coupons_is_used DEFAULT 0,
-        granted_at DATETIME2 NULL CONSTRAINT DF_user_coupons_granted_at DEFAULT SYSDATETIME(),
+        assigned_by_user_id INT NULL,
+        booking_id INT NULL,
+        source NVARCHAR(30) NOT NULL CONSTRAINT DF_user_coupons_source DEFAULT N'manual',
+        status NVARCHAR(20) NOT NULL CONSTRAINT DF_user_coupons_status DEFAULT N'available',
+        note NVARCHAR(MAX) NULL,
+        assigned_at DATETIME2 NOT NULL CONSTRAINT DF_user_coupons_assigned_at DEFAULT SYSDATETIME(),
+        expires_at DATETIME2 NOT NULL,
         used_at DATETIME2 NULL,
         CONSTRAINT FK_user_coupons_user FOREIGN KEY (user_id) REFERENCES dbo.users(id),
-        CONSTRAINT FK_user_coupons_coupon FOREIGN KEY (coupon_id) REFERENCES dbo.coupons(id)
+        CONSTRAINT FK_user_coupons_coupon FOREIGN KEY (coupon_id) REFERENCES dbo.coupons(id),
+        CONSTRAINT FK_user_coupons_assigned_by FOREIGN KEY (assigned_by_user_id) REFERENCES dbo.users(id),
+        CONSTRAINT FK_user_coupons_booking FOREIGN KEY (booking_id) REFERENCES dbo.bookings(id)
+    );
+END
+GO
+
+IF OBJECT_ID(N'dbo.coupon_event_types', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.coupon_event_types (
+        id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        event_key NVARCHAR(50) NOT NULL,
+        label NVARCHAR(100) NOT NULL,
+        icon NVARCHAR(50) NULL CONSTRAINT DF_coupon_event_types_icon DEFAULT N'category',
+        color NVARCHAR(20) NULL CONSTRAINT DF_coupon_event_types_color DEFAULT N'#6b7280',
+        sort_order INT NULL CONSTRAINT DF_coupon_event_types_sort_order DEFAULT 0,
+        is_system BIT NULL CONSTRAINT DF_coupon_event_types_is_system DEFAULT 0,
+        CONSTRAINT UQ_coupon_event_types_event_key UNIQUE (event_key)
     );
 END
 GO
@@ -311,6 +343,344 @@ BEGIN
         is_used BIT NOT NULL CONSTRAINT DF_password_reset_codes_is_used DEFAULT 0,
         created_at DATETIME2 NULL CONSTRAINT DF_password_reset_codes_created_at DEFAULT SYSDATETIME()
     );
+END
+GO
+
+/* =========================================================
+   SCHEMA RECONCILE FOR EXISTING DBS
+   ========================================================= */
+
+IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH('dbo.bookings', 'coupon_code') IS NULL
+        ALTER TABLE dbo.bookings ADD coupon_code NVARCHAR(50) NULL;
+
+    IF COL_LENGTH('dbo.bookings', 'discount_amount') IS NULL
+        ALTER TABLE dbo.bookings ADD discount_amount DECIMAL(15,2) NULL;
+
+    IF COL_LENGTH('dbo.bookings', 'deposit_amount') IS NULL
+        ALTER TABLE dbo.bookings ADD deposit_amount DECIMAL(15,2) NULL;
+
+    IF COL_LENGTH('dbo.bookings', 'final_amount') IS NULL
+        ALTER TABLE dbo.bookings ADD final_amount DECIMAL(15,2) NULL;
+
+    UPDATE dbo.bookings
+    SET discount_amount = COALESCE(discount_amount, 0),
+        deposit_amount = COALESCE(deposit_amount, 0),
+        final_amount = COALESCE(final_amount, total_price - COALESCE(discount_amount, 0), total_price, 0);
+
+    ALTER TABLE dbo.bookings ALTER COLUMN total_price DECIMAL(15,2) NULL;
+    ALTER TABLE dbo.bookings ALTER COLUMN discount_amount DECIMAL(15,2) NOT NULL;
+    ALTER TABLE dbo.bookings ALTER COLUMN deposit_amount DECIMAL(15,2) NOT NULL;
+    ALTER TABLE dbo.bookings ALTER COLUMN final_amount DECIMAL(15,2) NULL;
+END
+GO
+
+IF OBJECT_ID(N'dbo.booking_details', N'U') IS NOT NULL AND COL_LENGTH('dbo.booking_details', 'price_at_booking') IS NOT NULL
+    ALTER TABLE dbo.booking_details ALTER COLUMN price_at_booking DECIMAL(15,2) NOT NULL;
+GO
+
+IF OBJECT_ID(N'dbo.reviews', N'U') IS NOT NULL
+BEGIN
+    UPDATE dbo.reviews
+    SET rating = CASE
+        WHEN rating < 1 THEN 1
+        WHEN rating > 5 THEN 5
+        ELSE rating
+    END
+    WHERE rating < 1 OR rating > 5;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.check_constraints
+        WHERE name = N'CK_reviews_rating_range'
+          AND parent_object_id = OBJECT_ID(N'dbo.reviews')
+    )
+        ALTER TABLE dbo.reviews ADD CONSTRAINT CK_reviews_rating_range CHECK (rating BETWEEN 1 AND 5);
+END
+GO
+
+IF OBJECT_ID(N'dbo.booking_services', N'U') IS NOT NULL AND COL_LENGTH('dbo.booking_services', 'price_at_booking') IS NOT NULL
+    ALTER TABLE dbo.booking_services ALTER COLUMN price_at_booking DECIMAL(15,2) NOT NULL;
+GO
+
+IF OBJECT_ID(N'dbo.payments', N'U') IS NOT NULL AND COL_LENGTH('dbo.payments', 'amount') IS NOT NULL
+    ALTER TABLE dbo.payments ALTER COLUMN amount DECIMAL(15,2) NOT NULL;
+GO
+
+IF OBJECT_ID(N'dbo.services', N'U') IS NOT NULL AND COL_LENGTH('dbo.services', 'price') IS NOT NULL
+    ALTER TABLE dbo.services ALTER COLUMN price DECIMAL(15,2) NOT NULL;
+GO
+
+IF OBJECT_ID(N'dbo.room_types', N'U') IS NOT NULL AND COL_LENGTH('dbo.room_types', 'price_per_night') IS NOT NULL
+    ALTER TABLE dbo.room_types ALTER COLUMN price_per_night DECIMAL(15,2) NOT NULL;
+GO
+
+IF OBJECT_ID(N'dbo.coupons', N'U') IS NOT NULL
+BEGIN
+    DECLARE @legacyDefaultTargetEventPattern NVARCHAR(150) = N'M' + NCHAR(63) + N'c d' + NCHAR(63) + N'nh%';
+    DECLARE @legacyReviewTargetEventPattern NVARCHAR(150) = N'T' + NCHAR(63) + N' d' + NCHAR(63) + N'ng t' + NCHAR(63) + N'ng%';
+    DECLARE @legacyWeekendTargetEventPattern NVARCHAR(150) = N'Khuy' + NCHAR(63) + N'n mãi Cu' + NCHAR(63) + N'i tu' + NCHAR(63) + N'n%';
+    DECLARE @legacyWeekendTargetEventMixedPattern NVARCHAR(150) = N'Khuyến mãi Cuối tu' + NCHAR(63) + N'n%';
+    DECLARE @legacyAtHotelTargetEventPattern NVARCHAR(150) = N'T' + NCHAR(63) + N'i khách s' + NCHAR(63) + N'n%';
+    DECLARE @hasCouponsMinBookingValue BIT = CASE WHEN COL_LENGTH('dbo.coupons', 'min_booking_value') IS NOT NULL THEN 1 ELSE 0 END;
+    DECLARE @hasCouponsMaxUses BIT = CASE WHEN COL_LENGTH('dbo.coupons', 'max_uses') IS NOT NULL THEN 1 ELSE 0 END;
+    DECLARE @couponMinOrderValueExpr NVARCHAR(MAX);
+    DECLARE @couponUsageLimitSet NVARCHAR(MAX);
+    DECLARE @couponUpdateSql NVARCHAR(MAX);
+
+    IF COL_LENGTH('dbo.coupons', 'name') IS NULL
+        ALTER TABLE dbo.coupons ADD name NVARCHAR(150) NULL;
+
+    IF COL_LENGTH('dbo.coupons', 'min_order_value') IS NULL
+        ALTER TABLE dbo.coupons ADD min_order_value DECIMAL(15,2) NULL;
+
+    IF COL_LENGTH('dbo.coupons', 'max_discount_amount') IS NULL
+        ALTER TABLE dbo.coupons ADD max_discount_amount DECIMAL(15,2) NULL;
+
+    IF COL_LENGTH('dbo.coupons', 'usage_limit') IS NULL
+        ALTER TABLE dbo.coupons ADD usage_limit INT NULL;
+
+    IF COL_LENGTH('dbo.coupons', 'updated_at') IS NULL
+        ALTER TABLE dbo.coupons ADD updated_at DATETIME2 NULL;
+
+    IF COL_LENGTH('dbo.coupons', 'target_event') IS NULL
+        ALTER TABLE dbo.coupons ADD target_event NVARCHAR(150) NULL;
+
+    SET @couponMinOrderValueExpr = CASE
+        WHEN @hasCouponsMinBookingValue = 1 THEN N'COALESCE(min_order_value, TRY_CONVERT(DECIMAL(15,2), min_booking_value), 0)'
+        ELSE N'COALESCE(min_order_value, 0)'
+    END;
+
+    SET @couponUsageLimitSet = CASE
+        WHEN @hasCouponsMaxUses = 1 THEN N'    usage_limit = COALESCE(usage_limit, max_uses),' + CHAR(13) + CHAR(10)
+        ELSE N''
+    END;
+
+    SET @couponUpdateSql = N'
+UPDATE dbo.coupons
+SET name = COALESCE(NULLIF(LTRIM(RTRIM(name)), N''''), code),
+    min_order_value = ' + @couponMinOrderValueExpr + N',
+' + @couponUsageLimitSet + N'    updated_at = COALESCE(updated_at, created_at, SYSDATETIME()),
+    target_event = CASE
+        WHEN target_event IS NULL OR LTRIM(RTRIM(target_event)) = N'''' THEN N''DEFAULT''
+        WHEN UPPER(LTRIM(RTRIM(target_event))) IN (N''DEFAULT'', N''ON_REVIEW'', N''WEEKEND'') THEN UPPER(LTRIM(RTRIM(target_event)))
+        WHEN target_event LIKE @legacyDefaultTargetEventPattern OR target_event LIKE N''Mặc định%'' THEN N''DEFAULT''
+        WHEN target_event LIKE @legacyReviewTargetEventPattern OR target_event LIKE N''Tự động tặng%'' THEN N''ON_REVIEW''
+        WHEN target_event LIKE @legacyWeekendTargetEventPattern OR target_event LIKE @legacyWeekendTargetEventMixedPattern OR target_event LIKE N''Khuyến mãi Cuối tuần%'' THEN N''WEEKEND''
+        WHEN target_event = N''Su kien Chao He'' OR target_event = N''Sự kiện Chào Hè'' OR target_event LIKE @legacyAtHotelTargetEventPattern OR target_event = N''Tại khách sạn'' THEN N''DEFAULT''
+        ELSE UPPER(LTRIM(RTRIM(target_event)))
+    END;';
+
+    EXEC sp_executesql
+        @couponUpdateSql,
+        N'@legacyDefaultTargetEventPattern NVARCHAR(150), @legacyReviewTargetEventPattern NVARCHAR(150), @legacyWeekendTargetEventPattern NVARCHAR(150), @legacyWeekendTargetEventMixedPattern NVARCHAR(150), @legacyAtHotelTargetEventPattern NVARCHAR(150)',
+        @legacyDefaultTargetEventPattern = @legacyDefaultTargetEventPattern,
+        @legacyReviewTargetEventPattern = @legacyReviewTargetEventPattern,
+        @legacyWeekendTargetEventPattern = @legacyWeekendTargetEventPattern,
+        @legacyWeekendTargetEventMixedPattern = @legacyWeekendTargetEventMixedPattern,
+        @legacyAtHotelTargetEventPattern = @legacyAtHotelTargetEventPattern;
+
+    ALTER TABLE dbo.coupons ALTER COLUMN name NVARCHAR(150) NOT NULL;
+    ALTER TABLE dbo.coupons ALTER COLUMN discount_value DECIMAL(15,2) NOT NULL;
+    ALTER TABLE dbo.coupons ALTER COLUMN min_order_value DECIMAL(15,2) NOT NULL;
+    ALTER TABLE dbo.coupons ALTER COLUMN max_discount_amount DECIMAL(15,2) NULL;
+    ALTER TABLE dbo.coupons ALTER COLUMN target_event NVARCHAR(150) NULL;
+END
+GO
+
+IF OBJECT_ID(N'dbo.user_coupons', N'U') IS NOT NULL
+BEGIN
+    DECLARE @hasUserCouponsIsUsed BIT = CASE WHEN COL_LENGTH('dbo.user_coupons', 'is_used') IS NOT NULL THEN 1 ELSE 0 END;
+    DECLARE @hasUserCouponsGrantedAt BIT = CASE WHEN COL_LENGTH('dbo.user_coupons', 'granted_at') IS NOT NULL THEN 1 ELSE 0 END;
+    DECLARE @userCouponsStatusExpr NVARCHAR(MAX);
+    DECLARE @userCouponsAssignedAtExpr NVARCHAR(MAX);
+    DECLARE @userCouponsUpdateSql NVARCHAR(MAX);
+
+    IF COL_LENGTH('dbo.user_coupons', 'assigned_by_user_id') IS NULL
+        ALTER TABLE dbo.user_coupons ADD assigned_by_user_id INT NULL;
+
+    IF COL_LENGTH('dbo.user_coupons', 'booking_id') IS NULL
+        ALTER TABLE dbo.user_coupons ADD booking_id INT NULL;
+
+    IF COL_LENGTH('dbo.user_coupons', 'source') IS NULL
+        ALTER TABLE dbo.user_coupons ADD source NVARCHAR(30) NULL;
+
+    IF COL_LENGTH('dbo.user_coupons', 'status') IS NULL
+        ALTER TABLE dbo.user_coupons ADD status NVARCHAR(20) NULL;
+
+    IF COL_LENGTH('dbo.user_coupons', 'note') IS NULL
+        ALTER TABLE dbo.user_coupons ADD note NVARCHAR(MAX) NULL;
+
+    IF COL_LENGTH('dbo.user_coupons', 'assigned_at') IS NULL
+        ALTER TABLE dbo.user_coupons ADD assigned_at DATETIME2 NULL;
+
+    IF COL_LENGTH('dbo.user_coupons', 'expires_at') IS NULL
+        ALTER TABLE dbo.user_coupons ADD expires_at DATETIME2 NULL;
+
+    IF COL_LENGTH('dbo.user_coupons', 'used_at') IS NULL
+        ALTER TABLE dbo.user_coupons ADD used_at DATETIME2 NULL;
+
+    SET @userCouponsStatusExpr = CASE
+        WHEN @hasUserCouponsIsUsed = 1 THEN N'COALESCE(NULLIF(LTRIM(RTRIM(uc.status)), N''''), CASE WHEN uc.is_used = 1 THEN N''used'' ELSE N''available'' END)'
+        ELSE N'COALESCE(NULLIF(LTRIM(RTRIM(uc.status)), N''''), N''available'')'
+    END;
+
+    SET @userCouponsAssignedAtExpr = CASE
+        WHEN @hasUserCouponsGrantedAt = 1 THEN N'COALESCE(uc.assigned_at, uc.granted_at, uc.used_at, SYSDATETIME())'
+        ELSE N'COALESCE(uc.assigned_at, uc.used_at, SYSDATETIME())'
+    END;
+
+    SET @userCouponsUpdateSql = N'
+UPDATE uc
+SET source = COALESCE(NULLIF(LTRIM(RTRIM(uc.source)), N''''), N''manual''),
+    status = ' + @userCouponsStatusExpr + N',
+    assigned_at = ' + @userCouponsAssignedAtExpr + N',
+    expires_at = COALESCE(uc.expires_at, c.end_date, DATEADD(DAY, 30, ' + @userCouponsAssignedAtExpr + N'))
+FROM dbo.user_coupons uc
+LEFT JOIN dbo.coupons c ON c.id = uc.coupon_id;';
+
+    EXEC sp_executesql @userCouponsUpdateSql;
+
+    ALTER TABLE dbo.user_coupons ALTER COLUMN source NVARCHAR(30) NOT NULL;
+    ALTER TABLE dbo.user_coupons ALTER COLUMN status NVARCHAR(20) NOT NULL;
+    ALTER TABLE dbo.user_coupons ALTER COLUMN assigned_at DATETIME2 NOT NULL;
+    ALTER TABLE dbo.user_coupons ALTER COLUMN expires_at DATETIME2 NOT NULL;
+
+    IF COL_LENGTH('dbo.user_coupons', 'assigned_by_user_id') IS NOT NULL
+        AND NOT EXISTS (
+            SELECT 1
+            FROM sys.foreign_key_columns fkc
+            JOIN sys.tables t ON t.object_id = fkc.parent_object_id
+            JOIN sys.columns c ON c.object_id = t.object_id AND c.column_id = fkc.parent_column_id
+            WHERE t.name = N'user_coupons' AND c.name = N'assigned_by_user_id'
+        )
+        ALTER TABLE dbo.user_coupons ADD CONSTRAINT FK_user_coupons_assigned_by FOREIGN KEY (assigned_by_user_id) REFERENCES dbo.users(id);
+
+    IF COL_LENGTH('dbo.user_coupons', 'booking_id') IS NOT NULL
+        AND NOT EXISTS (
+            SELECT 1
+            FROM sys.foreign_key_columns fkc
+            JOIN sys.tables t ON t.object_id = fkc.parent_object_id
+            JOIN sys.columns c ON c.object_id = t.object_id AND c.column_id = fkc.parent_column_id
+            WHERE t.name = N'user_coupons' AND c.name = N'booking_id'
+        )
+        ALTER TABLE dbo.user_coupons ADD CONSTRAINT FK_user_coupons_booking FOREIGN KEY (booking_id) REFERENCES dbo.bookings(id);
+END
+GO
+
+IF OBJECT_ID(N'dbo.coupon_event_types', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH('dbo.coupon_event_types', 'event_key') IS NULL
+        ALTER TABLE dbo.coupon_event_types ADD event_key NVARCHAR(50) NULL;
+
+    IF COL_LENGTH('dbo.coupon_event_types', 'label') IS NULL
+        ALTER TABLE dbo.coupon_event_types ADD label NVARCHAR(100) NULL;
+
+    IF COL_LENGTH('dbo.coupon_event_types', 'icon') IS NULL
+        ALTER TABLE dbo.coupon_event_types ADD icon NVARCHAR(50) NULL;
+
+    IF COL_LENGTH('dbo.coupon_event_types', 'color') IS NULL
+        ALTER TABLE dbo.coupon_event_types ADD color NVARCHAR(20) NULL;
+
+    IF COL_LENGTH('dbo.coupon_event_types', 'sort_order') IS NULL
+        ALTER TABLE dbo.coupon_event_types ADD sort_order INT NULL;
+
+    IF COL_LENGTH('dbo.coupon_event_types', 'is_system') IS NULL
+        ALTER TABLE dbo.coupon_event_types ADD is_system BIT NULL;
+
+    UPDATE dbo.coupon_event_types
+    SET event_key = COALESCE(NULLIF(UPPER(LTRIM(RTRIM(event_key))), N''), N'DEFAULT'),
+        label = COALESCE(NULLIF(LTRIM(RTRIM(label)), N''), N'Mặc định (Cấp thủ công)'),
+        icon = COALESCE(NULLIF(LTRIM(RTRIM(icon)), N''), N'category'),
+        color = COALESCE(NULLIF(LTRIM(RTRIM(color)), N''), N'#6b7280'),
+        sort_order = COALESCE(sort_order, 0),
+        is_system = COALESCE(is_system, 0);
+
+    IF EXISTS (
+        SELECT 1
+        FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'dbo.coupon_event_types')
+          AND name = N'event_key'
+          AND is_nullable = 1
+    )
+    BEGIN
+        DECLARE @couponEventKeyConstraint SYSNAME;
+        DECLARE @couponEventKeyIndex SYSNAME;
+        DECLARE @couponEventKeySql NVARCHAR(MAX);
+
+        SELECT TOP (1) @couponEventKeyConstraint = kc.name
+        FROM sys.key_constraints kc
+        JOIN sys.index_columns ic
+            ON ic.object_id = kc.parent_object_id
+           AND ic.index_id = kc.unique_index_id
+        JOIN sys.columns c
+            ON c.object_id = ic.object_id
+           AND c.column_id = ic.column_id
+        WHERE kc.parent_object_id = OBJECT_ID(N'dbo.coupon_event_types')
+          AND kc.[type] = N'UQ'
+        GROUP BY kc.name
+        HAVING COUNT(*) = 1
+           AND MAX(c.name) = N'event_key';
+
+        IF @couponEventKeyConstraint IS NOT NULL
+        BEGIN
+            SET @couponEventKeySql = N'ALTER TABLE dbo.coupon_event_types DROP CONSTRAINT ' + QUOTENAME(@couponEventKeyConstraint) + N';';
+            EXEC sp_executesql @couponEventKeySql;
+        END
+        ELSE
+        BEGIN
+            SELECT TOP (1) @couponEventKeyIndex = i.name
+            FROM sys.indexes i
+            JOIN sys.index_columns ic
+                ON ic.object_id = i.object_id
+               AND ic.index_id = i.index_id
+            JOIN sys.columns c
+                ON c.object_id = ic.object_id
+               AND c.column_id = ic.column_id
+            WHERE i.object_id = OBJECT_ID(N'dbo.coupon_event_types')
+              AND i.is_unique = 1
+              AND i.is_primary_key = 0
+              AND i.is_unique_constraint = 0
+            GROUP BY i.name
+            HAVING COUNT(*) = 1
+               AND MAX(c.name) = N'event_key';
+
+            IF @couponEventKeyIndex IS NOT NULL
+            BEGIN
+                SET @couponEventKeySql = N'DROP INDEX ' + QUOTENAME(@couponEventKeyIndex) + N' ON dbo.coupon_event_types;';
+                EXEC sp_executesql @couponEventKeySql;
+            END
+        END
+
+        ALTER TABLE dbo.coupon_event_types ALTER COLUMN event_key NVARCHAR(50) NOT NULL;
+    END
+
+    IF EXISTS (
+        SELECT 1
+        FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'dbo.coupon_event_types')
+          AND name = N'label'
+          AND is_nullable = 1
+    )
+        ALTER TABLE dbo.coupon_event_types ALTER COLUMN label NVARCHAR(100) NOT NULL;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.indexes i
+        JOIN sys.index_columns ic
+            ON ic.object_id = i.object_id
+           AND ic.index_id = i.index_id
+        JOIN sys.columns c
+            ON c.object_id = ic.object_id
+           AND c.column_id = ic.column_id
+        WHERE i.object_id = OBJECT_ID(N'dbo.coupon_event_types')
+          AND i.is_unique = 1
+        GROUP BY i.name
+        HAVING COUNT(*) = 1
+           AND MAX(c.name) = N'event_key'
+    )
+        ALTER TABLE dbo.coupon_event_types ADD CONSTRAINT UQ_coupon_event_types_event_key UNIQUE (event_key);
 END
 GO
 
@@ -349,22 +719,42 @@ GO
 IF NOT EXISTS (SELECT 1 FROM dbo.users WHERE email = N'admin@goathotel.local')
 BEGIN
     INSERT INTO dbo.users (full_name, email, password, phone, image, role, created_at)
-    VALUES (N'GOAT Admin', N'admin@goathotel.local', N'admin123', N'0900000001', NULL, N'admin', SYSDATETIME());
+    VALUES (N'GOAT Admin', N'admin@goathotel.local', N'$2a$10$xFm5bx0.lwf/YPDD1ntz2.1CdBUrPwPD4fBMEsDEg6BEKSD1QVQ2K', N'0900000001', NULL, N'admin', SYSDATETIME());
 END
 GO
 
 IF NOT EXISTS (SELECT 1 FROM dbo.users WHERE email = N'customer@goathotel.local')
 BEGIN
     INSERT INTO dbo.users (full_name, email, password, phone, image, role, created_at)
-    VALUES (N'Khach Hang Demo', N'customer@goathotel.local', N'customer123', N'0900000002', NULL, N'customer', SYSDATETIME());
+    VALUES (N'Khach Hang Demo', N'customer@goathotel.local', N'$2a$10$eOqnElV2ra98gpQ3Iqxkv.Hlwrs.9D6YDj5uOuOv3N8bVNu0TYqh.', N'0900000002', NULL, N'customer', SYSDATETIME());
 END
 GO
 
 IF NOT EXISTS (SELECT 1 FROM dbo.users WHERE email = N'customer2@goathotel.local')
 BEGIN
     INSERT INTO dbo.users (full_name, email, password, phone, image, role, created_at)
-    VALUES (N'Thanh Vien Demo', N'customer2@goathotel.local', N'customer123', N'0900000003', NULL, N'customer', SYSDATETIME());
+    VALUES (N'Thanh Vien Demo', N'customer2@goathotel.local', N'$2a$10$eOqnElV2ra98gpQ3Iqxkv.Hlwrs.9D6YDj5uOuOv3N8bVNu0TYqh.', N'0900000003', NULL, N'customer', SYSDATETIME());
 END
+GO
+
+/*
+   Legacy demo password reconcile
+   Chi migrate dung bo seed cu tung luu plaintext admin123/customer123.
+   Nhung password plaintext khac (neu co) se duoc backend auto-backfill bang BCrypt khi app khoi dong.
+*/
+UPDATE dbo.users
+SET password = CASE
+    WHEN email = N'admin@goathotel.local' AND password = N'admin123'
+        THEN N'$2a$10$xFm5bx0.lwf/YPDD1ntz2.1CdBUrPwPD4fBMEsDEg6BEKSD1QVQ2K'
+    WHEN email = N'customer@goathotel.local' AND password = N'customer123'
+        THEN N'$2a$10$eOqnElV2ra98gpQ3Iqxkv.Hlwrs.9D6YDj5uOuOv3N8bVNu0TYqh.'
+    WHEN email = N'customer2@goathotel.local' AND password = N'customer123'
+        THEN N'$2a$10$eOqnElV2ra98gpQ3Iqxkv.Hlwrs.9D6YDj5uOuOv3N8bVNu0TYqh.'
+    ELSE password
+END
+WHERE (email = N'admin@goathotel.local' AND password = N'admin123')
+   OR (email = N'customer@goathotel.local' AND password = N'customer123')
+   OR (email = N'customer2@goathotel.local' AND password = N'customer123');
 GO
 
 /* =========================================================
@@ -975,9 +1365,22 @@ IF NOT EXISTS (
       AND b.created_at = '2026-03-15T10:00:00'
 )
 BEGIN
-    INSERT INTO dbo.bookings (user_id, total_price, status, payment_status, created_at, expires_at)
+    INSERT INTO dbo.bookings (
+        user_id,
+        total_price,
+        discount_amount,
+        deposit_amount,
+        final_amount,
+        status,
+        payment_status,
+        created_at,
+        expires_at
+    )
     SELECT
         u.id,
+        1000000,
+        0,
+        300000,
         1000000,
         N'completed',
         N'paid',

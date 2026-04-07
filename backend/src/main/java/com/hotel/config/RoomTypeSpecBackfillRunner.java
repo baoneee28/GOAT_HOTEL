@@ -3,6 +3,7 @@ package com.hotel.config;
 import com.hotel.entity.RoomType;
 import com.hotel.repository.RoomTypeRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -12,6 +13,7 @@ import java.util.Locale;
 import java.util.Map;
 
 @Component
+@ConditionalOnProperty(name = "app.backfill-room-type-specs-on-startup", havingValue = "true")
 public class RoomTypeSpecBackfillRunner implements CommandLineRunner {
 
     private final RoomTypeRepository roomTypeRepository;

@@ -1,11 +1,17 @@
 package com.hotel.controller.api;
 
+import com.hotel.dto.AdminBookingCheckoutRequest;
+import com.hotel.dto.AdminBookingUpsertRequest;
+import com.hotel.dto.ApiResponse;
+import com.hotel.dto.BookRoomRequest;
+import com.hotel.dto.BookingPageMeta;
+import com.hotel.dto.BookingResponse;
 import com.hotel.entity.Booking;
 import com.hotel.entity.BookingDetail;
 import com.hotel.entity.Room;
 import com.hotel.entity.User;
-import com.hotel.repository.BookingRepository;
 import com.hotel.repository.BookingDetailRepository;
+import com.hotel.repository.BookingRepository;
 import com.hotel.repository.RoomRepository;
 import com.hotel.repository.UserRepository;
 import com.hotel.service.AuthService;
@@ -13,16 +19,25 @@ import com.hotel.service.BookingService;
 import com.hotel.service.NotificationService;
 import com.hotel.service.PaymentService;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -54,86 +69,220 @@ public class BookingApiController {
 
     @Autowired
     private NotificationService notificationService;
-
-    private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final LocalTime DEFAULT_CHECK_IN_TIME = LocalTime.of(14, 0);
+    private static final LocalTime DEFAULT_CHECK_OUT_TIME = LocalTime.of(12, 0);
+    private static final LocalTime FILTER_START_TIME = LocalTime.of(0, 0);
+    private static final LocalTime FILTER_END_TIME = LocalTime.of(23, 59);
+    private static final int DEFAULT_PAGE_SIZE = 5;
+    private static final int MAX_PAGE_SIZE = 100;
 
     private User getSessionUser(HttpSession session) {
         Object userObj = session.getAttribute("user");
         return userObj instanceof User ? (User) userObj : null;
     }
 
-    private ResponseEntity<Map<String, Object>> authRequiredResponse() {
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("message", "Vui lòng đăng nhập để tiếp tục.");
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    private <T> ResponseEntity<ApiResponse<T>> authRequiredResponse() {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error("Vui lòng đăng nhập để tiếp tục."));
     }
 
-    private LocalDateTime parseDate(String dateStr) {
-        if (dateStr.contains("T")) {
-            dateStr = dateStr.replace("T", " ");
+    private <T> ResponseEntity<ApiResponse<T>> forbiddenResponse(String message) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(message));
+    }
+
+    private <T> ResponseEntity<ApiResponse<T>> badRequestResponse(String message) {
+        return ResponseEntity.badRequest().body(ApiResponse.error(message));
+    }
+
+    private <T> ResponseEntity<ApiResponse<T>> notFoundResponse(String message) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(message));
+    }
+
+    private <T> ResponseEntity<ApiResponse<T>> methodNotAllowedResponse(String message) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(ApiResponse.error(message));
+    }
+
+    private <T> ResponseEntity<ApiResponse<T>> requireBackofficeAccess(HttpSession session) {
+        User currentUser = getSessionUser(session);
+        if (currentUser == null) {
+            return authRequiredResponse();
         }
-        if (dateStr.length() == 10) { dateStr += " 12:00"; }
-        return LocalDateTime.parse(dateStr, formatter);
+        if (!authService.isBackoffice(currentUser)) {
+            return forbiddenResponse("Bạn không có quyền xử lý nghiệp vụ booking quản trị.");
+        }
+        return null;
     }
 
-    private String requirePayloadField(Map<String, String> payload, String key, String label) {
-        String value = payload.get(key);
-        if (value == null || value.isBlank()) {
+    private <T> ResponseEntity<ApiResponse<T>> requireAdminBookingEditor(HttpSession session) {
+        User currentUser = getSessionUser(session);
+        if (currentUser == null) {
+            return authRequiredResponse();
+        }
+        if (!authService.isAdmin(currentUser)) {
+            return forbiddenResponse("Nhân viên chỉ được xử lý vận hành booking, không được tạo hoặc sửa booking.");
+        }
+        return null;
+    }
+
+    private LocalDateTime parseDate(String dateStr, LocalTime defaultTime, String label) {
+        if (dateStr == null || dateStr.isBlank()) {
             throw new IllegalArgumentException(label + " không được để trống.");
         }
-        return value.trim();
+
+        String normalized = dateStr.trim();
+        try {
+            if (normalized.length() == 10) {
+                return LocalDate.parse(normalized).atTime(defaultTime);
+            }
+            if (normalized.contains(" ")) {
+                normalized = normalized.replace(" ", "T");
+            }
+            return LocalDateTime.parse(normalized);
+        } catch (DateTimeParseException ex) {
+            throw new IllegalArgumentException(label + " không hợp lệ.");
+        }
+    }
+
+    private LocalDateTime parseCheckInDate(String dateStr) {
+        return parseDate(dateStr, DEFAULT_CHECK_IN_TIME, "Ngày nhận phòng");
+    }
+
+    private LocalDateTime parseCheckOutDate(String dateStr) {
+        return parseDate(dateStr, DEFAULT_CHECK_OUT_TIME, "Ngày trả phòng");
+    }
+
+    private LocalDateTime parseFilterDate(String dateStr, boolean inclusiveEnd) {
+        return parseDate(dateStr, inclusiveEnd ? FILTER_END_TIME : FILTER_START_TIME, "Khoảng thời gian lọc");
+    }
+
+    private String normalizeText(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private String normalizeStatusFilter(String status) {
+        String normalized = normalizeText(status);
+        return normalized == null ? null : normalized.toLowerCase();
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(1, page);
+    }
+
+    private int normalizePageSize(int pageSize) {
+        return Math.max(1, Math.min(pageSize, MAX_PAGE_SIZE));
+    }
+
+    private BookingPageMeta buildPageMeta(Page<?> page, int pageSize, Map<String, Long> statusSummary) {
+        int totalPages = Math.max(1, page.getTotalPages());
+        int currentPage = Math.min(Math.max(1, page.getNumber() + 1), totalPages);
+        return new BookingPageMeta(
+                currentPage,
+                pageSize,
+                totalPages,
+                page.getTotalElements(),
+                statusSummary
+        );
+    }
+
+    private BookingPageMeta buildPageMeta(int currentPage,
+                                          int pageSize,
+                                          long totalElements,
+                                          int totalPages,
+                                          Map<String, Long> statusSummary) {
+        int normalizedTotalPages = Math.max(1, totalPages);
+        int normalizedCurrentPage = Math.min(Math.max(1, currentPage), normalizedTotalPages);
+        return new BookingPageMeta(
+                normalizedCurrentPage,
+                pageSize,
+                normalizedTotalPages,
+                totalElements,
+                statusSummary
+        );
+    }
+
+    private BookingResponse reloadBookingResponse(Integer bookingId) {
+        if (bookingId == null) {
+            return null;
+        }
+        return bookingRepository.findById(bookingId)
+                .map(bookingService::normalizeBookingFinancials)
+                .map(BookingResponse::from)
+                .orElse(null);
+    }
+
+    private String buildBookingCreatedMessage(String paymentFlow) {
+        if ("vnpay".equalsIgnoreCase(paymentFlow) || "vnpay_demo".equalsIgnoreCase(paymentFlow)) {
+            return "Đã tạo booking giữ chỗ chờ thanh toán VNPay demo. Giữ chỗ có hiệu lực trong "
+                    + bookingService.getPendingHoldDisplayText() + ".";
+        }
+        return "Đã tạo booking giữ chỗ. Phòng sẽ được giữ trong "
+                + bookingService.getPendingHoldDisplayText() + " để chờ khách sạn xác nhận.";
+    }
+
+    private Page<Booking> findAdminBookingsPage(String status,
+                                                LocalDateTime fromDateTime,
+                                                LocalDateTime toDateTime,
+                                                int page,
+                                                int pageSize) {
+        int safePage = normalizePage(page);
+        Page<Booking> bookingPage = bookingRepository.findAdminBookingsByFilters(
+                status,
+                fromDateTime,
+                toDateTime,
+                PageRequest.of(safePage - 1, pageSize)
+        );
+
+        if (bookingPage.getTotalPages() > 0 && safePage > bookingPage.getTotalPages()) {
+            return bookingRepository.findAdminBookingsByFilters(
+                    status,
+                    fromDateTime,
+                    toDateTime,
+                    PageRequest.of(bookingPage.getTotalPages() - 1, pageSize)
+            );
+        }
+
+        return bookingPage;
     }
 
     @PostMapping("/bookings")
-    public ResponseEntity<Map<String, Object>> bookRoom(@RequestBody Map<String, String> payload, HttpSession session) {
-        Map<String, Object> response = new HashMap<>();
+    public ResponseEntity<ApiResponse<BookingResponse>> bookRoom(@Valid @RequestBody BookRoomRequest request,
+                                                                 HttpSession session) {
+        User currentUser = getSessionUser(session);
+        if (currentUser == null) {
+            return authRequiredResponse();
+        }
+
         try {
-            User currentUser = getSessionUser(session);
-            if (currentUser == null) {
-                return authRequiredResponse();
-            }
+            String paymentFlow = normalizeText(request.paymentFlow());
+            String couponCode = normalizeText(request.couponCode());
+            LocalDateTime checkIn = parseCheckInDate(request.checkIn());
+            LocalDateTime checkOut = parseCheckOutDate(request.checkOut());
 
-            String roomIdRaw = requirePayloadField(payload, "roomId", "Phòng");
-            String checkInRaw = requirePayloadField(payload, "checkIn", "Ngày nhận phòng");
-            String checkOutRaw = requirePayloadField(payload, "checkOut", "Ngày trả phòng");
-            String paymentFlow = payload.get("paymentFlow");
-            String couponCode = payload.get("couponCode");
-
-            Integer roomId = Integer.parseInt(roomIdRaw);
-            LocalDateTime checkIn = parseDate(checkInRaw);
-            LocalDateTime checkOut = parseDate(checkOutRaw);
-
-            Booking createdBooking = bookingService.createBooking(currentUser, roomId, checkIn, checkOut, paymentFlow, couponCode);
-
-            response.put("success", true);
-            response.put(
-                    "message",
-                    "vnpay".equalsIgnoreCase(paymentFlow) || "vnpay_demo".equalsIgnoreCase(paymentFlow)
-                            ? "Đã tạo booking giữ chỗ chờ thanh toán VNPay demo. Giữ chỗ có hiệu lực trong " + bookingService.getPendingHoldDisplayText() + "."
-                            : "Đã tạo booking giữ chỗ. Phòng sẽ được giữ trong " + bookingService.getPendingHoldDisplayText() + " để chờ khách sạn xác nhận."
+            Booking createdBooking = bookingService.createBooking(
+                    currentUser,
+                    request.roomId(),
+                    checkIn,
+                    checkOut,
+                    paymentFlow,
+                    couponCode
             );
-            response.put("bookingId", createdBooking.getId());
-            response.put("bookingStatus", createdBooking.getStatus());
-            response.put("paymentStatus", createdBooking.getPaymentStatus());
-            response.put("expiresAt", createdBooking.getExpiresAt());
-            response.put("couponCode", createdBooking.getCouponCode());
-            response.put("discountAmount", createdBooking.getDiscountAmount());
-            response.put("finalAmount", createdBooking.getFinalAmount());
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "Lỗi dữ liệu đầu vào: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
+
+            return ResponseEntity.ok(ApiResponse.ok(
+                    buildBookingCreatedMessage(paymentFlow),
+                    reloadBookingResponse(createdBooking.getId())
+            ));
+        } catch (IllegalArgumentException ex) {
+            return badRequestResponse(ex.getMessage());
         }
     }
 
     @GetMapping("/bookings/history")
-    public ResponseEntity<Map<String, Object>> getHistory(
+    public ResponseEntity<ApiResponse<List<BookingResponse>>> getHistory(
             @RequestParam(value = "status", defaultValue = "") String status,
             @RequestParam(value = "page", defaultValue = "1") int page,
             HttpSession session) {
@@ -142,172 +291,162 @@ public class BookingApiController {
             return authRequiredResponse();
         }
 
-        Page<Booking> historyPage = bookingService.getHistory(currentUser.getId(), status.isBlank() ? null : status, page);
-        Map<String, Object> response = new HashMap<>();
-        response.put("bookings", bookingService.normalizeBookingFinancials(historyPage.getContent()));
-        response.put("totalPages", historyPage.getTotalPages());
-        response.put("statusSummary", bookingService.countHistoryStatuses(currentUser.getId()));
-        return ResponseEntity.ok(response);
+        Page<Booking> historyPage = bookingService.getHistory(
+                currentUser.getId(),
+                normalizeStatusFilter(status),
+                page
+        );
+        List<BookingResponse> bookings = BookingResponse.fromList(
+                bookingService.normalizeBookingFinancials(historyPage.getContent())
+        );
+        Map<String, Long> statusSummary = bookingService.countHistoryStatuses(currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.ok(
+                bookings,
+                buildPageMeta(historyPage, historyPage.getSize(), statusSummary)
+        ));
     }
 
     @GetMapping("/bookings/{id}")
-    public ResponseEntity<Map<String, Object>> getBookingDetail(@PathVariable("id") Integer id, HttpSession session) {
+    public ResponseEntity<ApiResponse<BookingResponse>> getBookingDetail(@PathVariable("id") Integer id,
+                                                                         HttpSession session) {
         User currentUser = getSessionUser(session);
         if (currentUser == null) {
             return authRequiredResponse();
         }
 
-        Map<String, Object> response = new HashMap<>();
         Optional<Booking> bookingOpt = bookingRepository.findById(id);
         if (bookingOpt.isEmpty()) {
-            response.put("success", false);
-            response.put("message", "Không tìm thấy đơn đặt phòng.");
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            return notFoundResponse("Không tìm thấy đơn đặt phòng.");
         }
 
         Booking booking = bookingOpt.get();
         if (booking.getUser() == null || !currentUser.getId().equals(booking.getUser().getId())) {
-            response.put("success", false);
-            response.put("message", "Bạn không có quyền xem đơn đặt phòng này.");
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+            return forbiddenResponse("Bạn không có quyền xem đơn đặt phòng này.");
         }
 
-        response.put("success", true);
-        response.put("booking", bookingService.normalizeBookingFinancials(booking));
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.ok(
+                BookingResponse.from(bookingService.normalizeBookingFinancials(booking))
+        ));
     }
 
     @PostMapping("/bookings/{id}/deposit")
-    public ResponseEntity<Map<String, Object>> collectDepositPayment(@PathVariable("id") Integer id, HttpSession session) {
+    public ResponseEntity<ApiResponse<BookingResponse>> collectDepositPayment(@PathVariable("id") Integer id,
+                                                                              HttpSession session) {
         User currentUser = getSessionUser(session);
         if (currentUser == null) {
             return authRequiredResponse();
         }
 
-        Map<String, Object> response = new HashMap<>();
         try {
             Booking booking = paymentService.collectDepositPayment(id, currentUser.getId());
-            response.put("success", true);
-            response.put("message", "Da ghi nhan dat coc 30% va xac nhan booking.");
-            response.put("bookingId", booking.getId());
-            response.put("bookingStatus", booking.getStatus());
-            response.put("paymentStatus", booking.getPaymentStatus());
-            response.put("booking", bookingService.normalizeBookingFinancials(booking));
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(ApiResponse.ok(
+                    "Đã ghi nhận đặt cọc 30% và xác nhận booking.",
+                    reloadBookingResponse(booking.getId())
+            ));
         } catch (SecurityException ex) {
-            response.put("success", false);
-            response.put("message", ex.getMessage());
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+            return forbiddenResponse(ex.getMessage());
         } catch (IllegalArgumentException ex) {
-            response.put("success", false);
-            response.put("message", ex.getMessage());
-            return ResponseEntity.badRequest().body(response);
+            return badRequestResponse(ex.getMessage());
         }
     }
 
     @DeleteMapping("/bookings/{id}")
-    public ResponseEntity<Map<String, Object>> cancelBooking(@PathVariable("id") Integer id, HttpSession session) {
+    public ResponseEntity<ApiResponse<BookingResponse>> cancelBooking(@PathVariable("id") Integer id,
+                                                                      HttpSession session) {
         User currentUser = getSessionUser(session);
         if (currentUser == null) {
             return authRequiredResponse();
         }
 
-        boolean success = bookingService.cancelBooking(id, currentUser.getId());
-        Map<String, Object> response = new HashMap<>();
-        if (success) {
-            response.put("success", true);
-            response.put("message", "Hủy phòng thành công");
-            return ResponseEntity.ok(response);
-        } else {
-            response.put("success", false);
-            response.put("message", "Không thể hủy phòng (Đã duyệt hoặc không phải của bạn)");
-            return ResponseEntity.badRequest().body(response);
+        try {
+            bookingService.cancelBooking(id, currentUser.getId());
+            return ResponseEntity.ok(ApiResponse.ok(
+                    "Hủy phòng thành công",
+                    reloadBookingResponse(id)
+            ));
+        } catch (SecurityException ex) {
+            return forbiddenResponse(ex.getMessage());
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return badRequestResponse(ex.getMessage());
         }
     }
 
     @GetMapping("/admin/bookings")
-    public ResponseEntity<Map<String, Object>> listAdminBookings(
+    public ResponseEntity<ApiResponse<List<BookingResponse>>> listAdminBookings(
             @RequestParam(value = "status", defaultValue = "") String status,
             @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "pageSize", defaultValue = "" + DEFAULT_PAGE_SIZE) int pageSize,
             @RequestParam(value = "bookingId", required = false) Integer bookingId,
             @RequestParam(value = "fromDateTime", required = false) String fromDateTime,
-            @RequestParam(value = "toDateTime", required = false) String toDateTime) {
-        bookingService.expirePendingBookings();
+            @RequestParam(value = "toDateTime", required = false) String toDateTime,
+            HttpSession session) {
+        ResponseEntity<ApiResponse<List<BookingResponse>>> authError = requireBackofficeAccess(session);
+        if (authError != null) {
+            return authError;
+        }
 
-        Map<String, Object> response = new HashMap<>();
+        int safePageSize = normalizePageSize(pageSize);
         if (bookingId != null) {
             Optional<Booking> bookingOpt = bookingRepository.findById(bookingId);
-            List<Booking> bookings = bookingOpt
-                    .map(booking -> List.of(bookingService.normalizeBookingFinancials(booking)))
+            List<BookingResponse> bookings = bookingOpt
+                    .map(booking -> List.of(BookingResponse.from(bookingService.normalizeBookingFinancials(booking))))
                     .orElseGet(List::of);
-            response.put("bookings", bookings);
-            response.put("totalPages", 1);
-            response.put("currentPage", 1);
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(ApiResponse.ok(
+                    bookings,
+                    buildPageMeta(1, safePageSize, bookings.size(), 1, null)
+            ));
         }
 
-        boolean hasDateFilter = fromDateTime != null && !fromDateTime.isBlank()
-                && toDateTime != null && !toDateTime.isBlank();
-        if (hasDateFilter) {
-            LocalDateTime from = parseDate(fromDateTime);
-            LocalDateTime to = parseDate(toDateTime);
+        boolean hasFromFilter = normalizeText(fromDateTime) != null;
+        boolean hasToFilter = normalizeText(toDateTime) != null;
+        if (hasFromFilter != hasToFilter) {
+            return badRequestResponse("Cần truyền đủ fromDateTime và toDateTime để lọc booking.");
+        }
+
+        LocalDateTime from = null;
+        LocalDateTime to = null;
+        if (hasFromFilter) {
+            from = parseFilterDate(fromDateTime, false);
+            to = parseFilterDate(toDateTime, true);
             if (!to.isAfter(from)) {
-                response.put("success", false);
-                response.put("message", "Khoang thoi gian loc booking khong hop le.");
-                return ResponseEntity.badRequest().body(response);
+                return badRequestResponse("Khoảng thời gian lọc booking không hợp lệ.");
             }
-
-            List<Booking> filteredBookings = bookingRepository.findAllAdminBookings(status.isBlank() ? null : status)
-                    .stream()
-                    .filter(booking -> overlapsBookingWindow(booking, from, to))
-                    .map(bookingService::normalizeBookingFinancials)
-                    .toList();
-
-            int safePageSize = 5;
-            int totalPages = Math.max(1, (int) Math.ceil((double) filteredBookings.size() / safePageSize));
-            int safePage = Math.min(Math.max(1, page), totalPages);
-            int fromIndex = Math.min((safePage - 1) * safePageSize, filteredBookings.size());
-            int toIndex = Math.min(fromIndex + safePageSize, filteredBookings.size());
-
-            response.put("bookings", filteredBookings.subList(fromIndex, toIndex));
-            response.put("totalPages", totalPages);
-            response.put("currentPage", safePage);
-            return ResponseEntity.ok(response);
         }
 
-        Page<Booking> bookingPage = bookingRepository.findAdminBookings(
-                status.isBlank() ? null : status,
-                PageRequest.of(page - 1, 5));
+        Page<Booking> bookingPage = findAdminBookingsPage(
+                normalizeStatusFilter(status),
+                from,
+                to,
+                page,
+                safePageSize
+        );
 
-        response.put("bookings", bookingService.normalizeBookingFinancials(bookingPage.getContent()));
-        response.put("totalPages", bookingPage.getTotalPages());
-        response.put("currentPage", page);
-        return ResponseEntity.ok(response);
+        List<BookingResponse> bookings = BookingResponse.fromList(
+                bookingService.normalizeBookingFinancials(bookingPage.getContent())
+        );
+        return ResponseEntity.ok(ApiResponse.ok(
+                bookings,
+                buildPageMeta(bookingPage, safePageSize, null)
+        ));
     }
 
     @PostMapping("/admin/bookings")
-    public ResponseEntity<Map<String, Object>> saveAdminBooking(@RequestBody Map<String, String> payload,
-                                                                HttpSession session) {
-        Map<String, Object> response = new HashMap<>();
-        User currentUser = getSessionUser(session);
-        if (!authService.isAdmin(currentUser)) {
-            response.put("success", false);
-            response.put("message", "Nhan vien chi duoc xu ly van hanh booking, khong duoc tao hoac sua booking.");
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    public ResponseEntity<ApiResponse<BookingResponse>> saveAdminBooking(
+            @Valid @RequestBody AdminBookingUpsertRequest request,
+            HttpSession session) {
+        ResponseEntity<ApiResponse<BookingResponse>> authError = requireAdminBookingEditor(session);
+        if (authError != null) {
+            return authError;
         }
-        try {
-            String bookingIdStr = payload.get("id");
-            Integer userId = Integer.parseInt(payload.get("userId"));
-            Integer roomId = Integer.parseInt(payload.get("roomId"));
-            LocalDateTime checkIn = parseDate(payload.get("checkIn"));
-            LocalDateTime checkOut = parseDate(payload.get("checkOut"));
-            String requestedStatus = payload.get("status");
 
-            Optional<Room> roomOpt = roomRepository.findById(roomId);
+        try {
+            LocalDateTime checkIn = parseCheckInDate(request.checkIn());
+            LocalDateTime checkOut = parseCheckOutDate(request.checkOut());
+            String requestedStatus = normalizeText(request.status());
+
+            Optional<Room> roomOpt = roomRepository.findById(request.roomId());
             if (roomOpt.isEmpty()) {
-                response.put("success", false);
-                response.put("message", "Phòng không tồn tại");
-                return ResponseEntity.badRequest().body(response);
+                return badRequestResponse("Phòng không tồn tại");
             }
 
             Room room = roomOpt.get();
@@ -316,27 +455,30 @@ public class BookingApiController {
             double totalHours = priceInfo.get("hours");
             double totalPrice = priceInfo.get("total");
             LocalDateTime now = LocalDateTime.now();
+            Integer bookingId = request.id();
 
-            if (bookingIdStr != null && !bookingIdStr.isBlank()) {
-                Integer existingBookingId = Integer.parseInt(bookingIdStr);
-                Optional<Booking> existingOpt = bookingRepository.findById(existingBookingId);
+            if (bookingId != null) {
+                Optional<Booking> existingOpt = bookingRepository.findById(bookingId);
                 if (existingOpt.isEmpty()) {
-                    response.put("success", false);
-                    return ResponseEntity.badRequest().body(response);
+                    return badRequestResponse("Không tìm thấy đơn đặt phòng.");
                 }
                 
                 Booking existing = existingOpt.get();
                 bookingService.normalizeBookingFinancials(existing);
                 String previousStatus = existing.getStatus();
                 String nextStatus = bookingService.validateAdminEditableStatus(previousStatus, requestedStatus);
-                long overlapCount = bookingRepository.countOverlappingBookingsExcept(roomId, checkIn, checkOut, existingBookingId, now);
+                long overlapCount = bookingRepository.countOverlappingBookingsExcept(
+                        request.roomId(),
+                        checkIn,
+                        checkOut,
+                        bookingId,
+                        now
+                );
                 if (overlapCount > 0
                         && !"cancelled".equalsIgnoreCase(nextStatus)
                         && !"expired".equalsIgnoreCase(nextStatus)
                         && !"refused".equalsIgnoreCase(nextStatus)) {
-                    response.put("success", false);
-                    response.put("message", "Xung đột lịch! Đã có đơn đặt phòng khác được duyệt trong thời gian này.");
-                    return ResponseEntity.badRequest().body(response);
+                    return badRequestResponse("Xung đột lịch! Đã có đơn đặt phòng khác được duyệt trong thời gian này.");
                 }
 
                 existing.setTotalPrice(totalPrice);
@@ -353,28 +495,21 @@ public class BookingApiController {
                     detail.setTotalHours(totalHours);
                     detail.setRoom(room);
                     bookingDetailRepository.save(detail);
-
-                    // KHÔNG CẬP NHẬT TRẠNG THÁI BOOKED VẬT LÝ NỮA
                 }
 
             } else {
-                User user = userRepository.findById(userId).orElse(null);
+                User user = userRepository.findById(request.userId()).orElse(null);
                 if (user == null) {
-                    response.put("success", false);
-                    response.put("message", "Khách hàng không tồn tại!");
-                    return ResponseEntity.badRequest().body(response);
+                    return badRequestResponse("Khách hàng không tồn tại!");
                 }
 
-                // Check overlap cho Admin
                 String initialStatus = bookingService.validateAdminCreateStatus(requestedStatus);
-                long overlapCount = bookingRepository.countOverlappingBookings(roomId, checkIn, checkOut, now);
+                long overlapCount = bookingRepository.countOverlappingBookings(request.roomId(), checkIn, checkOut, now);
                 if (overlapCount > 0
                         && !"cancelled".equalsIgnoreCase(initialStatus)
                         && !"expired".equalsIgnoreCase(initialStatus)
                         && !"refused".equalsIgnoreCase(initialStatus)) {
-                    response.put("success", false);
-                    response.put("message", "Xung đột lịch! Đã có đơn đặt phòng khác được duyệt trong thời gian này.");
-                    return ResponseEntity.badRequest().body(response);
+                    return badRequestResponse("Xung đột lịch! Đã có đơn đặt phòng khác được duyệt trong thời gian này.");
                 }
 
                 Booking booking = new Booking();
@@ -385,6 +520,7 @@ public class BookingApiController {
                 booking.setFinalAmount(totalPrice);
                 bookingService.preparePendingBooking(booking, null);
                 booking = bookingRepository.save(booking);
+                bookingId = booking.getId();
                 
                 BookingDetail detail = new BookingDetail();
                 detail.setBooking(booking);
@@ -394,78 +530,52 @@ public class BookingApiController {
                 detail.setCheckOut(checkOut);
                 detail.setTotalHours(totalHours);
                 bookingDetailRepository.save(detail);
+            }
 
-                // KHÔNG CẬP NHẬT TRẠNG THÁI BOOKED VẬT LÝ, HỆ THỐNG DÙNG DATE OVERLAP
-            }
-            response.put("success", true);
-            response.put("message", "Đã lưu đơn đặt phòng.");
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.ok(ApiResponse.ok(
+                    "Đã lưu đơn đặt phòng.",
+                    reloadBookingResponse(bookingId)
+            ));
+        } catch (IllegalArgumentException ex) {
+            return badRequestResponse(ex.getMessage());
         }
-    }
-
-    private boolean overlapsBookingWindow(Booking booking, LocalDateTime from, LocalDateTime to) {
-        if (booking == null || booking.getDetails() == null) {
-            return false;
-        }
-        for (BookingDetail detail : booking.getDetails()) {
-            if (detail == null || detail.getCheckIn() == null || detail.getCheckOut() == null) {
-                continue;
-            }
-            if (detail.getCheckIn().isBefore(to) && detail.getCheckOut().isAfter(from)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @PostMapping("/admin/bookings/{id}/checkout")
-    public ResponseEntity<Map<String, Object>> checkoutAdmin(
+    public ResponseEntity<ApiResponse<BookingResponse>> checkoutAdmin(
             @PathVariable("id") Integer id,
-            @RequestBody Map<String, String> payload) {
+            @Valid @RequestBody AdminBookingCheckoutRequest request,
+            HttpSession session) {
+        ResponseEntity<ApiResponse<BookingResponse>> authError = requireBackofficeAccess(session);
+        if (authError != null) {
+            return authError;
+        }
         
-        String checkoutType = payload.get("checkoutType");
         Optional<Booking> bookingOpt = bookingRepository.findById(id);
-        Map<String, Object> response = new HashMap<>();
         if (bookingOpt.isEmpty()) {
-            response.put("success", false);
-            return ResponseEntity.badRequest().body(response);
+            return badRequestResponse("Đơn không tồn tại.");
         }
 
         Booking booking = bookingOpt.get();
         if (booking.getDetails() == null || booking.getDetails().isEmpty()) {
-            response.put("success", false);
-            response.put("message", "Đơn lưu trú không có phòng.");
-            return ResponseEntity.badRequest().body(response);
+            return badRequestResponse("Đơn lưu trú không có phòng.");
         }
         
         BookingDetail detail = booking.getDetails().get(0);
-        Room room = detail.getRoom();
         if (!"confirmed".equalsIgnoreCase(booking.getStatus())) {
-            response.put("success", false);
-            response.put("message", "Chỉ có thể trả phòng cho đơn đã xác nhận.");
-            return ResponseEntity.badRequest().body(response);
+            return badRequestResponse("Chỉ có thể trả phòng cho đơn đã xác nhận.");
         }
         if (detail.getCheckInActual() == null) {
-            response.put("success", false);
-            response.put("message", "Khách chưa nhận phòng. Hãy check-in trước khi checkout.");
-            return ResponseEntity.badRequest().body(response);
+            return badRequestResponse("Khách chưa nhận phòng. Hãy check-in trước khi checkout.");
         }
         if (detail.getCheckOutActual() != null) {
-            response.put("success", false);
-            response.put("message", "Đơn này đã được checkout trước đó.");
-            return ResponseEntity.badRequest().body(response);
+            return badRequestResponse("Đơn này đã được checkout trước đó.");
         }
         if (!"paid".equalsIgnoreCase(booking.getPaymentStatus())) {
-            response.put("success", false);
-            response.put("message", "Chỉ có thể checkout booking đã thanh toán. Hãy thu tiền trước khi checkout.");
-            return ResponseEntity.badRequest().body(response);
+            return badRequestResponse("Chỉ có thể checkout booking đã thanh toán. Hãy thu tiền trước khi checkout.");
         }
 
-        if ("recalc".equals(checkoutType)) {
+        if ("recalc".equals(request.checkoutType())) {
             LocalDateTime now = LocalDateTime.now();
             double pricePerNight = detail.getPriceAtBooking();
             LocalDateTime actualStayStart = detail.getCheckInActual() != null ? detail.getCheckInActual() : detail.getCheckIn();
@@ -484,145 +594,137 @@ public class BookingApiController {
             booking.setStatus("completed");
             booking.setFinalAmount(Math.max(0.0, (booking.getTotalPrice() != null ? booking.getTotalPrice() : 0.0) - (booking.getDiscountAmount() == null ? 0.0 : booking.getDiscountAmount())));
         }
-
         bookingRepository.save(booking);
-        if(room != null) {
-            room.setStatus("available");
-            roomRepository.save(room);
-        }
 
         if (booking.getUser() != null) {
             notificationService.sendReviewPrompt(booking);
         }
 
-        response.put("success", true);
-        response.put("message", "Checkout đơn đặt phòng thành công.");
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Checkout đơn đặt phòng thành công.",
+                reloadBookingResponse(booking.getId())
+        ));
     }
 
     @PostMapping("/admin/bookings/{id}/checkin")
-    public ResponseEntity<Map<String, Object>> checkInAdmin(@PathVariable("id") Integer id) {
+    public ResponseEntity<ApiResponse<BookingResponse>> checkInAdmin(@PathVariable("id") Integer id,
+                                                                     HttpSession session) {
+        ResponseEntity<ApiResponse<BookingResponse>> authError = requireBackofficeAccess(session);
+        if (authError != null) {
+            return authError;
+        }
+
         Optional<Booking> bookingOpt = bookingRepository.findById(id);
-        Map<String, Object> response = new HashMap<>();
         if (bookingOpt.isEmpty()) {
-            response.put("success", false);
-            response.put("message", "Đơn không tồn tại.");
-            return ResponseEntity.badRequest().body(response);
+            return badRequestResponse("Đơn không tồn tại.");
         }
 
         Booking booking = bookingOpt.get();
         if (!"confirmed".equalsIgnoreCase(booking.getStatus())) {
-            response.put("success", false);
-            response.put("message", "Chỉ có thể nhận phòng cho đơn đã xác nhận.");
-            return ResponseEntity.badRequest().body(response);
+            return badRequestResponse("Chỉ có thể nhận phòng cho đơn đã xác nhận.");
         }
         if (booking.getDetails() == null || booking.getDetails().isEmpty()) {
-            response.put("success", false);
-            response.put("message", "Đơn lưu trú không có phòng.");
-            return ResponseEntity.badRequest().body(response);
+            return badRequestResponse("Đơn lưu trú không có phòng.");
         }
 
         BookingDetail detail = booking.getDetails().get(0);
         if (detail.getCheckInActual() != null && detail.getCheckOutActual() == null) {
-            response.put("success", false);
-            response.put("message", "Khách đã nhận phòng rồi.");
-            return ResponseEntity.badRequest().body(response);
+            return badRequestResponse("Khách đã nhận phòng rồi.");
         }
         if (detail.getCheckOutActual() != null) {
-            response.put("success", false);
-            response.put("message", "Đơn này đã checkout, không thể check-in lại.");
-            return ResponseEntity.badRequest().body(response);
+            return badRequestResponse("Đơn này đã checkout, không thể check-in lại.");
         }
 
         LocalDateTime now = LocalDateTime.now();
         try {
             bookingService.validateAdminCheckInTime(detail, now);
         } catch (IllegalArgumentException ex) {
-            response.put("success", false);
-            response.put("message", ex.getMessage());
-            return ResponseEntity.badRequest().body(response);
+            return badRequestResponse(ex.getMessage());
         }
 
         if (detail.getRoom() != null && "maintenance".equalsIgnoreCase(detail.getRoom().getStatus())) {
-            response.put("success", false);
-            response.put("message", "Phòng đang ở trạng thái bảo trì, không thể check-in.");
-            return ResponseEntity.badRequest().body(response);
+            return badRequestResponse("Phòng đang ở trạng thái bảo trì, không thể check-in.");
         }
 
         detail.setCheckInActual(now);
         detail.setCheckOutActual(null);
         bookingDetailRepository.save(detail);
 
-        response.put("success", true);
-        response.put("message", "Đã nhận phòng thành công.");
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Đã nhận phòng thành công.",
+                reloadBookingResponse(booking.getId())
+        ));
     }
 
     @PostMapping("/admin/bookings/{id}/approve")
-    public ResponseEntity<Map<String, Object>> approveAdminBooking(@PathVariable("id") Integer id) {
+    public ResponseEntity<ApiResponse<BookingResponse>> approveAdminBooking(@PathVariable("id") Integer id,
+                                                                            HttpSession session) {
+        ResponseEntity<ApiResponse<BookingResponse>> authError = requireBackofficeAccess(session);
+        if (authError != null) {
+            return authError;
+        }
+
         Optional<Booking> bookingOpt = bookingRepository.findById(id);
-        Map<String, Object> response = new HashMap<>();
         if (bookingOpt.isEmpty()) {
-            response.put("success", false);
-            response.put("message", "Đơn không tồn tại.");
-            return ResponseEntity.badRequest().body(response);
+            return badRequestResponse("Đơn không tồn tại.");
         }
         Booking booking = bookingOpt.get();
         bookingService.normalizeBookingFinancials(booking);
-        if (!"pending".equals(booking.getStatus())) {
-            response.put("success", false);
+        if (!"pending".equalsIgnoreCase(booking.getStatus())) {
             if ("expired".equalsIgnoreCase(booking.getStatus())) {
-                response.put("message", "Đơn này đã hết hạn giữ chỗ nên không thể duyệt nữa.");
-            } else if ("cancelled".equalsIgnoreCase(booking.getStatus())) {
-                response.put("message", "Đơn này đã bị hủy nên không thể duyệt.");
-            } else if ("confirmed".equalsIgnoreCase(booking.getStatus())) {
-                response.put("message", "Đơn này đã được duyệt trước đó.");
-            } else if ("completed".equalsIgnoreCase(booking.getStatus())) {
-                response.put("message", "Đơn này đã hoàn thành nên không thể duyệt lại.");
-            } else {
-                response.put("message", "Chỉ có thể duyệt đơn đang chờ.");
+                return badRequestResponse("Đơn này đã hết hạn giữ chỗ nên không thể duyệt nữa.");
             }
-            return ResponseEntity.badRequest().body(response);
+            if ("cancelled".equalsIgnoreCase(booking.getStatus())) {
+                return badRequestResponse("Đơn này đã bị hủy nên không thể duyệt.");
+            }
+            if ("confirmed".equalsIgnoreCase(booking.getStatus())) {
+                return badRequestResponse("Đơn này đã được duyệt trước đó.");
+            }
+            if ("completed".equalsIgnoreCase(booking.getStatus())) {
+                return badRequestResponse("Đơn này đã hoàn thành nên không thể duyệt lại.");
+            }
+            return badRequestResponse("Chỉ có thể duyệt đơn đang chờ.");
         }
         booking.setStatus("confirmed");
         booking.setPaymentStatus(bookingService.normalizeAdminPaymentStatus(booking.getPaymentStatus(), "confirmed"));
         bookingRepository.save(booking);
-        response.put("success", true);
-        response.put("message", "Đã duyệt đơn phòng.");
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Đã duyệt đơn phòng.",
+                reloadBookingResponse(booking.getId())
+        ));
     }
 
     @PostMapping("/admin/bookings/{id}/collect-cash-payment")
-    public ResponseEntity<Map<String, Object>> collectCashPayment(@PathVariable("id") Integer id) {
-        Map<String, Object> response = new HashMap<>();
+    public ResponseEntity<ApiResponse<BookingResponse>> collectCashPayment(@PathVariable("id") Integer id,
+                                                                           HttpSession session) {
+        ResponseEntity<ApiResponse<BookingResponse>> authError = requireBackofficeAccess(session);
+        if (authError != null) {
+            return authError;
+        }
+
         try {
             Booking booking = paymentService.collectCashPayment(id);
-            response.put("success", true);
-            response.put("message", "Đã ghi nhận thanh toán tiền mặt.");
-            response.put("bookingId", booking.getId());
-            response.put("bookingStatus", booking.getStatus());
-            response.put("paymentStatus", booking.getPaymentStatus());
-            response.put("booking", bookingService.normalizeBookingFinancials(booking));
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(ApiResponse.ok(
+                    "Đã ghi nhận thanh toán tiền mặt.",
+                    reloadBookingResponse(booking.getId())
+            ));
         } catch (IllegalArgumentException ex) {
-            response.put("success", false);
-            response.put("message", ex.getMessage());
-            return ResponseEntity.badRequest().body(response);
+            return badRequestResponse(ex.getMessage());
         }
     }
 
     @DeleteMapping("/admin/bookings/{id}")
-    public ResponseEntity<Map<String, Object>> deleteAdminBooking(@PathVariable("id") Integer id) {
-        Map<String, Object> response = new HashMap<>();
-        Optional<Booking> bookingOpt = bookingRepository.findById(id);
-        if (bookingOpt.isEmpty()) {
-            response.put("success", false);
-            response.put("message", "Không tìm thấy đơn đặt phòng.");
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    public ResponseEntity<ApiResponse<Void>> deleteAdminBooking(@PathVariable("id") Integer id,
+                                                                HttpSession session) {
+        ResponseEntity<ApiResponse<Void>> authError = requireBackofficeAccess(session);
+        if (authError != null) {
+            return authError;
         }
 
-        response.put("success", false);
-        response.put("message", "GOAT HOTEL không hỗ trợ xóa cứng booking. Hãy giữ đơn ở trạng thái cancelled để lưu lịch sử.");
-        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
+        if (bookingRepository.findById(id).isEmpty()) {
+            return notFoundResponse("Không tìm thấy đơn đặt phòng.");
+        }
+
+        return methodNotAllowedResponse("GOAT HOTEL không hỗ trợ xóa cứng booking. Hãy giữ đơn ở trạng thái cancelled để lưu lịch sử.");
     }
 }

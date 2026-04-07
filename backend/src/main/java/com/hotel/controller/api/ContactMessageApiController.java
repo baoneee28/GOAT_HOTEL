@@ -1,7 +1,10 @@
 package com.hotel.controller.api;
 
+import com.hotel.dto.ContactMessageCreateRequest;
+import com.hotel.dto.ContactMessageUpdateRequest;
 import com.hotel.entity.ContactMessage;
 import com.hotel.service.ContactMessageService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -19,23 +22,13 @@ public class ContactMessageApiController {
     private ContactMessageService contactMessageService;
 
     @PostMapping("/contact")
-    public ResponseEntity<Map<String, Object>> createMessage(@RequestBody Map<String, String> payload) {
-        String firstName = payload.get("firstName");
-        String lastName = payload.get("lastName");
-        String email = payload.get("email");
-        String message = payload.get("message");
-
-        if (firstName == null || firstName.isBlank()
-                || lastName == null || lastName.isBlank()
-                || email == null || email.isBlank()
-                || message == null || message.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", "Vui lòng nhập đầy đủ họ tên, email và nội dung."
-            ));
-        }
-
-        ContactMessage created = contactMessageService.createMessage(firstName, lastName, email, message);
+    public ResponseEntity<Map<String, Object>> createMessage(@Valid @RequestBody ContactMessageCreateRequest request) {
+        ContactMessage created = contactMessageService.createMessage(
+                request.firstName(),
+                request.lastName(),
+                request.email(),
+                request.message()
+        );
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Đã gửi tin nhắn thành công.",
@@ -50,7 +43,8 @@ public class ContactMessageApiController {
             @RequestParam(defaultValue = "1") int page) {
         Page<ContactMessage> messagePage;
         try {
-            messagePage = contactMessageService.getAdminMessages(q, status, page, 8);
+            int safePage = normalizePage(page);
+            messagePage = contactMessageService.getAdminMessages(q, status, safePage, 8);
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
@@ -87,7 +81,7 @@ public class ContactMessageApiController {
 
     @PutMapping("/admin/contact-messages/{id}")
     public ResponseEntity<Map<String, Object>> updateAdminMessage(@PathVariable Integer id,
-                                                                  @RequestBody Map<String, String> payload) {
+                                                                  @Valid @RequestBody ContactMessageUpdateRequest request) {
         Optional<ContactMessage> messageOpt = contactMessageService.getMessageById(id);
         if (messageOpt.isEmpty()) {
             return ResponseEntity.status(404).body(Map.of(
@@ -99,8 +93,8 @@ public class ContactMessageApiController {
         try {
             ContactMessage updated = contactMessageService.updateMessage(
                     messageOpt.get(),
-                    payload.get("status"),
-                    payload.get("adminNote")
+                    request.status(),
+                    request.adminNote()
             );
             return ResponseEntity.ok(Map.of(
                     "success", true,
@@ -129,5 +123,9 @@ public class ContactMessageApiController {
                 "success", true,
                 "message", "Đã xóa liên hệ."
         ));
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(1, page);
     }
 }

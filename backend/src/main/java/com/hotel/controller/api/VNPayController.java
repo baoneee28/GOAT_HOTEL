@@ -1,11 +1,16 @@
 package com.hotel.controller.api;
 
 import com.hotel.config.VNPayConfig;
+import com.hotel.dto.BookingResponse;
+import com.hotel.dto.VNPayDemoSuccessRequest;
 import com.hotel.entity.User;
 import com.hotel.service.BookingService;
 import com.hotel.service.VNPayService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -23,6 +28,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/vnpay")
 public class VNPayController {
+
+    private static final Logger log = LoggerFactory.getLogger(VNPayController.class);
 
     @Autowired
     private VNPayService vnPayService;
@@ -71,9 +78,10 @@ public class VNPayController {
             response.put("message", ex.getMessage());
             return ResponseEntity.badRequest().body(response);
         } catch (Exception ex) {
+            log.error("VNPay create-payment failed for bookingId={}", bookingId, ex);
             response.put("success", false);
-            response.put("message", ex.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            response.put("message", "Không thể khởi tạo thanh toán VNPay lúc này.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 
@@ -92,7 +100,7 @@ public class VNPayController {
 
     @PostMapping("/demo-success")
     public ResponseEntity<Map<String, Object>> demoSuccess(
-            @RequestBody Map<String, String> payload,
+            @Valid @RequestBody VNPayDemoSuccessRequest request,
             HttpSession session
     ) {
         User currentUser = getSessionUser(session);
@@ -102,8 +110,8 @@ public class VNPayController {
 
         Map<String, Object> response = new HashMap<>();
         try {
-            Integer bookingId = Integer.parseInt(payload.get("bookingId"));
-            String paymentMode = VNPayConfig.normalizePaymentMode(payload.get("paymentMode"));
+            Integer bookingId = request.bookingId();
+            String paymentMode = VNPayConfig.normalizePaymentMode(request.paymentMode());
             var booking = vnPayService.confirmDemoPayment(bookingId, currentUser.getId(), paymentMode);
             response.put("success", true);
             response.put(
@@ -116,12 +124,8 @@ public class VNPayController {
             response.put("bookingStatus", booking.getStatus());
             response.put("paymentStatus", booking.getPaymentStatus());
             response.put("paymentMode", paymentMode);
-            response.put("booking", bookingService.normalizeBookingFinancials(booking));
+            response.put("booking", BookingResponse.from(bookingService.normalizeBookingFinancials(booking)));
             return ResponseEntity.ok(response);
-        } catch (NumberFormatException ex) {
-            response.put("success", false);
-            response.put("message", "Ma booking khong hop le.");
-            return ResponseEntity.badRequest().body(response);
         } catch (SecurityException ex) {
             response.put("success", false);
             response.put("message", ex.getMessage());
@@ -130,6 +134,11 @@ public class VNPayController {
             response.put("success", false);
             response.put("message", ex.getMessage());
             return ResponseEntity.badRequest().body(response);
+        } catch (Exception ex) {
+            log.error("VNPay demo-success failed for bookingId={}", request.bookingId(), ex);
+            response.put("success", false);
+            response.put("message", "Không thể xác nhận thanh toán demo lúc này.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 }

@@ -5,6 +5,7 @@ import com.hotel.entity.RoomType;
 import com.hotel.repository.RoomRepository;
 import com.hotel.repository.RoomTypeRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +14,7 @@ import java.util.Comparator;
 import java.util.List;
 
 @Component
+@ConditionalOnProperty(name = "app.seed-maintenance-rooms", havingValue = "true")
 public class MaintenanceRoomSeedRunner implements CommandLineRunner {
 
     private final RoomRepository roomRepository;

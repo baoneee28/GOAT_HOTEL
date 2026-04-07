@@ -19,6 +19,7 @@ import com.hotel.repository.UserRepository;
 import com.hotel.service.BookingService;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
@@ -34,7 +35,11 @@ import java.util.Map;
 import java.util.Optional;
 
 @Component
+@ConditionalOnProperty(name = "app.seed-demo-data", havingValue = "true")
 public class AdminDemoDataSeedRunner implements CommandLineRunner {
+
+    private static final String DEMO_ADMIN_PASSWORD_HASH = "$2a$10$xFm5bx0.lwf/YPDD1ntz2.1CdBUrPwPD4fBMEsDEg6BEKSD1QVQ2K";
+    private static final String DEMO_CUSTOMER_PASSWORD_HASH = "$2a$10$32aQr.C2VTnaNSCd4Htn1ugl5P6cd/dnb9tejR8JFzW.y0YeF/f42";
 
     @Value("${booking.pending-hold-seconds:180}")
     private long pendingHoldSeconds;
@@ -87,13 +92,13 @@ public class AdminDemoDataSeedRunner implements CommandLineRunner {
 
     private Map<String, User> ensureUsers(LocalDateTime now) {
         List<UserSeed> seeds = List.of(
-                new UserSeed("demo_admin", "GOAT Demo Admin", "demo.admin@goathotel.local", "0909000100", "admin", "admin123", now.minusDays(40)),
-                new UserSeed("customer_a", "Nguyen Bao An", "bao.an.demo@goathotel.local", "0909000101", "customer", "demo123", now.minusDays(30)),
-                new UserSeed("customer_b", "Tran Minh Binh", "minh.binh.demo@goathotel.local", "0909000102", "customer", "demo123", now.minusDays(26)),
-                new UserSeed("customer_c", "Le Thu Chi", "thu.chi.demo@goathotel.local", "0909000103", "customer", "demo123", now.minusDays(22)),
-                new UserSeed("customer_d", "Pham Hoang Duong", "hoang.duong.demo@goathotel.local", "0909000104", "customer", "demo123", now.minusDays(18)),
-                new UserSeed("customer_e", "Vo Anh Em", "anh.em.demo@goathotel.local", "0909000105", "customer", "demo123", now.minusDays(12)),
-                new UserSeed("customer_f", "Dang Gia Huy", "gia.huy.demo@goathotel.local", "0909000106", "customer", "demo123", now.minusDays(8))
+                new UserSeed("demo_admin", "GOAT Demo Admin", "demo.admin@goathotel.local", "0909000100", "admin", DEMO_ADMIN_PASSWORD_HASH, now.minusDays(40)),
+                new UserSeed("customer_a", "Nguyen Bao An", "bao.an.demo@goathotel.local", "0909000101", "customer", DEMO_CUSTOMER_PASSWORD_HASH, now.minusDays(30)),
+                new UserSeed("customer_b", "Tran Minh Binh", "minh.binh.demo@goathotel.local", "0909000102", "customer", DEMO_CUSTOMER_PASSWORD_HASH, now.minusDays(26)),
+                new UserSeed("customer_c", "Le Thu Chi", "thu.chi.demo@goathotel.local", "0909000103", "customer", DEMO_CUSTOMER_PASSWORD_HASH, now.minusDays(22)),
+                new UserSeed("customer_d", "Pham Hoang Duong", "hoang.duong.demo@goathotel.local", "0909000104", "customer", DEMO_CUSTOMER_PASSWORD_HASH, now.minusDays(18)),
+                new UserSeed("customer_e", "Vo Anh Em", "anh.em.demo@goathotel.local", "0909000105", "customer", DEMO_CUSTOMER_PASSWORD_HASH, now.minusDays(12)),
+                new UserSeed("customer_f", "Dang Gia Huy", "gia.huy.demo@goathotel.local", "0909000106", "customer", DEMO_CUSTOMER_PASSWORD_HASH, now.minusDays(8))
         );
 
         Map<String, User> users = new LinkedHashMap<>();
@@ -104,7 +109,7 @@ public class AdminDemoDataSeedRunner implements CommandLineRunner {
             user.setPhone(seed.phone());
             user.setRole(seed.role());
             if (user.getPassword() == null || user.getPassword().isBlank()) {
-                user.setPassword(seed.password());
+                user.setPassword(seed.passwordHash());
             }
             if (user.getCreatedAt() == null) {
                 user.setCreatedAt(seed.createdAt());
@@ -427,7 +432,7 @@ public class AdminDemoDataSeedRunner implements CommandLineRunner {
             String email,
             String phone,
             String role,
-            String password,
+            String passwordHash,
             LocalDateTime createdAt
     ) {
     }

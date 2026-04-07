@@ -40,6 +40,8 @@ bin/
 # Environment files
 .env
 .env.local
+backend/application-local.properties
+backend/src/main/resources/application-local.properties
 
 # Build files
 *.class

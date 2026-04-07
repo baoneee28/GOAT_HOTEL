@@ -122,7 +122,7 @@ export default function Profile() {
     fetchProfile();
 
     axios.get(`${API_BASE}/api/bookings/history?page=1`, { withCredentials: true })
-      .then(res => setRecentBookings((res.data?.bookings || []).slice(0, 3)))
+      .then((res) => setRecentBookings((res.data?.data || []).slice(0, 3)))
       .catch(() => {});
   }, [currentUserId]);
 

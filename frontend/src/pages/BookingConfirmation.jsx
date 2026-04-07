@@ -176,12 +176,13 @@ export default function BookingConfirmation() {
         paymentFlow,
         couponCode: appliedCouponCode || null,
       }, { withCredentials: true });
-      if (res.data?.success) {
-        return res.data;
+      const response = res.data;
+      if (response?.success) {
+        return response;
       }
 
-      if (window.Swal) window.Swal.fire('Lỗi', res.data?.message || 'Có lỗi khi đặt phòng.', 'error');
-      else alert(res.data?.message || 'Có lỗi khi đặt phòng.');
+      if (window.Swal) window.Swal.fire('Lỗi', response?.message || 'Có lỗi khi đặt phòng.', 'error');
+      else alert(response?.message || 'Có lỗi khi đặt phòng.');
     } catch (err) {
       console.error(err);
       if (err.response?.status === 401) {
@@ -297,8 +298,9 @@ export default function BookingConfirmation() {
     try {
       const result = await createBooking('standard_request');
       if (!result?.success) return;
+      const createdBooking = result?.data;
 
-      if (!result.bookingId) {
+      if (!createdBooking?.id) {
         if (window.Swal) {
           window.Swal.fire('Thiếu dữ liệu', 'Booking đã được tạo nhưng chưa lấy được mã đơn để mở trang chi tiết.', 'warning')
             .then(() => navigate('/history'));
@@ -311,10 +313,10 @@ export default function BookingConfirmation() {
 
       if (window.Swal) {
         window.Swal.fire('Thành công', result.message || 'Đã tạo booking giữ chỗ!', 'success')
-          .then(() => navigate(`/booking/${result.bookingId}`));
+          .then(() => navigate(`/booking/${createdBooking.id}`));
       } else {
         alert(result.message || 'Đã tạo booking giữ chỗ!');
-        navigate(`/booking/${result.bookingId}`);
+        navigate(`/booking/${createdBooking.id}`);
       }
     } finally {
       setSubmitting(false);

@@ -7,7 +7,10 @@ import com.hotel.repository.RoomTypeItemRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,6 +25,8 @@ public class RoomStatusService {
 
     private static final DateTimeFormatter RESERVATION_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM");
     private static final DateTimeFormatter HOLD_UNTIL_FORMATTER = DateTimeFormatter.ofPattern("HH:mm dd/MM");
+    private static final LocalTime FILTER_START_TIME = LocalTime.of(0, 0);
+    private static final LocalTime FILTER_END_TIME = LocalTime.of(23, 59);
 
     @Autowired
     private RoomRepository roomRepository;
@@ -146,8 +151,8 @@ public class RoomStatusService {
             return null;
         }
 
-        LocalDateTime start = parseDateTimeParam(availableFrom);
-        LocalDateTime end = parseDateTimeParam(availableTo);
+        LocalDateTime start = parseDateTimeParam(availableFrom, FILTER_START_TIME);
+        LocalDateTime end = parseDateTimeParam(availableTo, FILTER_END_TIME);
         if (!end.isAfter(start)) {
             throw new IllegalArgumentException("Khoang thoi gian tim phong trong khong hop le.");
         }
@@ -161,15 +166,23 @@ public class RoomStatusService {
         return availableRoomIds;
     }
 
-    private LocalDateTime parseDateTimeParam(String value) {
+    private LocalDateTime parseDateTimeParam(String value, LocalTime defaultTime) {
         String normalized = value == null ? "" : value.trim();
-        if (normalized.contains("T")) {
-            normalized = normalized.replace("T", " ");
+        if (normalized.isBlank()) {
+            throw new IllegalArgumentException("Khoang thoi gian tim phong trong khong hop le.");
         }
-        if (normalized.length() == 10) {
-            normalized += " 12:00";
+
+        try {
+            if (normalized.length() == 10) {
+                return LocalDate.parse(normalized).atTime(defaultTime);
+            }
+            if (normalized.contains(" ")) {
+                normalized = normalized.replace(" ", "T");
+            }
+            return LocalDateTime.parse(normalized);
+        } catch (DateTimeParseException ex) {
+            throw new IllegalArgumentException("Khoang thoi gian tim phong trong khong hop le.");
         }
-        return LocalDateTime.parse(normalized, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
     }
 
     private void applyRoomTypeItemCounts(List<Room> rooms) {

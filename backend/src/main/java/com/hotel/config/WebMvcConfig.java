@@ -59,7 +59,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addResourceHandler("/**")
                 .addResourceLocations("file:../frontend/static/");
 
-        // Ảnh upload từ admin chỉ phục vụ từ backend static/uploads/<table>.
+        // Anh upload duoc phuc vu tu thu muc ngoai classpath /uploads/**.
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations(resolveUploadResourceLocation());
 

@@ -1,24 +1,36 @@
 package com.hotel.controller.api;
 
+import com.hotel.dto.ApiResponse;
+import com.hotel.dto.ForgotPasswordRequest;
+import com.hotel.dto.LoginRequest;
+import com.hotel.dto.RegisterRequest;
+import com.hotel.dto.UserResponse;
+import com.hotel.dto.VerifyResetRequest;
 import com.hotel.entity.PasswordResetCode;
 import com.hotel.entity.User;
 import com.hotel.repository.PasswordResetCodeRepository;
 import com.hotel.repository.UserRepository;
 import com.hotel.service.AuthService;
 import com.hotel.service.EmailService;
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthApiController {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthApiController.class);
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Autowired
     private AuthService authService;
@@ -38,7 +50,7 @@ public class AuthApiController {
         Object userObj = session.getAttribute("user");
         if (userObj instanceof User user) {
             response.put("authenticated", true);
-            response.put("user", authService.toClientUser(user));
+            response.put("user", UserResponse.from(user));
             response.put("role", authService.resolveClientRole(user));
             response.put("redirectTo", authService.resolveDefaultRedirect(user));
         } else {
@@ -49,16 +61,15 @@ public class AuthApiController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> payload, jakarta.servlet.http.HttpSession session) {
-        String email = payload.get("email");
-        String password = payload.get("password");
-        User user = authService.login(email, password, session);
+    public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request,
+                                                      jakarta.servlet.http.HttpSession session) {
+        User user = authService.login(request.email(), request.password(), session);
         Map<String, Object> response = new HashMap<>();
         if (user != null) {
             response.put("success", true);
             response.put("authenticated", true);
             response.put("message", "Đăng nhập thành công!");
-            response.put("user", authService.toClientUser(user));
+            response.put("user", UserResponse.from(user));
             response.put("role", authService.resolveClientRole(user));
             response.put("redirectTo", authService.resolveDefaultRedirect(user));
             return ResponseEntity.ok(response);
@@ -71,27 +82,16 @@ public class AuthApiController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<Map<String, Object>> register(@RequestBody Map<String, String> payload) {
-        String fullname = payload.get("fullname");
-        String email = payload.get("email");
-        String phone = payload.get("phone");
-        String password = payload.get("password");
-        Map<String, Object> response = new HashMap<>();
+    public ResponseEntity<ApiResponse<Void>> register(@Valid @RequestBody RegisterRequest request) {
         try {
-            String errorMsg = authService.register(fullname, email, password, phone);
+            String errorMsg = authService.register(request.fullname(), request.email(), request.password(), request.phone());
             if (errorMsg != null) {
-                response.put("success", false);
-                response.put("message", errorMsg);
-                return ResponseEntity.badRequest().body(response);
-            } else {
-                response.put("success", true);
-                response.put("message", "Đăng ký thành công! Vui lòng đăng nhập.");
-                return ResponseEntity.ok(response);
+                return ResponseEntity.badRequest().body(ApiResponse.<Void>error(errorMsg));
             }
+            return ResponseEntity.ok(ApiResponse.okMessage("Đăng ký thành công! Vui lòng đăng nhập."));
         } catch (Exception ex) {
-            response.put("success", false);
-            response.put("message", "Có lỗi hệ thống: " + ex.getMessage());
-            return ResponseEntity.status(500).body(response);
+            log.error("Registration error for email={}", request.email(), ex);
+            return ResponseEntity.status(500).body(ApiResponse.<Void>error("Có lỗi hệ thống. Vui lòng thử lại."));
         }
     }
 
@@ -107,18 +107,16 @@ public class AuthApiController {
 
     // Bước 1: Gửi OTP tới email
     @PostMapping("/forgot-password-request")
-    public ResponseEntity<Map<String, Object>> forgotPasswordRequest(@RequestBody Map<String, String> payload) {
-        String email = payload.get("email");
-        Map<String, Object> response = new HashMap<>();
+    public ResponseEntity<ApiResponse<Void>> forgotPasswordRequest(@Valid @RequestBody ForgotPasswordRequest request) {
+        String email = request.email();
 
         Optional<User> optUser = userRepository.findByEmail(email);
         if (optUser.isEmpty()) {
-            response.put("success", true);
-            response.put("message", "Nếu email tồn tại, mã OTP sẽ được gửi tới hộp thư của bạn.");
-            return ResponseEntity.ok(response);
+            // Trả về thành công để tránh enumeration attack
+            return ResponseEntity.ok(ApiResponse.okMessage("Nếu email tồn tại, mã OTP sẽ được gửi tới hộp thư của bạn."));
         }
 
-        String otp = String.format("%06d", new Random().nextInt(1000000));
+        String otp = String.format("%06d", SECURE_RANDOM.nextInt(1000000));
 
         PasswordResetCode code = new PasswordResetCode();
         code.setEmail(email);
@@ -130,57 +128,36 @@ public class AuthApiController {
         try {
             emailService.sendPasswordResetOtp(email, otp);
         } catch (Exception e) {
-            e.printStackTrace();
-            response.put("success", false);
-            response.put("message", "Lỗi: " + e.getMessage());
-            return ResponseEntity.status(500).body(response);
+            log.error("Failed to send OTP to email={}", email, e);
+            return ResponseEntity.status(500).body(ApiResponse.<Void>error("Gửi email thất bại. Vui lòng thử lại."));
         }
 
-        response.put("success", true);
-        response.put("message", "Mã OTP đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư.");
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.okMessage("Mã OTP đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư."));
     }
 
     // Bước 2: Xác thực OTP + đặt mật khẩu mới
     @PostMapping("/verify-reset")
-    public ResponseEntity<Map<String, Object>> verifyReset(@RequestBody Map<String, String> payload) {
-        String email = payload.get("email");
-        String otp = payload.get("otp");
-        String newPassword = payload.get("newPassword");
-        Map<String, Object> response = new HashMap<>();
-
-        if (email == null || otp == null || newPassword == null || newPassword.length() < 6) {
-            response.put("success", false);
-            response.put("message", "Vui lòng điền đầy đủ thông tin. Mật khẩu tối thiểu 6 ký tự.");
-            return ResponseEntity.badRequest().body(response);
-        }
-
+    public ResponseEntity<ApiResponse<Void>> verifyReset(@Valid @RequestBody VerifyResetRequest request) {
         Optional<PasswordResetCode> optCode = resetCodeRepository
-                .findTopByEmailAndIsUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(email, LocalDateTime.now());
+                .findTopByEmailAndIsUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(request.email(), LocalDateTime.now());
 
-        if (optCode.isEmpty() || !optCode.get().getCode().equals(otp)) {
-            response.put("success", false);
-            response.put("message", "Mã OTP không đúng hoặc đã hết hạn. Vui lòng yêu cầu mã mới.");
-            return ResponseEntity.badRequest().body(response);
+        if (optCode.isEmpty() || !optCode.get().getCode().equals(request.otp())) {
+            return ResponseEntity.badRequest().body(ApiResponse.<Void>error("Mã OTP không đúng hoặc đã hết hạn. Vui lòng yêu cầu mã mới."));
         }
 
         PasswordResetCode code = optCode.get();
         code.setIsUsed(true);
         resetCodeRepository.save(code);
 
-        Optional<User> optUser = userRepository.findByEmail(email);
+        Optional<User> optUser = userRepository.findByEmail(request.email());
         if (optUser.isEmpty()) {
-            response.put("success", false);
-            response.put("message", "Không tìm thấy tài khoản.");
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.<Void>error("Không tìm thấy tài khoản."));
         }
 
         User user = optUser.get();
-        user.setPassword(newPassword);
+        user.setPassword(authService.encodePassword(request.newPassword()));
         userRepository.save(user);
 
-        response.put("success", true);
-        response.put("message", "Mật khẩu đã được đặt lại thành công! Vui lòng đăng nhập.");
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.okMessage("Mật khẩu đã được đặt lại thành công! Vui lòng đăng nhập."));
     }
 }

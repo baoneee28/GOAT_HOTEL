@@ -1,5 +1,8 @@
 package com.hotel.controller.api;
 
+import com.hotel.dto.AdminUserUpsertRequest;
+import com.hotel.dto.BookingResponse;
+import com.hotel.dto.UserResponse;
 import com.hotel.entity.Booking;
 import com.hotel.entity.User;
 import com.hotel.repository.BookingRepository;
@@ -16,11 +19,14 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/admin/users")
 
 public class UserApiController {
+
+    private static final Set<String> ALLOWED_ROLES = Set.of("customer", "staff", "admin");
 
     @Autowired
     private UserRepository userRepository;
@@ -34,15 +40,14 @@ public class UserApiController {
     @Autowired
     private AuthService authService;
 
-    private User sanitizeUser(User user) {
-        return authService.toClientUser(user);
+    private UserResponse toUserResponse(User user) {
+        return UserResponse.from(user);
     }
 
     @GetMapping("/all")
-    public List<User> getAllUsers() {
+    public List<UserResponse> getAllUsers() {
         List<User> users = userRepository.findAll(Sort.by("fullName").ascending());
-        users.forEach(this::sanitizeUser);
-        return users;
+        return UserResponse.fromList(users);
     }
 
     @GetMapping
@@ -51,73 +56,75 @@ public class UserApiController {
             @RequestParam(defaultValue = "1") int page) {
 
         int pageSize = 5;
+        int safePage = normalizePage(page);
         Page<User> userPage = userRepository.findWithSearch(
                 q.isBlank() ? null : q.trim(),
-                PageRequest.of(page - 1, pageSize, Sort.by("id").descending()));
-
-        userPage.getContent().forEach(this::sanitizeUser);
+                PageRequest.of(safePage - 1, pageSize, Sort.by("id").descending()));
 
         Map<String, Object> response = new HashMap<>();
-        response.put("users", userPage.getContent());
+        response.put("success", true);
+        response.put("users", UserResponse.fromList(userPage.getContent()));
         response.put("totalPages", userPage.getTotalPages());
-        response.put("currentPage", page);
+        response.put("currentPage", safePage);
         response.put("search", q);
 
         return ResponseEntity.ok(response);
     }
 
     @PostMapping
-    public ResponseEntity<Map<String, Object>> saveUser(@RequestBody Map<String, String> payload) {
-        String idStr = payload.get("id");
-        String fullName = payload.get("fullName");
-        String email = payload.get("email");
-        String phone = payload.get("phone");
-        String role = payload.get("role");
-        String password = payload.get("password");
-        String image = payload.get("image");
+    public ResponseEntity<Map<String, Object>> saveUser(@RequestBody AdminUserUpsertRequest request) {
+        try {
+            String fullName = normalizeText(request.fullName());
+            String email = normalizeText(request.email());
+            String phone = normalizeText(request.phone());
+            String role = normalizeRole(request.role());
+            String password = request.password();
+            String image = normalizeText(request.image());
 
-        User user;
-        if (idStr != null && !idStr.isBlank()) {
-            user = userRepository.findById(Integer.parseInt(idStr)).orElse(null);
-            if (user == null) {
-                return ResponseEntity.status(404).body(Map.of(
-                        "success", false,
-                        "message", "Không tìm thấy người dùng để cập nhật."
-                ));
+            User user;
+            if (request.id() != null && request.id() > 0) {
+                user = userRepository.findById(request.id()).orElse(null);
+                if (user == null) {
+                    return ResponseEntity.status(404).body(Map.of(
+                            "success", false,
+                            "message", "Không tìm thấy người dùng để cập nhật."
+                    ));
+                }
+                user.setRole(role);
+                user.setImage(image);
+                userRepository.save(user);
+            } else {
+                if (fullName == null || email == null || password == null || password.isBlank()) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                            "success", false,
+                            "message", "Họ tên, email và mật khẩu là bắt buộc."
+                    ));
+                }
+                if (userRepository.findByEmailIgnoreCase(email).isPresent()) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                            "success", false,
+                            "message", "Email này đã tồn tại trong hệ thống."
+                    ));
+                }
+                user = new User();
+                user.setFullName(fullName);
+                user.setEmail(email);
+                user.setPhone(phone);
+                user.setRole(role);
+                user.setPassword(authService.encodePassword(password));
+                user.setImage(image);
+                userRepository.save(user);
             }
-            if (role != null && !role.isBlank()) {
-                user.setRole(role.trim());
-            }
-            if (image != null) {
-                user.setImage(image.isBlank() ? null : image.trim());
-            }
-            userRepository.save(user);
-        } else {
-            if (fullName == null || fullName.isBlank() || email == null || email.isBlank() || password == null || password.isBlank()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "success", false,
-                        "message", "Họ tên, email và mật khẩu là bắt buộc."
-                ));
-            }
-            if (userRepository.findByEmailIgnoreCase(email.trim()).isPresent()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "success", false,
-                        "message", "Email này đã tồn tại trong hệ thống."
-                ));
-            }
-            user = new User();
-            user.setFullName(fullName.trim());
-            user.setEmail(email.trim());
-            user.setPhone(phone != null ? phone.trim() : null);
-            user.setRole(role != null && !role.isBlank() ? role.trim() : "customer");
-            user.setPassword(password);
-            user.setImage(image != null && !image.isBlank() ? image.trim() : null);
-            userRepository.save(user);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", ex.getMessage()
+            ));
         }
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")
@@ -147,23 +154,48 @@ public class UserApiController {
             ));
         }
 
+        int safePage = normalizePage(page);
         Page<Booking> bookingPage = bookingRepository.findAdminBookingsByUserId(
                 id,
                 status.isBlank() ? null : status.trim(),
-                PageRequest.of(page - 1, 5, Sort.by("id").descending())
+                PageRequest.of(safePage - 1, 5, Sort.by("id").descending())
         );
         bookingService.normalizeBookingFinancials(bookingPage.getContent());
         double totalSpent = bookingService.getTotalSpent(id);
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
-        response.put("user", sanitizeUser(user));
-        response.put("bookings", bookingPage.getContent());
+        response.put("user", toUserResponse(user));
+        response.put("bookings", BookingResponse.fromList(bookingPage.getContent()));
         response.put("totalPages", bookingPage.getTotalPages());
-        response.put("currentPage", page);
+        response.put("currentPage", safePage);
         response.put("status", status);
         response.put("totalSpent", totalSpent);
         response.put("totalBookings", bookingRepository.countByUserIdAndStatus(id, null));
         return ResponseEntity.ok(response);
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(1, page);
+    }
+
+    private String normalizeText(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        return normalized.isBlank() ? null : normalized;
+    }
+
+    private String normalizeRole(String role) {
+        String normalized = normalizeText(role);
+        if (normalized == null) {
+            return "customer";
+        }
+        String lowered = normalized.toLowerCase();
+        if (!ALLOWED_ROLES.contains(lowered)) {
+            throw new IllegalArgumentException("Vai trò người dùng không hợp lệ.");
+        }
+        return lowered;
     }
 }

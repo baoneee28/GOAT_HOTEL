@@ -9,7 +9,6 @@ import com.hotel.repository.RoomRepository;
 import com.hotel.repository.RoomTypeItemRepository;
 import com.hotel.repository.RoomTypeRepository;
 import com.hotel.repository.UserRepository;
-import com.hotel.service.BookingService;
 import com.hotel.service.PaymentService;
 import com.hotel.service.RoomStatusService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,9 +61,6 @@ public class AdminDashboardApiController {
     private RoomStatusService roomStatusService;
 
     @Autowired
-    private BookingService bookingService;
-
-    @Autowired
     private PaymentService paymentService;
 
     @GetMapping("/stats")
@@ -72,7 +68,6 @@ public class AdminDashboardApiController {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            bookingService.expirePendingBookings();
             response.put("total_revenue", paymentService.getTotalCollectedRevenue());
 
             response.put("total_customers", userRepository.countByRole("customer"));

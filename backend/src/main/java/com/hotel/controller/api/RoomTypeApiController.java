@@ -1,6 +1,7 @@
 
 package com.hotel.controller.api;
 
+import com.hotel.dto.AdminRoomTypeUpsertRequest;
 import com.hotel.entity.RoomType;
 import com.hotel.entity.RoomTypeItem;
 import com.hotel.entity.Item;
@@ -12,10 +13,16 @@ import com.hotel.repository.RoomRepository;
 import com.hotel.repository.BookingDetailRepository;
 import com.hotel.repository.FeaturedRoomTypeRepository;
 import com.hotel.service.FileUploadService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -24,6 +31,9 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/room-types")
 @SuppressWarnings("null")
 public class RoomTypeApiController {
+
+    private static final LocalTime DEFAULT_CHECK_IN_TIME = LocalTime.of(14, 0);
+    private static final LocalTime DEFAULT_CHECK_OUT_TIME = LocalTime.of(12, 0);
 
     @Autowired
     private RoomTypeRepository roomTypeRepository;
@@ -55,14 +65,8 @@ public class RoomTypeApiController {
         
         if (checkIn != null && !checkIn.isBlank() && checkOut != null && !checkOut.isBlank()) {
             try {
-                java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-                String startStr = checkIn.contains("T") ? checkIn.replace("T", " ") : checkIn;
-                String endStr = checkOut.contains("T") ? checkOut.replace("T", " ") : checkOut;
-                if (startStr.length() == 10) startStr += " 12:00";
-                if (endStr.length() == 10) endStr += " 12:00";
-                
-                java.time.LocalDateTime start = java.time.LocalDateTime.parse(startStr, formatter);
-                java.time.LocalDateTime end = java.time.LocalDateTime.parse(endStr, formatter);
+                LocalDateTime start = parseStayDate(checkIn, DEFAULT_CHECK_IN_TIME);
+                LocalDateTime end = parseStayDate(checkOut, DEFAULT_CHECK_OUT_TIME);
                 
                 List<Object[]> counts = roomTypeRepository.countAvailableRoomsByDate(start, end, java.time.LocalDateTime.now());
                 Map<Integer, Long> countMap = counts.stream()
@@ -107,25 +111,24 @@ public class RoomTypeApiController {
             @RequestParam(defaultValue = "") String q,
             @RequestParam(defaultValue = "1") int page) {
         int pageSize = 5;
+        int safePage = Math.max(1, page);
         org.springframework.data.domain.Page<RoomType> typePage = roomTypeRepository.findWithSearch(
                 q.isBlank() ? null : q,
-                org.springframework.data.domain.PageRequest.of(page - 1, pageSize, org.springframework.data.domain.Sort.by("id").descending())
+                org.springframework.data.domain.PageRequest.of(safePage - 1, pageSize, org.springframework.data.domain.Sort.by("id").descending())
         );
-        Map<String, Object> response = new java.util.HashMap<>();
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
         response.put("roomTypes", typePage.getContent());
         response.put("totalPages", typePage.getTotalPages());
-        response.put("currentPage", page);
+        response.put("currentPage", safePage);
         return org.springframework.http.ResponseEntity.ok(response);
     }
 
     @PostMapping("/admin")
     @Transactional
-    public org.springframework.http.ResponseEntity<Map<String, Object>> saveRoomType(@RequestBody Map<String, Object> payload) {
+    public org.springframework.http.ResponseEntity<Map<String, Object>> saveRoomType(@Valid @RequestBody AdminRoomTypeUpsertRequest request) {
         RoomType roomType;
-        Integer id = null;
-        if(payload.get("id") != null && !payload.get("id").toString().isBlank()) {
-            id = Integer.parseInt(payload.get("id").toString());
-        }
+        Integer id = request.id();
         
         if (id != null) {
             roomType = roomTypeRepository.findById(id).orElse(new RoomType());
@@ -133,14 +136,14 @@ public class RoomTypeApiController {
             roomType = new RoomType();
         }
         
-        roomType.setTypeName(payload.get("typeName").toString());
-        roomType.setPricePerNight(Double.parseDouble(payload.get("pricePerNight").toString()));
-        roomType.setCapacity(Integer.parseInt(payload.get("capacity").toString()));
-        roomType.setSize(payload.get("size") != null ? payload.get("size").toString() : "");
-        roomType.setBeds(payload.get("beds") != null ? payload.get("beds").toString() : "");
-        roomType.setView(payload.get("view") != null ? payload.get("view").toString() : "");
-        roomType.setDescription(payload.get("description") != null ? payload.get("description").toString() : "");
-        roomType.setImage(payload.get("image") != null ? payload.get("image").toString() : "");
+        roomType.setTypeName(request.typeName().trim());
+        roomType.setPricePerNight(request.pricePerNight());
+        roomType.setCapacity(request.capacity());
+        roomType.setSize(request.size() != null ? request.size().trim() : "");
+        roomType.setBeds(request.beds() != null ? request.beds().trim() : "");
+        roomType.setView(request.view() != null ? request.view().trim() : "");
+        roomType.setDescription(request.description() != null ? request.description().trim() : "");
+        roomType.setImage(request.image() != null ? request.image().trim() : "");
 
         roomType = roomTypeRepository.save(roomType);
         
@@ -149,26 +152,22 @@ public class RoomTypeApiController {
             roomTypeItemRepository.deleteByRoomTypeId(id);
         }
         
-        if (payload.get("itemsIds") != null) {
-            String itemsIdsStr = payload.get("itemsIds").toString();
-            if(!itemsIdsStr.isBlank()) {
-                String[] itemsIdArray = itemsIdsStr.split(",");
-                for (String itemIdStr : itemsIdArray) {
-                    try {
-                        Integer itemId = Integer.parseInt(itemIdStr.trim());
-                        Item item = itemRepository.findById(itemId).orElse(null);
-                        if(item != null){
-                            RoomTypeItem rti = new RoomTypeItem();
-                            rti.setRoomType(roomType);
-                            rti.setItem(item);
-                            roomTypeItemRepository.save(rti);
-                        }
-                    } catch(Exception ignored) {}
+        if (request.itemIds() != null) {
+            for (Integer itemId : request.itemIds()) {
+                if (itemId == null) {
+                    continue;
+                }
+                Item item = itemRepository.findById(itemId).orElse(null);
+                if (item != null) {
+                    RoomTypeItem rti = new RoomTypeItem();
+                    rti.setRoomType(roomType);
+                    rti.setItem(item);
+                    roomTypeItemRepository.save(rti);
                 }
             }
         }
         
-        Map<String, Object> response = new java.util.HashMap<>();
+        Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         return org.springframework.http.ResponseEntity.ok(response);
     }
@@ -224,6 +223,25 @@ public class RoomTypeApiController {
         }
         if (!featuredRoomTypes.isEmpty()) {
             featuredRoomTypeRepository.saveAll(featuredRoomTypes);
+        }
+    }
+
+    private LocalDateTime parseStayDate(String value, LocalTime defaultTime) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isBlank()) {
+            throw new IllegalArgumentException("Thoi gian luu tru khong hop le.");
+        }
+
+        try {
+            if (normalized.length() == 10) {
+                return LocalDate.parse(normalized).atTime(defaultTime);
+            }
+            if (normalized.contains(" ")) {
+                normalized = normalized.replace(" ", "T");
+            }
+            return LocalDateTime.parse(normalized);
+        } catch (DateTimeParseException ex) {
+            throw new IllegalArgumentException("Thoi gian luu tru khong hop le.");
         }
     }
 }

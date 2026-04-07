@@ -76,12 +76,12 @@ public class AdminNewsController {
 
         news.setContent(content);
 
-        // Xử lý logic tải ảnh bìa bài báo lên Server
+        // Xu ly viec tai anh bia bai viet
         String imgName = current_image;
-        // Nếu người dùng có chọn file ảnh mới
+        // Neu nguoi dung co chon file anh moi
         if (image != null && !image.isEmpty()) {
             try {
-                // Đẩy hàm upload vào FileUploadService lo
+                // FileUploadService xu ly va luu anh vao thu muc uploads ngoai classpath
                 imgName = fileUploadService.uploadNews(image);
             } catch (Exception ignored) {}
         }

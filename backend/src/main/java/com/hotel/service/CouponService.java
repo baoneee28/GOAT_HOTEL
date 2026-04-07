@@ -317,9 +317,19 @@ public class CouponService {
                                                       LocalDateTime checkOut,
                                                       Integer userCouponId,
                                                       String couponCode) {
+        return previewCouponSelection(user, roomId, checkIn, checkOut, userCouponId, couponCode, true);
+    }
+
+    public CouponPricingResult previewCouponSelection(User user,
+                                                      Integer roomId,
+                                                      LocalDateTime checkIn,
+                                                      LocalDateTime checkOut,
+                                                      Integer userCouponId,
+                                                      String couponCode,
+                                                      boolean couponRequired) {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new IllegalArgumentException("Phong khong ton tai."));
-        return evaluatePricing(room, checkIn, checkOut, user, userCouponId, couponCode, LocalDateTime.now(), true);
+        return evaluatePricing(room, checkIn, checkOut, user, userCouponId, couponCode, LocalDateTime.now(), couponRequired);
     }
 
     public CouponPricingResult evaluatePricing(Room room,
@@ -624,17 +634,11 @@ public class CouponService {
     }
 
     private double calculateSubtotal(LocalDateTime checkIn, LocalDateTime checkOut, double pricePerNight) {
-        long nights = calculateStayNights(checkIn, checkOut);
-        return Math.round(nights * pricePerNight);
+        return BookingPricingCalculator.summarize(checkIn, checkOut, pricePerNight).total();
     }
 
     private long calculateStayNights(LocalDateTime checkIn, LocalDateTime checkOut) {
-        if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
-            return 0;
-        }
-
-        long nights = java.time.temporal.ChronoUnit.DAYS.between(checkIn.toLocalDate(), checkOut.toLocalDate());
-        return Math.max(1, nights);
+        return BookingPricingCalculator.calculateStayNights(checkIn, checkOut);
     }
 
     private String normalizeOptionalCode(Object value) {

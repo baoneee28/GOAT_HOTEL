@@ -1,4 +1,6 @@
 package com.hotel.entity;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -22,6 +24,8 @@ public class Review {
     @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"details", "services", "payments", "user"})
     private Booking booking;
     @Column(name = "rating", nullable = false)
+    @Min(value = 1, message = "Rating phải nằm trong khoảng từ 1 đến 5.")
+    @Max(value = 5, message = "Rating phải nằm trong khoảng từ 1 đến 5.")
     private Integer rating;
     @Column(name = "comment", columnDefinition = "TEXT")
     private String comment;
@@ -29,7 +33,11 @@ public class Review {
     private LocalDateTime createdAt;
     
     @PrePersist
+    @PreUpdate
     protected void onCreate() {
+        if (rating == null || rating < 1 || rating > 5) {
+            throw new IllegalStateException("Rating phải nằm trong khoảng từ 1 đến 5.");
+        }
         if (createdAt == null) createdAt = LocalDateTime.now();
     }
 }

@@ -161,9 +161,11 @@ export default function History() {
       const params = new URLSearchParams({ page: pg });
       if (filter !== 'all') params.append('status', filter);
       const res = await axios.get(`${API_BASE}/api/bookings/history?${params}`, { withCredentials: true });
-      setBookings(res.data?.bookings || []);
-      setTotalPages(res.data?.totalPages || 1);
-      setStatusSummary({ ...EMPTY_STATUS_SUMMARY, ...(res.data?.statusSummary || {}) });
+      const payload = res.data || {};
+      const meta = payload.meta || {};
+      setBookings(payload.data || []);
+      setTotalPages(meta.totalPages || 1);
+      setStatusSummary({ ...EMPTY_STATUS_SUMMARY, ...(meta.statusSummary || {}) });
     } catch (err) {
       console.error('History fetch error:', err);
     } finally {

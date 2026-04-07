@@ -55,7 +55,9 @@ public class HistoryController {
         User user = (User) session.getAttribute("user");
         
         // Gọi Service thực hiện Hủy, bên trong Service đã có logic chốt chặn bảo mật (Chặn xóa trộm)
-        bookingService.cancelBooking(cancel_id, user.getId());
+        try {
+            bookingService.cancelBooking(cancel_id, user.getId());
+        } catch (RuntimeException ignored) {}
 
         return "redirect:/history"; // Đá lại trang đầu
     }

@@ -8,12 +8,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 
 // Service xử lý toàn bộ nghiệp vụ Xác thực người dùng (Đăng nhập, Đăng ký, Đăng xuất)
 @Service
 public class AuthService {
+
+    public static final String SESSION_USER_KEY = "user";
+    public static final String SESSION_VERSION_KEY = "sessionVersion";
 
     private static final Pattern BCRYPT_PATTERN = Pattern.compile("^\\$2[aby]\\$\\d{2}\\$[./A-Za-z0-9]{53}$");
 
@@ -108,12 +112,12 @@ public class AuthService {
 
         if (!isPasswordHashed(storedPassword)) {
             user.setPassword(encodePassword(storedPassword));
-            user = userRepository.save(user);
         }
 
-        if (session != null) {
-            session.setAttribute("user", user);
-        }
+        user.setSessionVersion(nextSessionVersion(user.getSessionVersion()));
+        user = userRepository.save(user);
+
+        attachAuthenticatedUser(session, user);
         return user;
     }
 
@@ -143,7 +147,71 @@ public class AuthService {
 
     
     public void logout(HttpSession session) {
+        if (session == null) {
+            return;
+        }
         session.invalidate();
+    }
+
+    public User getValidSessionUser(HttpSession session) {
+        if (session == null) {
+            return null;
+        }
+
+        Object userObj = session.getAttribute(SESSION_USER_KEY);
+        if (!(userObj instanceof User sessionUser)) {
+            return null;
+        }
+
+        Integer sessionVersion = extractSessionVersion(session.getAttribute(SESSION_VERSION_KEY));
+        if (sessionUser.getId() == null || sessionVersion == null) {
+            invalidateQuietly(session);
+            return null;
+        }
+
+        Optional<User> optUser = userRepository.findById(sessionUser.getId());
+        if (optUser.isEmpty()) {
+            invalidateQuietly(session);
+            return null;
+        }
+
+        User currentUser = optUser.get();
+        if (currentUser.getSessionVersion() == null
+                || !Objects.equals(currentUser.getSessionVersion(), sessionVersion)) {
+            invalidateQuietly(session);
+            return null;
+        }
+
+        attachAuthenticatedUser(session, currentUser);
+        return currentUser;
+    }
+
+    private void attachAuthenticatedUser(HttpSession session, User user) {
+        if (session == null || user == null) {
+            return;
+        }
+
+        session.setAttribute(SESSION_USER_KEY, user);
+        session.setAttribute(SESSION_VERSION_KEY, user.getSessionVersion());
+    }
+
+    private Integer extractSessionVersion(Object rawValue) {
+        if (rawValue instanceof Number number) {
+            return number.intValue();
+        }
+        return null;
+    }
+
+    private int nextSessionVersion(Integer currentVersion) {
+        return currentVersion == null ? 1 : currentVersion + 1;
+    }
+
+    private void invalidateQuietly(HttpSession session) {
+        try {
+            session.invalidate();
+        } catch (IllegalStateException ignored) {
+            // Session đã bị invalidate trước đó thì không cần xử lý thêm.
+        }
     }
 
     public String encodePassword(String rawPassword) {

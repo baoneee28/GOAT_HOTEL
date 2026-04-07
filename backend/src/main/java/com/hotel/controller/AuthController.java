@@ -20,10 +20,11 @@ public class AuthController {
     // Hiển thị trang đăng nhập (phương thức GET)
     @GetMapping("/login")
     public String loginPage(HttpSession session) {
+        User user = authService.getValidSessionUser(session);
+
         // Nếu người dùng đã đăng nhập rồi thì không cần hiển thị lại trang login nữa
         // Đá thẳng về trang chủ (nếu là user) hoặc trang quản trị (nếu là admin)
-        if (session.getAttribute("user") != null) {
-            User user = (User) session.getAttribute("user");
+        if (user != null) {
             return authService.isBackoffice(user) ? "redirect:/admin" : "redirect:/";
         }
         // Trả về file giao diện login.html

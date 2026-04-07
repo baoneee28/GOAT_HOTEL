@@ -219,11 +219,11 @@ public class BookingApiController {
 
     private String buildBookingCreatedMessage(String paymentFlow) {
         if ("vnpay".equalsIgnoreCase(paymentFlow) || "vnpay_demo".equalsIgnoreCase(paymentFlow)) {
-            return "Đã tạo booking giữ chỗ chờ thanh toán VNPay demo. Giữ chỗ có hiệu lực trong "
-                    + bookingService.getPendingHoldDisplayText() + ".";
+            return "Phòng sẽ được giữ trong " + bookingService.getPendingHoldDisplayText()
+                    + ". Tiếp theo, hãy thanh toán để giữ chỗ.";
         }
-        return "Đã tạo booking giữ chỗ. Phòng sẽ được giữ trong "
-                + bookingService.getPendingHoldDisplayText() + " để chờ khách sạn xác nhận.";
+        return "Phòng sẽ được giữ trong " + bookingService.getPendingHoldDisplayText()
+                + ". Tiếp theo, hãy đặt cọc hoặc thanh toán toàn bộ để giữ chỗ.";
     }
 
     private Page<Booking> findAdminBookingsPage(String status,

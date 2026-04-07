@@ -2,6 +2,7 @@ package com.hotel.config;
 
 import com.hotel.interceptor.AdminInterceptor;
 import com.hotel.interceptor.AuthInterceptor;
+import com.hotel.interceptor.SessionConsistencyInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -26,11 +27,24 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Autowired
     private AdminInterceptor adminInterceptor;
 
+    @Autowired
+    private SessionConsistencyInterceptor sessionConsistencyInterceptor;
+
     @Value("${app.upload.dir}")
     private String uploadDir;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(sessionConsistencyInterceptor)
+                .addPathPatterns("/api/**", "/history", "/profile", "/admin", "/admin/**")
+                .excludePathPatterns(
+                        "/api/auth/login",
+                        "/api/auth/register",
+                        "/api/auth/logout",
+                        "/api/auth/forgot-password-request",
+                        "/api/auth/verify-reset"
+                );
+
         // Đăng ký AuthInterceptor: Bắt buộc người dùng phải đăng nhập mới được vào trang Lịch sử và Profile
         // Nếu chưa đăng nhập, Interceptor sẽ đá văng về trang /login
         registry.addInterceptor(authInterceptor)

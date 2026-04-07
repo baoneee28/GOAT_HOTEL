@@ -47,8 +47,8 @@ public class AuthApiController {
     @GetMapping("/session")
     public ResponseEntity<Map<String, Object>> getSession(jakarta.servlet.http.HttpSession session) {
         Map<String, Object> response = new HashMap<>();
-        Object userObj = session.getAttribute("user");
-        if (userObj instanceof User user) {
+        User user = authService.getValidSessionUser(session);
+        if (user != null) {
             response.put("authenticated", true);
             response.put("user", UserResponse.from(user));
             response.put("role", authService.resolveClientRole(user));
@@ -97,7 +97,7 @@ public class AuthApiController {
 
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(jakarta.servlet.http.HttpSession session) {
-        session.invalidate();
+        authService.logout(session);
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("authenticated", false);

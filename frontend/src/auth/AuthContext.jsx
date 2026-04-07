@@ -11,6 +11,8 @@ import {
 } from './authUtils';
 import { AuthContext } from './AuthContextValue';
 
+const SESSION_SYNC_INTERVAL_MS = 10000;
+
 async function fetchSessionPayload() {
   const res = await axios.get(`${API_BASE}/api/auth/session`, { withCredentials: true });
   return normalizeSessionPayload(res.data);
@@ -90,6 +92,72 @@ export function AuthProvider({ children }) {
       active = false;
     };
   }, [applyAuthState]);
+
+  React.useEffect(() => {
+    const interceptorId = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error?.response?.status === 401) {
+          applyAuthState({ authenticated: false });
+          setInitialized(true);
+          setLoading(false);
+        }
+
+        return Promise.reject(error);
+      },
+    );
+
+    return () => {
+      axios.interceptors.response.eject(interceptorId);
+    };
+  }, [applyAuthState]);
+
+  React.useEffect(() => {
+    if (!initialized || !user) {
+      return undefined;
+    }
+
+    let active = true;
+
+    const syncSessionSilently = async () => {
+      try {
+        const payload = await fetchSessionPayload();
+        if (!active) {
+          return;
+        }
+        applyAuthState(payload);
+      } catch {
+        if (!active) {
+          return;
+        }
+        applyAuthState({ authenticated: false });
+      }
+    };
+
+    const handleWindowFocus = () => {
+      void syncSessionSilently();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void syncSessionSilently();
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void syncSessionSilently();
+    }, SESSION_SYNC_INTERVAL_MS);
+
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [initialized, user, applyAuthState]);
 
   const login = React.useCallback(async (credentials) => {
     const res = await axios.post(`${API_BASE}/api/auth/login`, credentials, { withCredentials: true });

@@ -37,6 +37,9 @@ public class User {
     @Column(name = "role", length = 20)
     private String role = "customer";
 
+    @Column(name = "session_version")
+    private Integer sessionVersion;
+
     // Thời điểm đẻ ra cái nick này
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

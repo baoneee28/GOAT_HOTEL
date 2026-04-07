@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Home from './pages/Home';
 import AuthPage from './pages/AuthPage';
 import ForgotPassword from './pages/ForgotPassword';
@@ -94,6 +94,8 @@ function App() {
                 </Route>
               </Route>
             </Route>
+
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>

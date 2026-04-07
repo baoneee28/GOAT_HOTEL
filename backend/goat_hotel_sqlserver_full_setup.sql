@@ -49,11 +49,18 @@ BEGIN
         phone NVARCHAR(15) NULL,
         image NVARCHAR(255) NULL,
         role NVARCHAR(20) NOT NULL CONSTRAINT DF_users_role DEFAULT N'customer',
+        session_version INT NULL,
         created_at DATETIME2 NULL CONSTRAINT DF_users_created_at DEFAULT SYSDATETIME()
     );
 
     ALTER TABLE dbo.users
         ADD CONSTRAINT UQ_users_email UNIQUE (email);
+END
+GO
+
+IF COL_LENGTH(N'dbo.users', N'session_version') IS NULL
+BEGIN
+    ALTER TABLE dbo.users ADD session_version INT NULL;
 END
 GO
 

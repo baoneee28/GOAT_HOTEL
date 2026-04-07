@@ -312,10 +312,14 @@ export default function BookingConfirmation() {
       }
 
       if (window.Swal) {
-        window.Swal.fire('Thành công', result.message || 'Đã tạo booking giữ chỗ!', 'success')
+        window.Swal.fire(
+          'Thành công',
+          result.message || 'Phòng sẽ được giữ trong 2 phút. Tiếp theo, hãy đặt cọc hoặc thanh toán toàn bộ để giữ chỗ.',
+          'success',
+        )
           .then(() => navigate(`/booking/${createdBooking.id}`));
       } else {
-        alert(result.message || 'Đã tạo booking giữ chỗ!');
+        alert(result.message || 'Phòng sẽ được giữ trong 2 phút. Tiếp theo, hãy đặt cọc hoặc thanh toán toàn bộ để giữ chỗ.');
         navigate(`/booking/${createdBooking.id}`);
       }
     } finally {

@@ -2,6 +2,7 @@ package com.hotel.service;
 
 import com.hotel.entity.User;
 import com.hotel.repository.UserRepository;
+import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -25,6 +26,9 @@ class AuthServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private HttpSession session;
 
     @InjectMocks
     private AuthService authService;
@@ -127,11 +131,33 @@ class AuthServiceTest {
 
         when(userRepository.findByEmailIgnoreCase("test@test.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("correctpass", validBcryptHash)).thenReturn(true);
+        when(userRepository.save(isA(User.class))).thenAnswer(invocation -> invocation.getArgument(0, User.class));
 
         User result = authService.login("test@test.com", "correctpass", null);
 
         assertThat(result).isNotNull();
         assertThat(result.getEmail()).isEqualTo("test@test.com");
+    }
+
+    @Test
+    void loginStoresIncrementedSessionVersionForCurrentBrowserSession() {
+        String validBcryptHash = "$2a$10$xFm5bx0.lwf/YPDD1ntz2.1CdBUrPwPD4fBMEsDEg6BEKSD1QVQ2K";
+        User user = new User();
+        user.setId(1);
+        user.setEmail("test@test.com");
+        user.setPassword(validBcryptHash);
+        user.setSessionVersion(2);
+
+        when(userRepository.findByEmailIgnoreCase("test@test.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("correctpass", validBcryptHash)).thenReturn(true);
+        when(userRepository.save(isA(User.class))).thenAnswer(invocation -> invocation.getArgument(0, User.class));
+
+        User result = authService.login("test@test.com", "correctpass", session);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getSessionVersion()).isEqualTo(3);
+        verify(session).setAttribute(AuthService.SESSION_USER_KEY, user);
+        verify(session).setAttribute(AuthService.SESSION_VERSION_KEY, 3);
     }
 
     @Test
@@ -167,6 +193,47 @@ class AuthServiceTest {
         assertThat(result.getPassword()).isEqualTo("$2a$10$rehashedLegacyPasswordValue123456789012345678901234");
         verify(passwordEncoder).encode("legacy123");
         verify(userRepository).save(user);
+    }
+
+    @Test
+    void getValidSessionUserRefreshesCurrentSessionWhenVersionMatches() {
+        User sessionUser = new User();
+        sessionUser.setId(1);
+
+        User storedUser = new User();
+        storedUser.setId(1);
+        storedUser.setEmail("test@test.com");
+        storedUser.setSessionVersion(4);
+
+        when(session.getAttribute(AuthService.SESSION_USER_KEY)).thenReturn(sessionUser);
+        when(session.getAttribute(AuthService.SESSION_VERSION_KEY)).thenReturn(4);
+        when(userRepository.findById(1)).thenReturn(Optional.of(storedUser));
+
+        User result = authService.getValidSessionUser(session);
+
+        assertThat(result).isSameAs(storedUser);
+        verify(session).setAttribute(AuthService.SESSION_USER_KEY, storedUser);
+        verify(session).setAttribute(AuthService.SESSION_VERSION_KEY, 4);
+        verify(session, never()).invalidate();
+    }
+
+    @Test
+    void getValidSessionUserInvalidatesStaleSessionWhenVersionDiffers() {
+        User sessionUser = new User();
+        sessionUser.setId(1);
+
+        User storedUser = new User();
+        storedUser.setId(1);
+        storedUser.setSessionVersion(5);
+
+        when(session.getAttribute(AuthService.SESSION_USER_KEY)).thenReturn(sessionUser);
+        when(session.getAttribute(AuthService.SESSION_VERSION_KEY)).thenReturn(4);
+        when(userRepository.findById(1)).thenReturn(Optional.of(storedUser));
+
+        User result = authService.getValidSessionUser(session);
+
+        assertThat(result).isNull();
+        verify(session).invalidate();
     }
 
     // ── Register ──

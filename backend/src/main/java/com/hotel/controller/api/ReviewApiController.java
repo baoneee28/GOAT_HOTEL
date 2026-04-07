@@ -14,12 +14,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpSession;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 @RestController
@@ -48,8 +50,8 @@ public class ReviewApiController {
             return ResponseEntity.status(401).body(Map.of("message", "Unauthorized"));
         }
 
-        Integer bookingId = request.bookingId();
-        Integer rating = request.rating();
+        Integer bookingId = Objects.requireNonNull(request.bookingId());
+        Integer rating = Objects.requireNonNull(request.rating());
         String comment = request.comment() == null ? "" : request.comment().trim();
 
         Optional<Booking> bookingOpt = bookingRepository.findById(bookingId);
@@ -108,7 +110,7 @@ public class ReviewApiController {
     }
     
     @GetMapping("/booking/{bookingId}")
-    public ResponseEntity<?> getReviewByBooking(@PathVariable Integer bookingId, HttpSession session) {
+    public ResponseEntity<?> getReviewByBooking(@PathVariable @NonNull Integer bookingId, HttpSession session) {
         List<Review> list = reviewRepository.findByBookingId(bookingId);
         List<Map<String, Object>> resList = list.stream().map(r -> {
             Map<String, Object> map = new java.util.HashMap<>();
@@ -120,7 +122,7 @@ public class ReviewApiController {
     }
 
     @GetMapping("/room/{roomId}")
-    public ResponseEntity<?> getReviewsByRoom(@PathVariable Integer roomId) {
+    public ResponseEntity<?> getReviewsByRoom(@PathVariable @NonNull Integer roomId) {
         List<Review> list = reviewRepository.findByRoomTypeIdOrderByCreatedAtDesc(roomId);
         List<Map<String, Object>> resList = list.stream().map(r -> {
             Map<String, Object> map = new java.util.HashMap<>();

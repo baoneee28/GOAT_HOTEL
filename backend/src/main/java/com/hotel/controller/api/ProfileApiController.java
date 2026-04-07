@@ -4,13 +4,13 @@ import com.hotel.dto.ProfileUpdateRequest;
 import com.hotel.dto.UserResponse;
 import com.hotel.entity.User;
 import com.hotel.repository.UserRepository;
-import com.hotel.service.AuthService;
 import com.hotel.service.FileUploadService;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -27,9 +27,6 @@ public class ProfileApiController {
 
     @Autowired
     private FileUploadService fileUploadService;
-
-    @Autowired
-    private AuthService authService;
 
     private User getSessionUser(HttpSession session) {
         Object userObj = session.getAttribute("user");
@@ -52,7 +49,7 @@ public class ProfileApiController {
 
     // FE gọi API này để lấy cục data JSON của User lên form Đổi thông tin
     @GetMapping("/{userId}")
-    public ResponseEntity<Map<String, Object>> getProfile(@PathVariable("userId") Integer userId, HttpSession session) {
+    public ResponseEntity<Map<String, Object>> getProfile(@PathVariable("userId") @NonNull Integer userId, HttpSession session) {
         User currentUser = getSessionUser(session);
         if (currentUser == null) {
             return authRequiredResponse();
@@ -76,7 +73,7 @@ public class ProfileApiController {
     // Luồng 1: FE Cập nhật TEXT (Tên, SĐT, Tên file ảnh từ luồng Avatar)
     @PostMapping("/{userId}")
     public ResponseEntity<Map<String, Object>> updateProfile(
-            @PathVariable("userId") Integer userId,
+            @PathVariable("userId") @NonNull Integer userId,
             @Valid @RequestBody ProfileUpdateRequest request,
             HttpSession session) {
         User currentUser = getSessionUser(session);
@@ -113,7 +110,7 @@ public class ProfileApiController {
     // Backend sẽ gọi FileUpload bảo dọn rác avatar cũ và đặt tên file avatar mới
     @PostMapping("/{userId}/avatar")
     public ResponseEntity<Map<String, Object>> uploadAvatar(
-            @PathVariable("userId") Integer userId,
+            @PathVariable("userId") @NonNull Integer userId,
             @RequestParam("avatar") MultipartFile avatar,
             HttpSession session) {
         Map<String, Object> response = new HashMap<>();

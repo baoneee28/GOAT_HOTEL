@@ -8,6 +8,7 @@ import com.hotel.repository.NewsRepository;
 import com.hotel.service.FileUploadService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.transaction.annotation.Transactional;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -109,7 +110,7 @@ public class NewsApiController {
 
     @PostMapping("/admin/featured/{newsId}")
     @Transactional
-    public ResponseEntity<Map<String, Object>> addFeaturedNews(@PathVariable("newsId") Integer newsId) {
+    public ResponseEntity<Map<String, Object>> addFeaturedNews(@PathVariable("newsId") @NonNull Integer newsId) {
         Map<String, Object> response = new HashMap<>();
 
         News news = newsRepository.findById(newsId).orElse(null);
@@ -139,7 +140,7 @@ public class NewsApiController {
 
     @DeleteMapping("/admin/featured/{featuredId}")
     @Transactional
-    public ResponseEntity<Map<String, Object>> removeFeaturedNews(@PathVariable("featuredId") Integer featuredId) {
+    public ResponseEntity<Map<String, Object>> removeFeaturedNews(@PathVariable("featuredId") @NonNull Integer featuredId) {
         Map<String, Object> response = new HashMap<>();
         Optional<FeaturedNews> featuredNewsOpt = featuredNewsRepository.findById(featuredId);
 
@@ -149,7 +150,8 @@ public class NewsApiController {
             return ResponseEntity.status(404).body(response);
         }
 
-        featuredNewsRepository.delete(featuredNewsOpt.get());
+        FeaturedNews featuredNews = featuredNewsOpt.orElseThrow();
+        featuredNewsRepository.delete(featuredNews);
         normalizeFeaturedDisplayOrder();
 
         response.put("success", true);
@@ -198,7 +200,7 @@ public class NewsApiController {
 
     @DeleteMapping("/admin/{id}")
     @Transactional
-    public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> deleteNews(@PathVariable("id") Integer id) {
+    public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> deleteNews(@PathVariable("id") @NonNull Integer id) {
         java.util.Map<String, Object> response = new java.util.HashMap<>();
         News news = newsRepository.findById(id).orElse(null);
         if (news == null) {

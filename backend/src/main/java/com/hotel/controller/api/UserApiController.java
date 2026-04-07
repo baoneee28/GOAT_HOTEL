@@ -14,6 +14,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -82,8 +83,9 @@ public class UserApiController {
             String image = normalizeText(request.image());
 
             User user;
-            if (request.id() != null && request.id() > 0) {
-                user = userRepository.findById(request.id()).orElse(null);
+            Integer userId = request.id();
+            if (userId != null && userId > 0) {
+                user = userRepository.findById(userId).orElse(null);
                 if (user == null) {
                     return ResponseEntity.status(404).body(Map.of(
                             "success", false,
@@ -128,7 +130,7 @@ public class UserApiController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> deleteUser(@PathVariable Integer id) {
+    public ResponseEntity<Map<String, Object>> deleteUser(@PathVariable @NonNull Integer id) {
         Map<String, Object> response = new HashMap<>();
         try {
             userRepository.deleteById(id);
@@ -142,7 +144,7 @@ public class UserApiController {
 
     @GetMapping("/{id}/bookings")
     public ResponseEntity<Map<String, Object>> getUserBookings(
-            @PathVariable Integer id,
+            @PathVariable @NonNull Integer id,
             @RequestParam(defaultValue = "") String status,
             @RequestParam(defaultValue = "1") int page) {
         bookingService.expirePendingBookingsForUser(id);

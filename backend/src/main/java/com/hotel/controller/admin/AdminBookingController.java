@@ -26,7 +26,6 @@ import org.springframework.lang.NonNull;
 
 @Controller
 @RequestMapping("/admin/bookings")
-@SuppressWarnings("null")
 public class AdminBookingController {
 
     @Autowired

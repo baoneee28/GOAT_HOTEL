@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -131,7 +132,7 @@ public class CouponApiController {
     }
 
     @GetMapping("/admin/coupons/{id}")
-    public ResponseEntity<Map<String, Object>> getAdminCoupon(@PathVariable Integer id) {
+    public ResponseEntity<Map<String, Object>> getAdminCoupon(@PathVariable @NonNull Integer id) {
         return couponService.getCouponById(id)
                 .map(coupon -> ResponseEntity.ok(Map.of(
                         "success", true,
@@ -145,7 +146,7 @@ public class CouponApiController {
 
     @GetMapping("/admin/coupons/{id}/holders")
     public ResponseEntity<Map<String, Object>> getCouponHolders(
-            @PathVariable Integer id,
+            @PathVariable @NonNull Integer id,
             @RequestParam(defaultValue = "all") String status) {
         try {
             return ResponseEntity.ok(couponService.buildCouponHolderResponse(id, status));
@@ -173,7 +174,7 @@ public class CouponApiController {
 
     @PostMapping("/admin/coupons/{id}/assignments")
     public ResponseEntity<Map<String, Object>> assignCouponToUser(
-            @PathVariable Integer id,
+            @PathVariable @NonNull Integer id,
             @Valid @RequestBody CouponAssignmentRequest request,
             HttpSession session) {
         User currentUser = getSessionUser(session);
@@ -209,7 +210,7 @@ public class CouponApiController {
     }
 
     @PutMapping("/admin/coupons/{id}")
-    public ResponseEntity<Map<String, Object>> updateCoupon(@PathVariable Integer id,
+    public ResponseEntity<Map<String, Object>> updateCoupon(@PathVariable @NonNull Integer id,
                                                             @Valid @RequestBody CouponUpsertRequest request,
                                                             HttpSession session) {
         User currentUser = getSessionUser(session);
@@ -220,7 +221,7 @@ public class CouponApiController {
     }
 
     @PatchMapping("/admin/coupons/{id}/toggle-active")
-    public ResponseEntity<Map<String, Object>> toggleActive(@PathVariable Integer id,
+    public ResponseEntity<Map<String, Object>> toggleActive(@PathVariable @NonNull Integer id,
                                                             HttpSession session) {
         User currentUser = getSessionUser(session);
         if (!authService.isAdmin(currentUser)) {
@@ -242,7 +243,7 @@ public class CouponApiController {
     }
 
     @DeleteMapping("/admin/coupons/{id}")
-    public ResponseEntity<Map<String, Object>> deleteCoupon(@PathVariable Integer id,
+    public ResponseEntity<Map<String, Object>> deleteCoupon(@PathVariable @NonNull Integer id,
                                                             HttpSession session) {
         User currentUser = getSessionUser(session);
         if (!authService.isAdmin(currentUser)) {
@@ -366,7 +367,7 @@ public class CouponApiController {
     }
 
     @DeleteMapping("/admin/coupon-events/{id}")
-    public ResponseEntity<Map<String, Object>> deleteEventType(@PathVariable Integer id, HttpSession session) {
+    public ResponseEntity<Map<String, Object>> deleteEventType(@PathVariable @NonNull Integer id, HttpSession session) {
         User currentUser = getSessionUser(session);
         if (!authService.isAdmin(currentUser)) {
             return forbiddenResponse("Chi admin moi duoc xoa nhom su kien.");

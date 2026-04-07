@@ -5,7 +5,6 @@ import com.hotel.dto.UserResponse;
 import com.hotel.entity.User;
 import com.hotel.repository.FeaturedRoomTypeRepository;
 import com.hotel.repository.FeaturedNewsRepository;
-import com.hotel.service.AuthService;
 import com.hotel.service.BookingService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,9 +31,6 @@ public class HomeController {
 
     @Autowired
     private FeaturedNewsRepository featuredNewsRepository;
-
-    @Autowired
-    private AuthService authService;
 
     @GetMapping("/")
     public ResponseEntity<Map<String, Object>> index(HttpSession session) {

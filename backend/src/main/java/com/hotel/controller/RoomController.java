@@ -10,14 +10,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@SuppressWarnings("null")
 public class RoomController {
 
     @Autowired
     private RoomRepository roomRepository;
-
-    @Autowired
-    private com.hotel.repository.ItemRepository itemRepository;
 
     @PostMapping(value = "/get-rooms", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> getRoomsByType(@RequestParam Integer type_id) {

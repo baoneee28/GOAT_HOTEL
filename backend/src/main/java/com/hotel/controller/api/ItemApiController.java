@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -58,8 +59,9 @@ public class ItemApiController {
     @PostMapping
     public ResponseEntity<Map<String, Object>> saveItem(@RequestBody Item payload) {
         Item item;
-        if (payload.getId() != null && payload.getId() > 0) {
-            item = itemRepository.findById(payload.getId()).orElse(new Item());
+        Integer itemId = payload.getId();
+        if (itemId != null && itemId > 0) {
+            item = itemRepository.findById(itemId).orElse(new Item());
         } else {
             item = new Item();
         }
@@ -75,7 +77,7 @@ public class ItemApiController {
 
     @DeleteMapping("/{id}")
     @Transactional
-    public ResponseEntity<Map<String, Object>> deleteItem(@PathVariable("id") Integer id) {
+    public ResponseEntity<Map<String, Object>> deleteItem(@PathVariable("id") @NonNull Integer id) {
         Map<String, Object> response = new HashMap<>();
         Item item = itemRepository.findById(id).orElse(null);
         if (item == null) {

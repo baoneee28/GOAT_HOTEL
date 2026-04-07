@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,6 +29,7 @@ import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -78,7 +80,7 @@ public class RoomApiController {
     }
 
     @GetMapping("/{id}")
-    public Room getRoomById(@PathVariable("id") Integer id) {
+    public Room getRoomById(@PathVariable("id") @NonNull Integer id) {
         Room room = roomRepository.findById(id).orElse(null);
         return sanitizePublicRoom(room);
     }
@@ -137,7 +139,7 @@ public class RoomApiController {
             boolean isAdmin = authService.isAdmin(currentUser);
 
             Integer roomId = request.id();
-            Integer typeId = request.typeId();
+            Integer typeId = Objects.requireNonNull(request.typeId());
             String status = normalizeRoomStatus(request.status());
             String roomNumber = normalizeRoomNumber(request.roomNumber());
             boolean updating = roomId != null && roomId > 0;
@@ -200,7 +202,7 @@ public class RoomApiController {
     }
 
     @DeleteMapping("/admin/{id}")
-    public ResponseEntity<Map<String, Object>> deleteRoom(@PathVariable("id") Integer id, HttpSession session) {
+    public ResponseEntity<Map<String, Object>> deleteRoom(@PathVariable("id") @NonNull Integer id, HttpSession session) {
         User currentUser = getSessionUser(session);
         if (!authService.isAdmin(currentUser)) {
             return forbidden("Nhan vien khong duoc xoa phong.");

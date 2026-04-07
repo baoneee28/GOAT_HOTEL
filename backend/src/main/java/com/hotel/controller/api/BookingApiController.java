@@ -25,6 +25,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -40,6 +41,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 @RestController
@@ -307,7 +309,7 @@ public class BookingApiController {
     }
 
     @GetMapping("/bookings/{id}")
-    public ResponseEntity<ApiResponse<BookingResponse>> getBookingDetail(@PathVariable("id") Integer id,
+    public ResponseEntity<ApiResponse<BookingResponse>> getBookingDetail(@PathVariable("id") @NonNull Integer id,
                                                                          HttpSession session) {
         User currentUser = getSessionUser(session);
         if (currentUser == null) {
@@ -330,7 +332,7 @@ public class BookingApiController {
     }
 
     @PostMapping("/bookings/{id}/deposit")
-    public ResponseEntity<ApiResponse<BookingResponse>> collectDepositPayment(@PathVariable("id") Integer id,
+    public ResponseEntity<ApiResponse<BookingResponse>> collectDepositPayment(@PathVariable("id") @NonNull Integer id,
                                                                               HttpSession session) {
         User currentUser = getSessionUser(session);
         if (currentUser == null) {
@@ -351,7 +353,7 @@ public class BookingApiController {
     }
 
     @DeleteMapping("/bookings/{id}")
-    public ResponseEntity<ApiResponse<BookingResponse>> cancelBooking(@PathVariable("id") Integer id,
+    public ResponseEntity<ApiResponse<BookingResponse>> cancelBooking(@PathVariable("id") @NonNull Integer id,
                                                                       HttpSession session) {
         User currentUser = getSessionUser(session);
         if (currentUser == null) {
@@ -443,8 +445,9 @@ public class BookingApiController {
             LocalDateTime checkIn = parseCheckInDate(request.checkIn());
             LocalDateTime checkOut = parseCheckOutDate(request.checkOut());
             String requestedStatus = normalizeText(request.status());
+            Integer roomId = Objects.requireNonNull(request.roomId());
 
-            Optional<Room> roomOpt = roomRepository.findById(request.roomId());
+            Optional<Room> roomOpt = roomRepository.findById(roomId);
             if (roomOpt.isEmpty()) {
                 return badRequestResponse("Phòng không tồn tại");
             }
@@ -468,7 +471,7 @@ public class BookingApiController {
                 String previousStatus = existing.getStatus();
                 String nextStatus = bookingService.validateAdminEditableStatus(previousStatus, requestedStatus);
                 long overlapCount = bookingRepository.countOverlappingBookingsExcept(
-                        request.roomId(),
+                        roomId,
                         checkIn,
                         checkOut,
                         bookingId,
@@ -498,13 +501,14 @@ public class BookingApiController {
                 }
 
             } else {
-                User user = userRepository.findById(request.userId()).orElse(null);
+                Integer userId = Objects.requireNonNull(request.userId());
+                User user = userRepository.findById(userId).orElse(null);
                 if (user == null) {
                     return badRequestResponse("Khách hàng không tồn tại!");
                 }
 
                 String initialStatus = bookingService.validateAdminCreateStatus(requestedStatus);
-                long overlapCount = bookingRepository.countOverlappingBookings(request.roomId(), checkIn, checkOut, now);
+                long overlapCount = bookingRepository.countOverlappingBookings(roomId, checkIn, checkOut, now);
                 if (overlapCount > 0
                         && !"cancelled".equalsIgnoreCase(initialStatus)
                         && !"expired".equalsIgnoreCase(initialStatus)
@@ -543,7 +547,7 @@ public class BookingApiController {
 
     @PostMapping("/admin/bookings/{id}/checkout")
     public ResponseEntity<ApiResponse<BookingResponse>> checkoutAdmin(
-            @PathVariable("id") Integer id,
+            @PathVariable("id") @NonNull Integer id,
             @Valid @RequestBody AdminBookingCheckoutRequest request,
             HttpSession session) {
         ResponseEntity<ApiResponse<BookingResponse>> authError = requireBackofficeAccess(session);
@@ -607,7 +611,7 @@ public class BookingApiController {
     }
 
     @PostMapping("/admin/bookings/{id}/checkin")
-    public ResponseEntity<ApiResponse<BookingResponse>> checkInAdmin(@PathVariable("id") Integer id,
+    public ResponseEntity<ApiResponse<BookingResponse>> checkInAdmin(@PathVariable("id") @NonNull Integer id,
                                                                      HttpSession session) {
         ResponseEntity<ApiResponse<BookingResponse>> authError = requireBackofficeAccess(session);
         if (authError != null) {
@@ -657,7 +661,7 @@ public class BookingApiController {
     }
 
     @PostMapping("/admin/bookings/{id}/approve")
-    public ResponseEntity<ApiResponse<BookingResponse>> approveAdminBooking(@PathVariable("id") Integer id,
+    public ResponseEntity<ApiResponse<BookingResponse>> approveAdminBooking(@PathVariable("id") @NonNull Integer id,
                                                                             HttpSession session) {
         ResponseEntity<ApiResponse<BookingResponse>> authError = requireBackofficeAccess(session);
         if (authError != null) {
@@ -695,7 +699,7 @@ public class BookingApiController {
     }
 
     @PostMapping("/admin/bookings/{id}/collect-cash-payment")
-    public ResponseEntity<ApiResponse<BookingResponse>> collectCashPayment(@PathVariable("id") Integer id,
+    public ResponseEntity<ApiResponse<BookingResponse>> collectCashPayment(@PathVariable("id") @NonNull Integer id,
                                                                            HttpSession session) {
         ResponseEntity<ApiResponse<BookingResponse>> authError = requireBackofficeAccess(session);
         if (authError != null) {
@@ -714,7 +718,7 @@ public class BookingApiController {
     }
 
     @DeleteMapping("/admin/bookings/{id}")
-    public ResponseEntity<ApiResponse<Void>> deleteAdminBooking(@PathVariable("id") Integer id,
+    public ResponseEntity<ApiResponse<Void>> deleteAdminBooking(@PathVariable("id") @NonNull Integer id,
                                                                 HttpSession session) {
         ResponseEntity<ApiResponse<Void>> authError = requireBackofficeAccess(session);
         if (authError != null) {

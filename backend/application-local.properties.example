@@ -1,0 +1,27 @@
+# Copy file nay thanh backend/application-local.properties neu muon override local.
+# File nay se duoc spring.config.import nap vao luc chay.
+# Hoac bo qua file nay va set bien moi truong GOAT_* thay the.
+
+# Database
+# spring.datasource.url=jdbc:sqlserver://localhost;databaseName=goat_hotel;user=sa;password=yourStrong(!)Password;encrypt=true;trustServerCertificate=true
+spring.datasource.url=
+spring.datasource.username=
+spring.datasource.password=
+
+# Schema
+# Chay backend/goat_hotel_sqlserver_full_setup.sql de tao/cap nhat schema truoc khi start app.
+# spring.jpa.hibernate.ddl-auto=none
+
+# One-off startup jobs (chi bat khi can migration/backfill tren local)
+# app.seed-demo-data=true
+# app.seed-maintenance-rooms=true
+# app.backfill-booking-prices-on-startup=true
+# app.backfill-room-type-specs-on-startup=true
+
+# VNPay
+vnp.tmnCode=
+vnp.hashSecret=
+
+# Mail SMTP
+spring.mail.username=
+spring.mail.password=

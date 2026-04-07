@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -41,7 +42,7 @@ public class ContactMessageService {
         );
     }
 
-    public Optional<ContactMessage> getMessageById(Integer id) {
+    public Optional<ContactMessage> getMessageById(@NonNull Integer id) {
         return contactMessageRepository.findById(id);
     }
 
@@ -53,7 +54,7 @@ public class ContactMessageService {
         return contactMessageRepository.save(existing);
     }
 
-    public void deleteMessage(Integer id) {
+    public void deleteMessage(@NonNull Integer id) {
         contactMessageRepository.deleteById(id);
     }
 

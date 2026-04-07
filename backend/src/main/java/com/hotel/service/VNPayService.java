@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TimeZone;
 
 @Service
@@ -38,7 +39,7 @@ public class VNPayService {
     private String vnpReturnUrl;
 
     @Value("${vnp.frontendReturnUrl:http://localhost:5173/vnpay-return}")
-    private String vnpFrontendReturnUrl;
+    private String vnpFrontendReturnUrl = "http://localhost:5173/vnpay-return";
 
     @Value("${booking.pending-hold-seconds:180}")
     private long pendingHoldSeconds;
@@ -151,7 +152,8 @@ public class VNPayService {
             confirmPaymentByMode(validation.booking(), validation.paymentMode(), "VNPay");
         }
 
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(vnpFrontendReturnUrl.trim())
+        String frontendReturnUrl = vnpFrontendReturnUrl.trim();
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(frontendReturnUrl)
                 .queryParam("status", validation.success() ? "success" : "error")
                 .queryParam("message", validation.message());
 
@@ -227,7 +229,7 @@ public class VNPayService {
             return new VNPayValidationResult(true, false, false, null, null, "full", "Khong xac dinh duoc booking tu giao dich VNPay.");
         }
 
-        Integer bookingId = txnRefData.bookingId();
+        Integer bookingId = Objects.requireNonNull(txnRefData.bookingId());
         String paymentMode = txnRefData.paymentMode();
         Booking booking = bookingRepository.findById(bookingId).orElse(null);
         if (booking == null) {

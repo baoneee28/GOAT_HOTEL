@@ -9,6 +9,7 @@ import com.hotel.repository.CouponRepository;
 import java.text.NumberFormat;
 import java.util.Locale;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,16 +36,16 @@ public class NotificationService {
         return notificationRepository.save(note);
     }
 
-    public List<Notification> getUserNotifications(Integer userId) {
+    public List<Notification> getUserNotifications(@NonNull Integer userId) {
         return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
-    public List<Notification> getUnreadNotifications(Integer userId) {
+    public List<Notification> getUnreadNotifications(@NonNull Integer userId) {
         return notificationRepository.findByUserIdAndIsReadFalse(userId);
     }
 
     @Transactional
-    public void markAsRead(Integer notificationId, Integer expectedUserId) {
+    public void markAsRead(@NonNull Integer notificationId, Integer expectedUserId) {
         Optional<Notification> opt = notificationRepository.findById(notificationId);
         if (opt.isPresent()) {
             Notification note = opt.get();
@@ -56,7 +57,7 @@ public class NotificationService {
     }
 
     @Transactional
-    public void markAllAsRead(Integer userId) {
+    public void markAllAsRead(@NonNull Integer userId) {
         List<Notification> unreadList = notificationRepository.findByUserIdAndIsReadFalse(userId);
         unreadList.forEach(note -> note.setIsRead(true));
         notificationRepository.saveAll(unreadList);

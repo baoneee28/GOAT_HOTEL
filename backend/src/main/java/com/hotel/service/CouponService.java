@@ -12,6 +12,7 @@ import com.hotel.repository.UserCouponRepository;
 import com.hotel.repository.UserRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -133,7 +134,7 @@ public class CouponService {
         return response;
     }
 
-    public Map<String, Object> buildCouponHolderResponse(Integer couponId, String status) {
+    public Map<String, Object> buildCouponHolderResponse(@NonNull Integer couponId, String status) {
         Coupon coupon = couponRepository.findById(couponId)
                 .map(this::enrichCoupon)
                 .orElseThrow(() -> new IllegalArgumentException("Khong tim thay coupon."));
@@ -178,7 +179,7 @@ public class CouponService {
                 .toList();
     }
 
-    public Optional<Coupon> getCouponById(Integer id) {
+    public Optional<Coupon> getCouponById(@NonNull Integer id) {
         return couponRepository.findById(id).map(this::enrichCoupon);
     }
 
@@ -252,14 +253,14 @@ public class CouponService {
         return enrichCoupon(couponRepository.save(coupon));
     }
 
-    public Coupon toggleActive(Integer couponId) {
+    public Coupon toggleActive(@NonNull Integer couponId) {
         Coupon coupon = couponRepository.findById(couponId)
                 .orElseThrow(() -> new IllegalArgumentException("Khong tim thay coupon."));
         coupon.setIsActive(!Boolean.TRUE.equals(coupon.getIsActive()));
         return enrichCoupon(couponRepository.save(coupon));
     }
 
-    public void deleteCoupon(Integer couponId) {
+    public void deleteCoupon(@NonNull Integer couponId) {
         Coupon coupon = couponRepository.findById(couponId)
                 .orElseThrow(() -> new IllegalArgumentException("Khong tim thay coupon."));
 
@@ -270,8 +271,8 @@ public class CouponService {
         couponRepository.delete(coupon);
     }
 
-    public UserCoupon assignCouponToUser(Integer couponId,
-                                         Integer targetUserId,
+    public UserCoupon assignCouponToUser(@NonNull Integer couponId,
+                                         @NonNull Integer targetUserId,
                                          User assignedBy,
                                          LocalDateTime requestedExpiry,
                                          String note) {
@@ -302,7 +303,7 @@ public class CouponService {
         return userCouponRepository.save(userCoupon);
     }
 
-    public CouponPricingResult previewCoupon(Integer roomId,
+    public CouponPricingResult previewCoupon(@NonNull Integer roomId,
                                              LocalDateTime checkIn,
                                              LocalDateTime checkOut,
                                              String couponCode) {
@@ -312,7 +313,7 @@ public class CouponService {
     }
 
     public CouponPricingResult previewCouponSelection(User user,
-                                                      Integer roomId,
+                                                      @NonNull Integer roomId,
                                                       LocalDateTime checkIn,
                                                       LocalDateTime checkOut,
                                                       Integer userCouponId,
@@ -321,7 +322,7 @@ public class CouponService {
     }
 
     public CouponPricingResult previewCouponSelection(User user,
-                                                      Integer roomId,
+                                                      @NonNull Integer roomId,
                                                       LocalDateTime checkIn,
                                                       LocalDateTime checkOut,
                                                       Integer userCouponId,
@@ -635,10 +636,6 @@ public class CouponService {
 
     private double calculateSubtotal(LocalDateTime checkIn, LocalDateTime checkOut, double pricePerNight) {
         return BookingPricingCalculator.summarize(checkIn, checkOut, pricePerNight).total();
-    }
-
-    private long calculateStayNights(LocalDateTime checkIn, LocalDateTime checkOut) {
-        return BookingPricingCalculator.calculateStayNights(checkIn, checkOut);
     }
 
     private String normalizeOptionalCode(Object value) {

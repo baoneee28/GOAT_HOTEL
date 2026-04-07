@@ -4,6 +4,7 @@ import com.hotel.entity.Booking;
 import com.hotel.entity.Payment;
 import com.hotel.repository.BookingRepository;
 import com.hotel.repository.PaymentRepository;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -77,7 +78,7 @@ public class PaymentService {
     }
 
     @Transactional
-    public Booking collectCashPayment(Integer bookingId) {
+    public Booking collectCashPayment(@NonNull Integer bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Khong tim thay don dat phong."));
 
@@ -86,7 +87,7 @@ public class PaymentService {
     }
 
     @Transactional
-    public Booking collectDepositPayment(Integer bookingId, Integer currentUserId) {
+    public Booking collectDepositPayment(@NonNull Integer bookingId, Integer currentUserId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Khong tim thay don dat phong."));
 

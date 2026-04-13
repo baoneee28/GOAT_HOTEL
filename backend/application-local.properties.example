@@ -18,6 +18,9 @@ spring.datasource.password=
 # app.backfill-booking-prices-on-startup=true
 # app.backfill-room-type-specs-on-startup=true
 
+# Booking hold (demo local)
+# booking.pending-hold-seconds=60
+
 # VNPay
 vnp.tmnCode=
 vnp.hashSecret=

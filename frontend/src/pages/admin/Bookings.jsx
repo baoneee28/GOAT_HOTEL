@@ -31,7 +31,7 @@ export default function Bookings() {
   const [invoiceData, setInvoiceData] = useState(null);
 
   const [formData, setFormData] = useState({
-    id: '', userId: '', roomId: '', roomTypeId: '', checkIn: '', checkOut: '', status: 'pending'
+    id: '', userId: '', roomId: '', roomTypeId: '', checkIn: '', checkOut: '', guestCount: '', status: 'pending'
   });
   const focusedBookingId = String(searchParams.get('bookingId') || '').trim();
 
@@ -253,6 +253,7 @@ export default function Bookings() {
       id: b.id, userId: b.user?.id || '', roomId: detail.room?.id || '', roomTypeId: detail.room?.roomType?.id || '',
       checkIn: toDateTimeLocalValue(detail.checkIn),
       checkOut: toDateTimeLocalValue(detail.checkOut),
+      guestCount: detail.guestCount || detail.room?.roomType?.capacity || '',
       status: b.status
     });
     setShowModal(true);
@@ -260,7 +261,7 @@ export default function Bookings() {
 
   const handleAddNew = () => {
     if (!isAdmin) return;
-    setFormData({ id: '', userId: '', roomId: '', roomTypeId: '', checkIn: '', checkOut: '', status: 'pending' });
+    setFormData({ id: '', userId: '', roomId: '', roomTypeId: '', checkIn: '', checkOut: '', guestCount: '', status: 'pending' });
     setShowModal(true);
   };
 
@@ -288,7 +289,11 @@ export default function Bookings() {
     e.preventDefault();
     if (!isAdmin) return;
     try {
-      const res = await axios.post(`${API_BASE}/api/admin/bookings`, formData, { withCredentials: true });
+      const payload = {
+        ...formData,
+        guestCount: formData.guestCount ? Number(formData.guestCount) : null,
+      };
+      const res = await axios.post(`${API_BASE}/api/admin/bookings`, payload, { withCredentials: true });
       if (res.data.success) {
         Swal.fire({ icon: 'success', title: 'Lưu thành công', timer: 1500, showConfirmButton: false });
         setShowModal(false);
@@ -310,6 +315,9 @@ export default function Bookings() {
     acc.push(type);
     return acc;
   }, []).sort((a, b) => String(a?.typeName || '').localeCompare(String(b?.typeName || ''), 'vi'));
+  const selectedRoomType = roomTypeOptions.find((type) => String(type?.id) === String(formData.roomTypeId))
+    || selectedRoom?.roomType
+    || null;
   const isSameSelectedRoomType = (room) => !formData.roomTypeId || String(room?.roomType?.id) === String(formData.roomTypeId);
   const hasPinnedCurrentRoom = Boolean(formData.id && selectedRoom && isSameSelectedRoomType(selectedRoom));
   const selectableRooms = rooms.filter((room) =>
@@ -661,6 +669,9 @@ export default function Bookings() {
                                           <button className="btn btn-sm btn-light text-primary border rounded-circle" style={{width:'32px', height:'32px'}} title="Sửa" onClick={() => handleEdit(b)}>✎</button>
                                       )}
                                   </div>
+                                  {normalizedStatus === 'confirmed' && checkedIn && normalizedPaymentStatus !== 'paid' && (
+                                      <div className="small text-muted mt-2">Thu tiền trước khi checkout</div>
+                                  )}
                               </td>
                           </tr>
                       )}) : (<tr><td colSpan="7" className="text-center py-5 text-muted">Không có đơn đặt phòng nào.</td></tr>)}
@@ -741,6 +752,22 @@ export default function Bookings() {
                                       <label className="form-label fw-bold small text-muted text-uppercase">Giờ Check-out</label>
                                       <input type="datetime-local" className="form-control" value={formData.checkOut} onChange={e => setFormData({...formData, checkOut: e.target.value})} required />
                                   </div>
+                              </div>
+                              <div className="mb-3">
+                                  <label className="form-label fw-bold small text-muted text-uppercase">Số khách</label>
+                                  <input
+                                      type="number"
+                                      min="1"
+                                      className="form-control rounded-3"
+                                      value={formData.guestCount}
+                                      onChange={e => setFormData({...formData, guestCount: e.target.value})}
+                                      placeholder={selectedRoomType?.capacity ? `Tối đa ${selectedRoomType.capacity} khách` : 'Nhập số khách'}
+                                  />
+                                  <small className="text-muted d-block mt-2">
+                                    {selectedRoomType?.capacity
+                                      ? `Sức chứa hiện tại của loại phòng này là ${selectedRoomType.capacity} khách.`
+                                      : 'Nếu để trống, hệ thống sẽ dùng sức chứa mặc định của loại phòng.'}
+                                  </small>
                               </div>
                                <div className="mb-4">
                                    <label className="form-label fw-bold small text-muted text-uppercase">Trạng thái</label>

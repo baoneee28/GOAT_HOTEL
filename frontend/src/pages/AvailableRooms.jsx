@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import axios from 'axios';
 import API_BASE, { calculateStayNights, uploadedImageUrl, resolveRoomTypeSpec } from '../config';
 import HeroHeader from '../components/HeroHeader';
+import { normalizeHotelStayDates } from '../utils/hotelStay';
 
 const AVAILABILITY_REFRESH_MS = 5000;
 
@@ -31,10 +32,14 @@ export default function AvailableRooms() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const normalizedStay = normalizeHotelStayDates({
+    checkIn: location.state?.checkIn || searchParams.get('checkIn'),
+    checkOut: location.state?.checkOut || searchParams.get('checkOut'),
+  });
 
   const [roomData, setRoomData] = useState(location.state?.roomData || null);
-  const [checkIn] = useState(location.state?.checkIn || searchParams.get('checkIn') || new Date().toISOString().split('T')[0]);
-  const [checkOut] = useState(location.state?.checkOut || searchParams.get('checkOut') || (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; })());
+  const [checkIn] = useState(normalizedStay.checkIn);
+  const [checkOut] = useState(normalizedStay.checkOut);
   const [guests] = useState(location.state?.guests || searchParams.get('guests') || 2);
   const [availableRooms, setAvailableRooms] = useState([]);
   const [loading, setLoading] = useState(true);

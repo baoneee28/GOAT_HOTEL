@@ -127,6 +127,9 @@ public class AuthApiController {
 
         try {
             emailService.sendPasswordResetOtp(email, otp);
+        } catch (IllegalStateException e) {
+            log.error("Password reset email is not configured for SMTP sending.", e);
+            return ResponseEntity.status(500).body(ApiResponse.<Void>error("Máy chủ gửi email chưa được cấu hình. Vui lòng cập nhật SMTP trước khi gửi mã OTP."));
         } catch (Exception e) {
             log.error("Failed to send OTP to email={}", email, e);
             return ResponseEntity.status(500).body(ApiResponse.<Void>error("Gửi email thất bại. Vui lòng thử lại."));

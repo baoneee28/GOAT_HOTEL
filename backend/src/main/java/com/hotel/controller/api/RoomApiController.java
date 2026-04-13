@@ -7,6 +7,7 @@ import com.hotel.repository.BookingDetailRepository;
 import com.hotel.repository.RoomRepository;
 import com.hotel.service.AuthService;
 import com.hotel.service.RoomStatusService;
+import com.hotel.service.StayDateTimeService;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,10 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,8 +36,26 @@ import java.util.Set;
 public class RoomApiController {
 
     private static final Set<String> ALLOWED_ROOM_STATUSES = Set.of("available", "booked", "maintenance");
-    private static final LocalTime DEFAULT_CHECK_IN_TIME = LocalTime.of(14, 0);
-    private static final LocalTime DEFAULT_CHECK_OUT_TIME = LocalTime.of(12, 0);
+
+    private void validateOperationalStatusTransition(Room room, String nextStatus) {
+        if (room == null || room.getId() == null) {
+            return;
+        }
+        if (!"maintenance".equalsIgnoreCase(nextStatus)) {
+            return;
+        }
+        if ("maintenance".equalsIgnoreCase(room.getStatus())) {
+            return;
+        }
+
+        long blockingBookings = bookingDetailRepository.countUpcomingOrActiveBookingsForRoom(
+                room.getId(),
+                LocalDateTime.now()
+        );
+        if (blockingBookings > 0) {
+            throw new IllegalArgumentException("Phòng đang có booking còn hiệu lực nên chưa thể chuyển sang bảo trì.");
+        }
+    }
 
     @Autowired
     private RoomRepository roomRepository;
@@ -54,6 +70,9 @@ public class RoomApiController {
     private AuthService authService;
 
     @Autowired
+    private StayDateTimeService stayDateTimeService;
+
+    @Autowired
     private com.hotel.repository.RoomTypeRepository roomTypeRepository;
 
     @GetMapping
@@ -63,11 +82,10 @@ public class RoomApiController {
             @RequestParam(value = "excludeBookingId", required = false) Integer excludeBookingId) {
         if (hasDateRange(checkIn, checkOut)) {
             try {
-                LocalDateTime start = parseCheckInDate(checkIn);
-                LocalDateTime end = parseCheckOutDate(checkOut);
+                StayDateTimeService.StayWindow stayWindow = stayDateTimeService.resolvePublicStayWindow(checkIn, checkOut);
                 List<Room> availableRooms = roomRepository.findAvailableRoomsForDate(
-                        start,
-                        end,
+                        stayWindow.checkIn(),
+                        stayWindow.checkOut(),
                         LocalDateTime.now(),
                         excludeBookingId
                 );
@@ -97,12 +115,11 @@ public class RoomApiController {
 
         if (hasDateRange(checkIn, checkOut)) {
             try {
-                LocalDateTime start = parseCheckInDate(checkIn);
-                LocalDateTime end = parseCheckOutDate(checkOut);
+                StayDateTimeService.StayWindow stayWindow = stayDateTimeService.resolvePublicStayWindow(checkIn, checkOut);
                 List<Room> availableRooms = roomRepository.findAvailableRoomsByDate(
                         typeId,
-                        start,
-                        end,
+                        stayWindow.checkIn(),
+                        stayWindow.checkOut(),
                         LocalDateTime.now()
                 );
                 return sanitizePublicRooms(availableRooms);
@@ -168,6 +185,8 @@ public class RoomApiController {
             } else {
                 room = new Room();
             }
+
+            validateOperationalStatusTransition(room, status);
 
             if (!isAdmin) {
                 room.setStatus(status);
@@ -260,33 +279,6 @@ public class RoomApiController {
             throw new IllegalArgumentException("Trang thai phong khong hop le.");
         }
         return normalized;
-    }
-
-    private LocalDateTime parseDateTimeParam(String value, LocalTime defaultTime) {
-        String normalized = value == null ? "" : value.trim();
-        if (normalized.isBlank()) {
-            throw new IllegalArgumentException("Thời gian tìm phòng không hợp lệ.");
-        }
-
-        try {
-            if (normalized.length() == 10) {
-                return LocalDate.parse(normalized).atTime(defaultTime);
-            }
-            if (normalized.contains(" ")) {
-                normalized = normalized.replace(" ", "T");
-            }
-            return LocalDateTime.parse(normalized);
-        } catch (DateTimeParseException ex) {
-            throw new IllegalArgumentException("Thời gian tìm phòng không hợp lệ.");
-        }
-    }
-
-    private LocalDateTime parseCheckInDate(String value) {
-        return parseDateTimeParam(value, DEFAULT_CHECK_IN_TIME);
-    }
-
-    private LocalDateTime parseCheckOutDate(String value) {
-        return parseDateTimeParam(value, DEFAULT_CHECK_OUT_TIME);
     }
 
     private boolean hasDateRange(String checkIn, String checkOut) {

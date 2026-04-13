@@ -66,32 +66,32 @@ public class NotificationService {
     @Transactional
     public void sendReviewPrompt(Booking booking) {
         if (booking.getUser() == null) return;
-        
-        List<Coupon> activeReviewCoupons = couponRepository.findByIsActiveTrue()
-                .stream()
-                .filter(c -> "ON_REVIEW".equalsIgnoreCase(c.getTargetEvent()))
-                .filter(c -> c.getEndDate().isAfter(java.time.LocalDateTime.now()))
-                .toList();
-                
-        String messageBody = "Cảm ơn bạn đã trải nghiệm dịch vụ. Đừng quên để lại đánh giá để tích lũy điểm thưởng nhé!";
-        
-        if (!activeReviewCoupons.isEmpty()) {
-            Coupon reward = activeReviewCoupons.get(0);
-            String discountStr = "";
+
+        // Tìm riêng REVIEWSTAR thay vì lấy bất kỳ coupon ON_REVIEW nào
+        Optional<com.hotel.entity.Coupon> reviewStarOpt = couponRepository.findByCodeIgnoreCase("REVIEWSTAR");
+
+        String messageBody;
+        if (reviewStarOpt.isPresent() && Boolean.TRUE.equals(reviewStarOpt.get().getIsActive())
+                && reviewStarOpt.get().getEndDate() != null
+                && reviewStarOpt.get().getEndDate().isAfter(java.time.LocalDateTime.now())) {
+            com.hotel.entity.Coupon reward = reviewStarOpt.get();
+            String discountStr;
             if ("FIXED".equalsIgnoreCase(reward.getDiscountType())) {
                 NumberFormat format = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
                 discountStr = format.format(reward.getDiscountValue());
             } else {
-                // If it's 10.0, format to "10" 
                 double val = reward.getDiscountValue();
                 discountStr = (val == Math.floor(val) ? String.format("%.0f", val) : String.valueOf(val)) + "%";
             }
-            messageBody = "Mời bạn đánh giá phòng vừa trả để nhận ngay Voucher " + discountStr + " cho lần đặt tiếp theo!";
+            messageBody = "Cảm ơn bạn đã lưu trú! Hãy đánh giá phòng vừa trả để nhận ngay Voucher "
+                    + discountStr + " (mã REVIEWSTAR) — xuất hiện tại trang Mã giảm giá sau khi bạn gửi review.";
+        } else {
+            messageBody = "Cảm ơn bạn đã trải nghiệm dịch vụ tại GOAT Hotel. Đừng quên để lại đánh giá nhé!";
         }
-        
+
         createNotification(
             booking.getUser(),
-            "Quà tặng tri ân từ GOAT Hotel",
+            "Quà tặng tri ân từ GOAT Hotel ⭐",
             messageBody,
             "REVIEW_PROMPT",
             booking.getId()

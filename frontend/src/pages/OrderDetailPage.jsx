@@ -140,6 +140,7 @@ export default function OrderDetailPage() {
   const roomType = detail?.room?.roomType;
   const currentStatus = (booking?.status || 'pending').toLowerCase();
   const currentPaymentStatus = (booking?.paymentStatus || 'unpaid').toLowerCase();
+  const pendingHoldDisplayText = booking?.pendingHoldDisplayText?.trim() || '';
   const remainingHoldSeconds = currentStatus === 'pending'
     ? getRemainingSeconds(booking?.expiresAt, clockTick)
     : null;
@@ -526,7 +527,11 @@ export default function OrderDetailPage() {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <p className="font-label text-[0.64rem] uppercase tracking-[0.28em] text-amber-700">Giữ chỗ tạm thời</p>
-                    <h2 className="mt-3 font-headline text-[1.8rem] leading-tight text-primary">Booking này đang được giữ chỗ trong 2 phút</h2>
+                    <h2 className="mt-3 font-headline text-[1.8rem] leading-tight text-primary">
+                      {pendingHoldDisplayText
+                        ? `Booking này đang được giữ chỗ trong ${pendingHoldDisplayText}`
+                        : 'Booking này đang được giữ chỗ tạm thời'}
+                    </h2>
                     <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant">
                       Bạn có thể thanh toán tiền đặt cọc hoặc thanh toán toàn bộ trước khi hết thời gian giữ chỗ để chuyển booking sang trạng thái đã xác nhận.
                     </p>
@@ -886,6 +891,11 @@ export default function OrderDetailPage() {
                       >
                         {cancelling ? 'Đang hủy...' : 'Hủy đặt phòng'}
                       </button>
+                    </div>
+                  )}
+                  {currentStatus !== 'pending' && !['cancelled', 'expired', 'completed'].includes(currentStatus) && (
+                    <div className="mt-6 rounded-[20px] border border-amber-200/70 bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-900">
+                      Đơn này đã sang bước xác nhận hoặc vận hành. Nếu cần hủy, vui lòng liên hệ GOAT HOTEL để được hỗ trợ trực tiếp.
                     </div>
                   )}
                 </section>

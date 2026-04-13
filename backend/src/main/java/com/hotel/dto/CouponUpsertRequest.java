@@ -31,6 +31,8 @@ public record CouponUpsertRequest(
         String endDate,
         @Positive(message = "Giới hạn sử dụng phải lớn hơn 0.")
         Integer usageLimit,
+        @Positive(message = "Giới hạn sử dụng mỗi người phải lớn hơn 0.")
+        Integer perUserLimit,
         Boolean isActive
 ) {
 }

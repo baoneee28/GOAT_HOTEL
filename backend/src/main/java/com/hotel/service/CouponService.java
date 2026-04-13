@@ -201,6 +201,7 @@ public class CouponService {
         LocalDateTime startDate = parseRequiredDateTime(payload.get("startDate"), "Thoi diem bat dau");
         LocalDateTime endDate = parseRequiredDateTime(payload.get("endDate"), "Thoi diem ket thuc");
         Integer usageLimit = parseNullablePositiveInteger(payload.get("usageLimit"), "Gioi han su dung");
+        Integer perUserLimit = parseNullablePositiveInteger(payload.get("perUserLimit"), "Gioi han su dung moi nguoi");
         boolean isActive = parseBoolean(payload.get("isActive"), true);
         String description = payload.get("description") == null ? "" : payload.get("description").toString().trim();
 
@@ -244,6 +245,7 @@ public class CouponService {
         coupon.setStartDate(startDate);
         coupon.setEndDate(endDate);
         coupon.setUsageLimit(usageLimit);
+        coupon.setPerUserLimit(perUserLimit);
         coupon.setIsActive(isActive);
 
         String targetEvent = payload.get("targetEvent") == null ? "DEFAULT" : payload.get("targetEvent").toString().trim().toUpperCase(Locale.ROOT);
@@ -301,6 +303,47 @@ public class CouponService {
         userCoupon.setUsedAt(null);
         userCoupon.setBooking(null);
         return userCouponRepository.save(userCoupon);
+    }
+
+    /**
+     * Tự động cấp UserCoupon REVIEWSTAR sau khi user gửi đánh giá.
+     * Mỗi booking chỉ được cấp tối đa 1 lần (idempotency qua source = "review_{bookingId}").
+     * Trả về UserCoupon vừa tạo, hoặc null nếu bỏ qua (đã cấp / coupon không active).
+     */
+    public UserCoupon autoAssignReviewReward(@NonNull Integer bookingId, @NonNull Integer userId) {
+        Coupon reviewStar = couponRepository.findByCodeIgnoreCase("REVIEWSTAR").orElse(null);
+        if (reviewStar == null || !Boolean.TRUE.equals(reviewStar.getIsActive())) {
+            return null;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        if (reviewStar.getEndDate() != null && !reviewStar.getEndDate().isAfter(now)) {
+            return null; // coupon đã hết hạn
+        }
+
+        // Idempotency: mỗi booking chỉ nhận REVIEWSTAR 1 lần
+        String source = "review_" + bookingId;
+        if (userCouponRepository.existsByUser_IdAndCoupon_CodeIgnoreCaseAndSource(userId, "REVIEWSTAR", source)) {
+            return null; // đã cấp cho booking này rồi
+        }
+
+        User targetUser = userRepository.findById(userId).orElse(null);
+        if (targetUser == null) return null;
+
+        LocalDateTime expiry = resolveAssignedExpiry(reviewStar, null, now);
+
+        UserCoupon uc = new UserCoupon();
+        uc.setUser(targetUser);
+        uc.setCoupon(reviewStar);
+        uc.setAssignedBy(null);
+        uc.setSource(source);
+        uc.setStatus("available");
+        uc.setNote("Phần thưởng đánh giá - Booking #" + bookingId);
+        uc.setAssignedAt(now);
+        uc.setExpiresAt(expiry);
+        uc.setUsedAt(null);
+        uc.setBooking(null);
+        return userCouponRepository.save(uc);
     }
 
     public CouponPricingResult previewCoupon(@NonNull Integer roomId,
@@ -403,7 +446,8 @@ public class CouponService {
         }
 
         coupon = enrichCoupon(coupon);
-        String invalidReason = resolveCouponInvalidReason(coupon, subtotal, now);
+        Integer userId = (user != null && user.getId() != null) ? user.getId() : null;
+        String invalidReason = resolveCouponInvalidReason(coupon, subtotal, now, userId);
         if (invalidReason != null) {
             return new CouponPricingResult(false, invalidReason, subtotal, 0.0, subtotal, coupon, null);
         }
@@ -490,7 +534,7 @@ public class CouponService {
             return null;
         }
         coupon.setCode(normalizeCode(coupon.getCode()));
-        coupon.setUsedCount(bookingRepository.countActiveCouponUsages(coupon.getCode()));
+        coupon.setUsedCount(bookingRepository.countActiveCouponUsages(coupon.getCode(), java.time.LocalDateTime.now()));
         coupon.setAssignedCount(userCouponRepository.countByCoupon_Id(coupon.getId()));
         coupon.setAvailableAssignedCount(userCouponRepository.countByCoupon_IdAndStatusIgnoreCase(coupon.getId(), "available"));
         coupon.setUsedAssignedCount(userCouponRepository.countByCoupon_IdAndStatusIgnoreCase(coupon.getId(), "used"));
@@ -563,6 +607,10 @@ public class CouponService {
     }
 
     private String resolveCouponInvalidReason(Coupon coupon, double subtotal, LocalDateTime now) {
+        return resolveCouponInvalidReason(coupon, subtotal, now, null);
+    }
+
+    private String resolveCouponInvalidReason(Coupon coupon, double subtotal, LocalDateTime now, Integer userId) {
         if (!Boolean.TRUE.equals(coupon.getIsActive())) {
             return "Ma giam gia nay hien dang tam tat.";
         }
@@ -576,6 +624,24 @@ public class CouponService {
                 && coupon.getUsageLimit() > 0
                 && (coupon.getUsedCount() == null ? 0 : coupon.getUsedCount()) >= coupon.getUsageLimit()) {
             return "Ma giam gia da het luot su dung.";
+        }
+        if (userId != null
+                && coupon.getPerUserLimit() != null
+                && coupon.getPerUserLimit() > 0
+                && coupon.getCode() != null) {
+            // REVIEWSTAR: dùng query đặc biệt loại trừ booking đã review → count tự về 0 sau khi review
+            long userUsedCount;
+            if ("REVIEWSTAR".equalsIgnoreCase(coupon.getCode())) {
+                userUsedCount = bookingRepository.countActiveCouponUsagesByUserExcludingReviewed(coupon.getCode(), userId, java.time.LocalDateTime.now());
+            } else {
+                userUsedCount = bookingRepository.countActiveCouponUsagesByUser(coupon.getCode(), userId, java.time.LocalDateTime.now());
+            }
+            if (userUsedCount >= coupon.getPerUserLimit()) {
+                if ("REVIEWSTAR".equalsIgnoreCase(coupon.getCode())) {
+                    return "Ban da su dung ma REVIEWSTAR. Hay danh gia phong de nhan lai uu dai!";
+                }
+                return "Ban da su dung het luot duoc phep cua ma giam gia nay.";
+            }
         }
         if (subtotal < (coupon.getMinOrderValue() == null ? 0.0 : coupon.getMinOrderValue())) {
             return "Don dat phong chua dat gia tri toi thieu de ap dung ma.";

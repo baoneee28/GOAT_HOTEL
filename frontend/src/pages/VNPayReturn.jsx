@@ -75,7 +75,7 @@ export default function VNPayReturn() {
 
         {status !== 'success' && bookingId && (
           <div className="mt-6 rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 text-left text-sm leading-7 text-amber-900">
-            Nếu booking vẫn còn hiệu lực, bạn có thể quay lại trang chi tiết đơn để mở lại VNPay hoặc xử lý đặt cọc 30%. Với case giữ chỗ tạm thời, thời gian demo hiện tại là 2 phút.
+            Nếu booking vẫn còn hiệu lực, bạn có thể quay lại trang chi tiết đơn để mở lại VNPay hoặc xử lý đặt cọc 30% trong thời gian giữ chỗ hiện tại của hệ thống.
           </div>
         )}
 

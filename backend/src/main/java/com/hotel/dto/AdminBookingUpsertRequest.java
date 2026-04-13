@@ -17,6 +17,8 @@ public record AdminBookingUpsertRequest(
         String checkIn,
         @NotBlank(message = "Ngày trả phòng không được để trống.")
         String checkOut,
+        @Positive(message = "Số khách phải lớn hơn 0.")
+        Integer guestCount,
         @NotBlank(message = "Trạng thái booking không được để trống.")
         String status
 ) {

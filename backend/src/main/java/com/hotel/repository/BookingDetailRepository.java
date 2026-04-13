@@ -43,4 +43,10 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, In
            "AND bd.checkOutActual >= :startTime AND bd.checkOutActual < :endTime")
     long countCheckOutsBetween(@Param("startTime") LocalDateTime startTime,
                                @Param("endTime") LocalDateTime endTime);
+
+    @Query("SELECT COUNT(bd) FROM BookingDetail bd JOIN bd.booking b " +
+           "WHERE bd.room.id = :roomId AND bd.checkOut > :atTime " +
+           "AND ((b.status = 'pending' AND b.expiresAt > :atTime) OR b.status = 'confirmed')")
+    long countUpcomingOrActiveBookingsForRoom(@Param("roomId") Integer roomId,
+                                              @Param("atTime") LocalDateTime atTime);
 }

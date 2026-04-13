@@ -44,6 +44,8 @@ public interface UserCouponRepository extends JpaRepository<UserCoupon, Integer>
             "WHERE uc.booking.id = :bookingId")
     Optional<UserCoupon> findByBookingId(@Param("bookingId") Integer bookingId);
 
+    boolean existsByUser_IdAndCoupon_CodeIgnoreCaseAndSource(Integer userId, String couponCode, String source);
+
     long countByCoupon_Id(Integer couponId);
 
     long countByCoupon_IdAndStatusIgnoreCase(Integer couponId, String status);

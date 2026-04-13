@@ -4,13 +4,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import API_BASE, { uploadedImageUrl } from '../config';
 import bookingImage from '../assets/collections_2.jpg';
 import HeroHeader from '../components/HeroHeader';
-
-const getToday = () => new Date().toISOString().split('T')[0];
-const getTomorrow = () => {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().split('T')[0];
-};
+import {
+  addDaysToDateInputValue,
+  getDefaultHotelStay,
+  getEarliestHotelCheckInDateValue,
+  normalizeHotelStayDates,
+} from '../utils/hotelStay';
 
 // Helper: lấy danh sách amenities từ API response (room.items[].item.name)
 const getRoomAmenities = (room) => {
@@ -23,6 +22,7 @@ const getRoomAmenities = (room) => {
 export default function Collections() {
   const navigate = useNavigate();
   const location = useLocation();
+  const defaultStay = getDefaultHotelStay();
   const [originalRooms, setOriginalRooms] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,8 +33,8 @@ export default function Collections() {
   const [navVisible, setNavVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
 
-  const [checkIn, setCheckIn] = useState(getToday);
-  const [checkOut, setCheckOut] = useState(getTomorrow);
+  const [checkIn, setCheckIn] = useState(defaultStay.checkIn);
+  const [checkOut, setCheckOut] = useState(defaultStay.checkOut);
 
   const [maxPrice, setMaxPrice] = useState(1500000);
   const [guests, setGuests] = useState(2);
@@ -72,6 +72,16 @@ export default function Collections() {
     return dateString;
   };
 
+  const applyStayDates = (nextCheckIn, nextCheckOut) => {
+    const normalizedStay = normalizeHotelStayDates({
+      checkIn: nextCheckIn,
+      checkOut: nextCheckOut,
+    });
+    setCheckIn(normalizedStay.checkIn);
+    setCheckOut(normalizedStay.checkOut);
+    return normalizedStay;
+  };
+
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
@@ -103,29 +113,23 @@ export default function Collections() {
   };
 
   useEffect(() => {
-    const stateCheckIn = location.state?.checkIn || getToday();
-    const stateCheckOut = location.state?.checkOut || getTomorrow();
-    setCheckIn(stateCheckIn);
-    setCheckOut(stateCheckOut);
-    fetchRooms(stateCheckIn, stateCheckOut);
+    const normalizedStay = normalizeHotelStayDates({
+      checkIn: location.state?.checkIn,
+      checkOut: location.state?.checkOut,
+    });
+    setCheckIn(normalizedStay.checkIn);
+    setCheckOut(normalizedStay.checkOut);
+    fetchRooms(normalizedStay.checkIn, normalizedStay.checkOut);
   }, []);
 
   const handleApplyFilters = () => {
-    const today = getToday();
-    if (checkIn < today) {
-      triggerShake('checkIn');
-      showToast('Ngày nhận phòng không thể ở trong quá khứ.', 'event_busy');
-      return;
-    }
-    if (checkOut <= checkIn) {
-      triggerShake('checkOut');
-      showToast('Ngày trả phòng phải sau ngày nhận phòng.', 'calendar_today');
-      return;
-    }
+    const normalizedStay = applyStayDates(checkIn, checkOut);
+    const effectiveCheckIn = normalizedStay.checkIn;
+    const effectiveCheckOut = normalizedStay.checkOut;
 
     const scrollY = window.scrollY;
     setLoading(true);
-    let url = `${API_BASE}/api/room-types?checkIn=${checkIn}&checkOut=${checkOut}`;
+    let url = `${API_BASE}/api/room-types?checkIn=${effectiveCheckIn}&checkOut=${effectiveCheckOut}`;
     
     axios.get(url, { withCredentials: true })
       .then(res => {
@@ -160,6 +164,8 @@ export default function Collections() {
   const capacityIcon = (cap) => cap >= 4 ? 'group' : 'person';
 
   const CAPACITY_OPTIONS = [1, 2, 3, 4];
+  const earliestCheckInDate = getEarliestHotelCheckInDateValue();
+  const earliestCheckOutDate = addDaysToDateInputValue(checkIn, 1);
 
   const AMENITY_OPTIONS = React.useMemo(() => {
     const amenitiesSet = new Set();
@@ -236,7 +242,8 @@ export default function Collections() {
                   <input 
                     type="date" 
                     value={checkIn}
-                    onChange={(e) => setCheckIn(e.target.value)}
+                    onChange={(e) => applyStayDates(e.target.value, checkOut)}
+                    min={earliestCheckInDate}
                     className={`text-xs p-2 rounded-lg bg-surface-container border ${shakeField === 'checkIn' ? 'border-red-500 field-shake' : 'border-outline-variant/30 focus:border-secondary'} focus:ring-0 outline-none`}
                   />
                 </div>
@@ -247,7 +254,8 @@ export default function Collections() {
                   <input 
                     type="date" 
                     value={checkOut}
-                    onChange={(e) => setCheckOut(e.target.value)}
+                    onChange={(e) => applyStayDates(checkIn, e.target.value)}
+                    min={earliestCheckOutDate}
                     className={`text-xs p-2 rounded-lg bg-surface-container border ${shakeField === 'checkOut' ? 'border-red-500 field-shake' : 'border-outline-variant/30 focus:border-secondary'} focus:ring-0 outline-none`}
                   />
                 </div>
@@ -389,12 +397,20 @@ export default function Collections() {
                     disabled={outOfRooms}
                     className={`${outOfRooms ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-secondary text-white hover:bg-[#5d4201]'} px-8 py-4 font-bold tracking-widest uppercase text-[10px]  transition-all`}
                     onClick={() => {
+                      const normalizedStay = applyStayDates(checkIn, checkOut);
                       const query = new URLSearchParams({
-                        checkIn,
-                        checkOut,
+                        checkIn: normalizedStay.checkIn,
+                        checkOut: normalizedStay.checkOut,
                         guests: String(guests),
                       }).toString();
-                      navigate(`/rooms/${room.id}?${query}`, { state: { room, checkIn, checkOut, guests } });
+                      navigate(`/rooms/${room.id}?${query}`, {
+                        state: {
+                          room,
+                          checkIn: normalizedStay.checkIn,
+                          checkOut: normalizedStay.checkOut,
+                          guests,
+                        },
+                      });
                     }}
                   >
                     {outOfRooms ? 'KHÔNG KẾT QUẢ' : 'CHỌN PHÒNG'}

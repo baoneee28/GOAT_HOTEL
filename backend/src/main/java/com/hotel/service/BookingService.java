@@ -256,8 +256,22 @@ public class BookingService {
         if (detail == null || detail.getCheckIn() == null) {
             throw new IllegalArgumentException("Đơn chưa có thời gian nhận phòng hợp lệ.");
         }
-        if (now != null && now.isBefore(detail.getCheckIn())) {
-            throw new IllegalArgumentException("Chỉ có thể check-in từ thời điểm nhận phòng đã đặt.");
+        
+        // Chỉ được check-in từ thời điểm checkIn trở đi (có thể du di sớm 1-2 tiếng nhưng theo user yêu cầu chặt, ta dùng đúng giờ)
+        if (now.isBefore(detail.getCheckIn())) {
+            String checkInDateStr = detail.getCheckIn()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy"));
+            throw new IllegalArgumentException(
+                    "Chưa đến giờ nhận phòng. Chỉ có thể check-in từ " + checkInDateStr + " trở đi."
+            );
+        }
+
+        // Sau 1 ngày (24h) từ ngày dự kiến thì không được phép nhận phòng nữa, coi như no-show (mất cọc)
+        LocalDateTime checkInDeadline = detail.getCheckIn().plusDays(1);
+        if (now.isAfter(checkInDeadline)) {
+            throw new IllegalArgumentException(
+                    "Đơn đã quá hạn check-in 1 ngày. Khách không đến nên mất cọc và không thể nhận phòng."
+            );
         }
     }
 
@@ -485,7 +499,7 @@ public class BookingService {
 
     @Transactional
     public Booking createBooking(User user, Integer roomId, LocalDateTime checkIn, LocalDateTime checkOut, String paymentFlow) {
-        return createBooking(user, roomId, checkIn, checkOut, paymentFlow, null, null);
+        return createBooking(user, roomId, checkIn, checkOut, paymentFlow, null, null, null);
     }
 
     @Transactional
@@ -495,7 +509,7 @@ public class BookingService {
                                  LocalDateTime checkOut,
                                  String paymentFlow,
                                  String couponCode) {
-        return createBooking(user, roomId, checkIn, checkOut, paymentFlow, couponCode, null);
+        return createBooking(user, roomId, checkIn, checkOut, paymentFlow, couponCode, null, null);
     }
 
     @Transactional
@@ -506,6 +520,18 @@ public class BookingService {
                                  String paymentFlow,
                                  String couponCode,
                                  Integer userCouponId) {
+        return createBooking(user, roomId, checkIn, checkOut, paymentFlow, couponCode, userCouponId, null);
+    }
+
+    @Transactional
+    public Booking createBooking(User user,
+                                 Integer roomId,
+                                 LocalDateTime checkIn,
+                                 LocalDateTime checkOut,
+                                 String paymentFlow,
+                                 String couponCode,
+                                 Integer userCouponId,
+                                 Integer guestCount) {
         if (user == null || user.getId() == null) {
             throw new IllegalArgumentException("Phiên người dùng không hợp lệ.");
         }
@@ -522,9 +548,10 @@ public class BookingService {
             );
         }
 
-        // Không cho phép đặt phòng với ngày nhận trong quá khứ
-        if (checkIn.isBefore(LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0))) {
-            throw new IllegalArgumentException("Ngày nhận phòng không thể ở trong quá khứ!");
+        LocalDateTime now = LocalDateTime.now();
+
+        if (!checkIn.isAfter(now)) {
+            throw new IllegalArgumentException("Ngày nhận phòng phải nằm trong tương lai.");
         }
         if (!checkOut.isAfter(checkIn)) {
             throw new IllegalArgumentException("Thời gian ra phải lớn hơn thời gian vào!");
@@ -540,7 +567,9 @@ public class BookingService {
             throw new IllegalArgumentException("Phòng này đang được bảo trì nên chưa thể nhận booking mới.");
         }
 
-        long overlapCount = bookingRepository.countOverlappingBookings(roomId, checkIn, checkOut, LocalDateTime.now());
+        int resolvedGuestCount = resolveRequestedGuestCount(guestCount, room);
+
+        long overlapCount = bookingRepository.countOverlappingBookings(roomId, checkIn, checkOut, now);
         if (overlapCount > 0) {
             throw new IllegalArgumentException("Phòng đã có người đặt trong thời gian này!");
         }
@@ -581,6 +610,7 @@ public class BookingService {
         detail.setPriceAtBooking(pricePerNight);
         detail.setCheckIn(checkIn);
         detail.setCheckOut(checkOut);
+        detail.setGuestCount(resolvedGuestCount);
         detail.setTotalHours(totalHours);
         bookingDetailRepository.save(detail);
         couponService.reserveUserCouponForBooking(couponPricing.userCouponId(), booking, user.getId());
@@ -591,11 +621,28 @@ public class BookingService {
     @Transactional
     public String bookRoom(User user, Integer roomId, LocalDateTime checkIn, LocalDateTime checkOut) {
         try {
-            createBooking(user, roomId, checkIn, checkOut, "standard_request", null, null);
+            createBooking(user, roomId, checkIn, checkOut, "standard_request", null, null, null);
             return null;
         } catch (IllegalArgumentException ex) {
             return ex.getMessage();
         }
+    }
+
+    private int resolveRequestedGuestCount(Integer guestCount, Room room) {
+        int resolvedGuestCount = guestCount != null && guestCount > 0
+                ? guestCount
+                : Math.max(1, room != null && room.getRoomType() != null && room.getRoomType().getCapacity() != null
+                ? room.getRoomType().getCapacity()
+                : 1);
+
+        int capacity = room != null && room.getRoomType() != null && room.getRoomType().getCapacity() != null
+                ? room.getRoomType().getCapacity()
+                : 0;
+        if (capacity > 0 && resolvedGuestCount > capacity) {
+            throw new IllegalArgumentException("Số khách vượt quá sức chứa hiện tại của phòng.");
+        }
+
+        return resolvedGuestCount;
     }
 
     @Transactional
@@ -613,7 +660,7 @@ public class BookingService {
             throw new SecurityException("Bạn không có quyền hủy đơn đặt phòng này.");
         }
         if (!"pending".equalsIgnoreCase(booking.getStatus())) {
-            throw new IllegalStateException("Chỉ có thể hủy booking đang chờ xác nhận.");
+            throw new IllegalStateException("Chỉ có thể hủy booking đang chờ xác nhận. Sau khi đơn đã được xác nhận, vui lòng liên hệ khách sạn để được hỗ trợ.");
         }
         if (hasRecordedPayment(booking)) {
             throw new IllegalStateException("Booking đã có thanh toán hoặc đặt cọc, vui lòng liên hệ khách sạn để được hỗ trợ.");

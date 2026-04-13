@@ -18,6 +18,7 @@ const EMPTY_FORM = {
   startDate: '',
   endDate: '',
   usageLimit: '',
+  perUserLimit: '',
   usedCount: 0,
   isActive: true,
 };
@@ -317,6 +318,7 @@ export default function AdminCoupons() {
         startDate: toDateTimeLocalInput(coupon.startDate),
         endDate: toDateTimeLocalInput(coupon.endDate),
         usageLimit: coupon.usageLimit ?? '',
+        perUserLimit: coupon.perUserLimit ?? '',
         usedCount: coupon.usedCount ?? 0,
         isActive: Boolean(coupon.isActive),
       });
@@ -441,6 +443,7 @@ export default function AdminCoupons() {
       startDate: formData.startDate || null,
       endDate: formData.endDate || null,
       usageLimit: formData.usageLimit !== '' ? Number(formData.usageLimit) : null,
+      perUserLimit: formData.perUserLimit !== '' ? Number(formData.perUserLimit) : null,
       isActive: Boolean(formData.isActive),
     };
 
@@ -664,7 +667,8 @@ export default function AdminCoupons() {
                                   </td>
                                   <td className="coupon-col-condition">
                                     <div className="coupon-meta-line"><span className="coupon-meta-label">Đơn tối thiểu:</span> <strong>{formatCurrency(coupon.minOrderValue)}</strong></div>
-                                    <div className="coupon-meta-line coupon-meta-sub"><span className="coupon-meta-label">Limit:</span> <span>{coupon.usageLimit || 'Không giới hạn'}</span></div>
+                                    <div className="coupon-meta-line coupon-meta-sub"><span className="coupon-meta-label">Tổng lượt:</span> <span>{coupon.usageLimit || 'Không giới hạn'}</span></div>
+                                    <div className="coupon-meta-line coupon-meta-sub"><span className="coupon-meta-label">Mỗi người:</span> <span>{coupon.perUserLimit || '∞'} lượt</span></div>
                                   </td>
                                   <td className="coupon-col-validity">
                                     <div className="coupon-meta-line"><span className="coupon-meta-label">Từ:</span> <span>{formatCompactDateTime(coupon.startDate)}</span></div>
@@ -775,8 +779,12 @@ export default function AdminCoupons() {
                       <input type="number" min="0" step="1000" className="form-control rounded-3" value={formData.maxDiscountAmount} onChange={(event) => setFormData((prev) => ({ ...prev, maxDiscountAmount: event.target.value }))} placeholder={formData.discountType === 'PERCENT' ? 'Ví dụ 150000' : 'Không áp dụng với FIXED'} disabled={formData.discountType !== 'PERCENT'} />
                     </div>
                     <div className="col-md-4">
-                      <label className="form-label fw-bold">Giới hạn sử dụng</label>
+                      <label className="form-label fw-bold">Giới hạn sử dụng <span className="text-muted fw-normal">(tổng)</span></label>
                       <input type="number" min="0" step="1" className="form-control rounded-3" value={formData.usageLimit} onChange={(event) => setFormData((prev) => ({ ...prev, usageLimit: event.target.value }))} placeholder="Để trống nếu không giới hạn" />
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label fw-bold">Giới hạn <span className="text-muted fw-normal">(mỗi người)</span></label>
+                      <input type="number" min="1" step="1" className="form-control rounded-3" value={formData.perUserLimit} onChange={(event) => setFormData((prev) => ({ ...prev, perUserLimit: event.target.value }))} placeholder="Để trống nếu không giới hạn" />
                     </div>
                     <div className="col-md-4">
                       <label className="form-label fw-bold">Đã dùng</label>

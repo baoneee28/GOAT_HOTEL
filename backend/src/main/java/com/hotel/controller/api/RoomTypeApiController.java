@@ -13,6 +13,7 @@ import com.hotel.repository.RoomRepository;
 import com.hotel.repository.BookingDetailRepository;
 import com.hotel.repository.FeaturedRoomTypeRepository;
 import com.hotel.service.FileUploadService;
+import com.hotel.service.StayDateTimeService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -56,6 +57,9 @@ public class RoomTypeApiController {
     @Autowired
     private FileUploadService fileUploadService;
 
+    @Autowired
+    private StayDateTimeService stayDateTimeService;
+
     @GetMapping
     public org.springframework.http.ResponseEntity<?> getAllRoomTypes(
             @RequestParam(value = "checkIn", required = false) String checkIn,
@@ -65,10 +69,13 @@ public class RoomTypeApiController {
         
         if (checkIn != null && !checkIn.isBlank() && checkOut != null && !checkOut.isBlank()) {
             try {
-                LocalDateTime start = parseStayDate(checkIn, DEFAULT_CHECK_IN_TIME);
-                LocalDateTime end = parseStayDate(checkOut, DEFAULT_CHECK_OUT_TIME);
+                StayDateTimeService.StayWindow stayWindow = stayDateTimeService.resolvePublicStayWindow(checkIn, checkOut);
                 
-                List<Object[]> counts = roomTypeRepository.countAvailableRoomsByDate(start, end, java.time.LocalDateTime.now());
+                List<Object[]> counts = roomTypeRepository.countAvailableRoomsByDate(
+                        stayWindow.checkIn(),
+                        stayWindow.checkOut(),
+                        java.time.LocalDateTime.now()
+                );
                 Map<Integer, Long> countMap = counts.stream()
                         .collect(Collectors.toMap(
                                 row -> (Integer) row[0],

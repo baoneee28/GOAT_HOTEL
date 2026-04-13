@@ -3,10 +3,12 @@ package com.hotel.service;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.NonNull;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.io.UnsupportedEncodingException;
 
@@ -16,11 +18,22 @@ public class EmailService {
     @Autowired
     private JavaMailSender mailSender;
 
+    @Value("${spring.mail.username:}")
+    private String mailUsername;
+
+    @Value("${spring.mail.password:}")
+    private String mailPassword;
+
     public void sendPasswordResetOtp(@NonNull String toEmail, @NonNull String otp) throws MessagingException, UnsupportedEncodingException {
+        if (!StringUtils.hasText(mailUsername) || !StringUtils.hasText(mailPassword)) {
+            throw new IllegalStateException("SMTP mail credentials are not configured.");
+        }
+
+        String senderEmail = mailUsername.trim();
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-        helper.setFrom("goathotelvua@gmail.com", "GOAT Hotel");
+        helper.setFrom(senderEmail, "GOAT Hotel");
         helper.setTo(toEmail);
         helper.setSubject("[GOAT HOTEL] Ma xac nhan dat lai mat khau");
 

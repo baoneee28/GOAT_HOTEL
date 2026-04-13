@@ -27,6 +27,8 @@ public class BookingDetail {
     private LocalDateTime checkInActual;
     @Column(name = "check_out_actual")
     private LocalDateTime checkOutActual;
+    @Column(name = "guest_count")
+    private Integer guestCount;
     @Column(name = "total_hours")
     private Double totalHours = 0.0;
 }

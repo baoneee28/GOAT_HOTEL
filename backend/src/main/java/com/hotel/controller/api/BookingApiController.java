@@ -18,6 +18,7 @@ import com.hotel.service.AuthService;
 import com.hotel.service.BookingService;
 import com.hotel.service.NotificationService;
 import com.hotel.service.PaymentService;
+import com.hotel.service.StayDateTimeService;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -71,6 +72,10 @@ public class BookingApiController {
 
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private StayDateTimeService stayDateTimeService;
+
     private static final LocalTime DEFAULT_CHECK_IN_TIME = LocalTime.of(14, 0);
     private static final LocalTime DEFAULT_CHECK_OUT_TIME = LocalTime.of(12, 0);
     private static final LocalTime FILTER_START_TIME = LocalTime.of(0, 0);
@@ -226,6 +231,28 @@ public class BookingApiController {
                 + ". Tiếp theo, hãy đặt cọc hoặc thanh toán toàn bộ để giữ chỗ.";
     }
 
+    private int resolveRequestedGuestCount(Integer requestedGuestCount, Room room) {
+        int fallbackGuestCount = room != null
+                && room.getRoomType() != null
+                && room.getRoomType().getCapacity() != null
+                && room.getRoomType().getCapacity() > 0
+                ? room.getRoomType().getCapacity()
+                : 1;
+        int resolvedGuestCount = requestedGuestCount != null && requestedGuestCount > 0
+                ? requestedGuestCount
+                : fallbackGuestCount;
+
+        if (room != null
+                && room.getRoomType() != null
+                && room.getRoomType().getCapacity() != null
+                && room.getRoomType().getCapacity() > 0
+                && resolvedGuestCount > room.getRoomType().getCapacity()) {
+            throw new IllegalArgumentException("Số khách vượt quá sức chứa hiện tại của phòng.");
+        }
+
+        return resolvedGuestCount;
+    }
+
     private Page<Booking> findAdminBookingsPage(String status,
                                                 LocalDateTime fromDateTime,
                                                 LocalDateTime toDateTime,
@@ -262,16 +289,20 @@ public class BookingApiController {
         try {
             String paymentFlow = normalizeText(request.paymentFlow());
             String couponCode = normalizeText(request.couponCode());
-            LocalDateTime checkIn = parseCheckInDate(request.checkIn());
-            LocalDateTime checkOut = parseCheckOutDate(request.checkOut());
+            StayDateTimeService.StayWindow stayWindow = stayDateTimeService.resolvePublicStayWindow(
+                    request.checkIn(),
+                    request.checkOut()
+            );
 
             Booking createdBooking = bookingService.createBooking(
                     currentUser,
                     request.roomId(),
-                    checkIn,
-                    checkOut,
+                    stayWindow.checkIn(),
+                    stayWindow.checkOut(),
                     paymentFlow,
-                    couponCode
+                    couponCode,
+                    null,
+                    request.guests()
             );
 
             return ResponseEntity.ok(ApiResponse.ok(
@@ -453,6 +484,7 @@ public class BookingApiController {
             }
 
             Room room = roomOpt.get();
+            int resolvedGuestCount = resolveRequestedGuestCount(request.guestCount(), room);
             double pricePerNight = room.getRoomType().getPricePerNight();
             Map<String, Double> priceInfo = bookingService.calculateBookingPriceAdmin(checkIn, checkOut, pricePerNight);
             double totalHours = priceInfo.get("hours");
@@ -495,6 +527,7 @@ public class BookingApiController {
                     BookingDetail detail = existing.getDetails().get(0);
                     detail.setCheckIn(checkIn);
                     detail.setCheckOut(checkOut);
+                    detail.setGuestCount(resolvedGuestCount);
                     detail.setTotalHours(totalHours);
                     detail.setRoom(room);
                     bookingDetailRepository.save(detail);
@@ -522,6 +555,7 @@ public class BookingApiController {
                 booking.setPaymentStatus(bookingService.normalizeAdminPaymentStatus(null, initialStatus));
                 booking.setTotalPrice(totalPrice);
                 booking.setFinalAmount(totalPrice);
+                booking.setDepositAmount(bookingService.calculateDepositAmount(totalPrice));
                 bookingService.preparePendingBooking(booking, null);
                 booking = bookingRepository.save(booking);
                 bookingId = booking.getId();
@@ -532,6 +566,7 @@ public class BookingApiController {
                 detail.setPriceAtBooking(pricePerNight);
                 detail.setCheckIn(checkIn);
                 detail.setCheckOut(checkOut);
+                detail.setGuestCount(resolvedGuestCount);
                 detail.setTotalHours(totalHours);
                 bookingDetailRepository.save(detail);
             }
@@ -576,7 +611,7 @@ public class BookingApiController {
             return badRequestResponse("Đơn này đã được checkout trước đó.");
         }
         if (!"paid".equalsIgnoreCase(booking.getPaymentStatus())) {
-            return badRequestResponse("Chỉ có thể checkout booking đã thanh toán. Hãy thu tiền trước khi checkout.");
+            return badRequestResponse("Chỉ có thể checkout booking đã thanh toán. Hãy dùng thao tác thu tiền mặt trước khi checkout.");
         }
 
         if ("recalc".equals(request.checkoutType())) {

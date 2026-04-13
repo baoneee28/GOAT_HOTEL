@@ -7,9 +7,12 @@ import com.hotel.dto.CouponUpsertRequest;
 import com.hotel.entity.Coupon;
 import com.hotel.entity.CouponEventType;
 import com.hotel.entity.User;
+import com.hotel.repository.BookingRepository;
 import com.hotel.repository.CouponEventTypeRepository;
+import com.hotel.repository.CouponRepository;
 import com.hotel.service.AuthService;
 import com.hotel.service.CouponService;
+import com.hotel.service.StayDateTimeService;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -35,13 +38,24 @@ public class CouponApiController {
     private final CouponService couponService;
     private final AuthService authService;
     private final CouponEventTypeRepository eventTypeRepository;
+    private final StayDateTimeService stayDateTimeService;
+    private final BookingRepository bookingRepository;
+    private final CouponRepository couponRepository;
     private static final LocalTime DEFAULT_CHECK_IN_TIME = LocalTime.of(14, 0);
     private static final LocalTime DEFAULT_CHECK_OUT_TIME = LocalTime.of(12, 0);
 
-    public CouponApiController(CouponService couponService, AuthService authService, CouponEventTypeRepository eventTypeRepository) {
+    public CouponApiController(CouponService couponService,
+                               AuthService authService,
+                               CouponEventTypeRepository eventTypeRepository,
+                               StayDateTimeService stayDateTimeService,
+                               BookingRepository bookingRepository,
+                               CouponRepository couponRepository) {
         this.couponService = couponService;
         this.authService = authService;
         this.eventTypeRepository = eventTypeRepository;
+        this.stayDateTimeService = stayDateTimeService;
+        this.bookingRepository = bookingRepository;
+        this.couponRepository = couponRepository;
     }
 
     @PostConstruct
@@ -86,12 +100,42 @@ public class CouponApiController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Trả về trạng thái REVIEWSTAR cho user hiện tại.
+     * available=true: user có thể dùng REVIEWSTAR (chưa dùng hoặc đã review).
+     * available=false: đã dùng và chưa review phòng.
+     */
+    @GetMapping("/coupons/reviewstar-status")
+    public ResponseEntity<Map<String, Object>> getReviewStarStatus(HttpSession session) {
+        User currentUser = getSessionUser(session);
+        if (currentUser == null) {
+            return ResponseEntity.ok(Map.of("available", false, "loggedIn", false));
+        }
+        Coupon rs = couponRepository.findByCodeIgnoreCase("REVIEWSTAR").orElse(null);
+        if (rs == null || !Boolean.TRUE.equals(rs.getIsActive())
+                || (rs.getEndDate() != null && rs.getEndDate().isBefore(java.time.LocalDateTime.now()))) {
+            return ResponseEntity.ok(Map.of("available", false, "loggedIn", true));
+        }
+        long usedCount = bookingRepository.countActiveCouponUsagesByUserExcludingReviewed("REVIEWSTAR", currentUser.getId(), java.time.LocalDateTime.now());
+        int perUserLimit = rs.getPerUserLimit() != null ? rs.getPerUserLimit() : Integer.MAX_VALUE;
+        boolean available = usedCount < perUserLimit;
+        Map<String, Object> res = new HashMap<>();
+        res.put("available", available);
+        res.put("loggedIn", true);
+        res.put("usedCount", usedCount);
+        res.put("perUserLimit", perUserLimit);
+        res.put("coupon", rs);
+        return ResponseEntity.ok(res);
+    }
+
     @PostMapping("/coupons/apply")
     public ResponseEntity<Map<String, Object>> applyCoupon(@Valid @RequestBody CouponApplyRequest request, HttpSession session) {
         Map<String, Object> response = new HashMap<>();
         try {
-            LocalDateTime checkIn = parseStayDate(request.checkIn(), DEFAULT_CHECK_IN_TIME, "Ngay nhan phong");
-            LocalDateTime checkOut = parseStayDate(request.checkOut(), DEFAULT_CHECK_OUT_TIME, "Ngay tra phong");
+            StayDateTimeService.StayWindow stayWindow = stayDateTimeService.resolvePublicStayWindow(
+                    request.checkIn(),
+                    request.checkOut()
+            );
             User currentUser = getSessionUser(session);
             boolean couponRequired = request.userCouponId() != null
                     || (request.couponCode() != null && !request.couponCode().isBlank());
@@ -99,8 +143,8 @@ public class CouponApiController {
             CouponService.CouponPricingResult result = couponService.previewCouponSelection(
                     currentUser,
                     request.roomId(),
-                    checkIn,
-                    checkOut,
+                    stayWindow.checkIn(),
+                    stayWindow.checkOut(),
                     request.userCouponId(),
                     request.couponCode(),
                     couponRequired
@@ -396,6 +440,7 @@ public class CouponApiController {
         payload.put("startDate", request.startDate());
         payload.put("endDate", request.endDate());
         payload.put("usageLimit", request.usageLimit());
+        payload.put("perUserLimit", request.perUserLimit());
         payload.put("isActive", request.isActive());
         return payload;
     }

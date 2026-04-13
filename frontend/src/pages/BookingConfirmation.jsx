@@ -3,12 +3,29 @@ import { useLocation, useNavigate, useOutletContext, useSearchParams } from 'rea
 import axios from 'axios';
 import API_BASE, { calculateStayNights, uploadedImageUrl, resolveRoomTypeSpec } from '../config';
 import HeroHeader from '../components/HeroHeader';
+import {
+  addDaysToDateInputValue,
+  getEarliestHotelCheckInDateValue,
+  normalizeHotelStayDates,
+} from '../utils/hotelStay';
 
 function fmtDate(d) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('vi-VN', {
     day: '2-digit', month: '2-digit', year: 'numeric',
   });
+}
+
+function buildCreatedBookingMessage(resultMessage, pendingHoldDisplayText) {
+  if (resultMessage?.trim()) {
+    return resultMessage;
+  }
+
+  if (pendingHoldDisplayText?.trim()) {
+    return `Phòng sẽ được giữ trong ${pendingHoldDisplayText}. Tiếp theo, hãy đặt cọc hoặc thanh toán toàn bộ để giữ chỗ.`;
+  }
+
+  return 'Phòng đã được giữ chỗ tạm thời. Tiếp theo, hãy đặt cọc hoặc thanh toán toàn bộ để giữ chỗ.';
 }
 
 export default function BookingConfirmation() {
@@ -19,6 +36,10 @@ export default function BookingConfirmation() {
   const [searchParams] = useSearchParams();
   const contentRef = React.useRef(null);
   const hasAutoScrolledRef = React.useRef(false);
+  const initialStay = normalizeHotelStayDates({
+    checkIn: state?.checkIn ?? searchParams.get('checkIn'),
+    checkOut: state?.checkOut ?? searchParams.get('checkOut'),
+  });
 
   const roomId = state?.roomId || searchParams.get('roomId') || '';
   const hasBookingContext = Boolean(roomId);
@@ -36,8 +57,8 @@ export default function BookingConfirmation() {
   });
 
   const [formData, setFormData] = useState({
-    checkIn: state?.checkIn ?? searchParams.get('checkIn') ?? new Date().toISOString().split('T')[0],
-    checkOut: state?.checkOut ?? searchParams.get('checkOut') ?? new Date(Date.now() + 86400000).toISOString().split('T')[0],
+    checkIn: initialStay.checkIn,
+    checkOut: initialStay.checkOut,
     guests: Number(state?.guests ?? searchParams.get('guests') ?? 2),
   });
 
@@ -64,6 +85,22 @@ export default function BookingConfirmation() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'checkIn' || name === 'checkOut') {
+      setFormData((prev) => {
+        const normalizedStay = normalizeHotelStayDates({
+          checkIn: name === 'checkIn' ? value : prev.checkIn,
+          checkOut: name === 'checkOut' ? value : prev.checkOut,
+        });
+
+        return {
+          ...prev,
+          checkIn: normalizedStay.checkIn,
+          checkOut: normalizedStay.checkOut,
+        };
+      });
+      return;
+    }
+
     setFormData(prev => ({...prev, [name]: value}));
   };
 
@@ -71,30 +108,51 @@ export default function BookingConfirmation() {
   const appliedCouponCode = pricingSummary.couponCode || '';
 
   useEffect(() => {
-    setPricingSummary((prev) => {
-      if (prev.couponCode) {
-        return prev;
-      }
-
-      return {
-        subtotal: bookingSubtotal,
-        discountAmount: 0,
-        finalAmount: bookingSubtotal,
-        couponCode: null,
-      };
-    });
-  }, [bookingSubtotal]);
-
-  useEffect(() => {
     setCouponInput('');
     setCouponFeedback(null);
-    setPricingSummary({
+
+    const fallbackPricing = {
       subtotal: bookingSubtotal,
       discountAmount: 0,
       finalAmount: bookingSubtotal,
       couponCode: null,
-    });
-  }, [roomId, formData.checkIn, formData.checkOut, bookingSubtotal]);
+    };
+
+    if (!roomId || nights <= 0 || !formData.checkIn || !formData.checkOut) {
+      setPricingSummary(fallbackPricing);
+      return undefined;
+    }
+
+    let ignore = false;
+
+    axios.post(`${API_BASE}/api/coupons/apply`, {
+      roomId: Number(roomId),
+      checkIn: formData.checkIn,
+      checkOut: formData.checkOut,
+      couponCode: null,
+    }, { withCredentials: true })
+      .then((res) => {
+        if (ignore || !res.data?.success) {
+          return;
+        }
+
+        setPricingSummary({
+          subtotal: Number(res.data.subtotal || 0),
+          discountAmount: Number(res.data.discountAmount || 0),
+          finalAmount: Number(res.data.finalAmount || res.data.subtotal || 0),
+          couponCode: null,
+        });
+      })
+      .catch(() => {
+        if (!ignore) {
+          setPricingSummary(fallbackPricing);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [roomId, formData.checkIn, formData.checkOut, bookingSubtotal, nights]);
 
   useEffect(() => {
     const needsRoomRefresh = !state?.room || !state?.size || !state?.beds || !state?.view || !state?.capacity;
@@ -157,10 +215,24 @@ export default function BookingConfirmation() {
       return null;
     }
 
-    return {
-      roomId: String(effectiveRoomId),
+    const normalizedStay = normalizeHotelStayDates({
       checkIn: formData.checkIn,
       checkOut: formData.checkOut,
+    });
+
+    if (normalizedStay.checkIn !== formData.checkIn || normalizedStay.checkOut !== formData.checkOut) {
+      setFormData((prev) => ({
+        ...prev,
+        checkIn: normalizedStay.checkIn,
+        checkOut: normalizedStay.checkOut,
+      }));
+    }
+
+    return {
+      roomId: Number(effectiveRoomId),
+      checkIn: normalizedStay.checkIn,
+      checkOut: normalizedStay.checkOut,
+      guests: Number(formData.guests) > 0 ? Number(formData.guests) : Math.max(1, Number(booking.capacity) || 1),
     };
   };
 
@@ -250,16 +322,16 @@ export default function BookingConfirmation() {
         const appliedCode = res.data?.coupon?.code || normalizedCouponCode;
         setCouponInput(appliedCode);
         setPricingSummary({
-          subtotal: Number(res.data.subtotal || 0),
-          discountAmount: Number(res.data.discountAmount || 0),
-          finalAmount: Number(res.data.finalAmount || 0),
-          couponCode: appliedCode,
+        subtotal: Number(res.data.subtotal || 0),
+        discountAmount: Number(res.data.discountAmount || 0),
+        finalAmount: Number(res.data.finalAmount || 0),
+        couponCode: appliedCode,
         });
       } else {
         setPricingSummary({
-          subtotal: Number(res.data.subtotal || bookingSubtotal),
+          subtotal: Number(res.data.subtotal || pricingSummary.subtotal || bookingSubtotal),
           discountAmount: 0,
-          finalAmount: Number(res.data.finalAmount || bookingSubtotal),
+          finalAmount: Number(res.data.finalAmount || pricingSummary.subtotal || bookingSubtotal),
           couponCode: null,
         });
       }
@@ -282,9 +354,9 @@ export default function BookingConfirmation() {
         message: err.response?.data?.message || 'Không thể kiểm tra mã giảm giá lúc này.',
       });
       setPricingSummary({
-        subtotal: bookingSubtotal,
+        subtotal: pricingSummary.subtotal || bookingSubtotal,
         discountAmount: 0,
-        finalAmount: bookingSubtotal,
+        finalAmount: pricingSummary.subtotal || bookingSubtotal,
         couponCode: null,
       });
     } finally {
@@ -311,15 +383,20 @@ export default function BookingConfirmation() {
         return;
       }
 
+      const createdMessage = buildCreatedBookingMessage(
+        result.message,
+        createdBooking?.pendingHoldDisplayText,
+      );
+
       if (window.Swal) {
         window.Swal.fire(
           'Thành công',
-          result.message || 'Phòng sẽ được giữ trong 2 phút. Tiếp theo, hãy đặt cọc hoặc thanh toán toàn bộ để giữ chỗ.',
+          createdMessage,
           'success',
         )
           .then(() => navigate(`/booking/${createdBooking.id}`));
       } else {
-        alert(result.message || 'Phòng sẽ được giữ trong 2 phút. Tiếp theo, hãy đặt cọc hoặc thanh toán toàn bộ để giữ chỗ.');
+        alert(createdMessage);
         navigate(`/booking/${createdBooking.id}`);
       }
     } finally {
@@ -345,6 +422,9 @@ export default function BookingConfirmation() {
       </div>
     );
   }
+
+  const earliestCheckInDate = getEarliestHotelCheckInDateValue();
+  const earliestCheckOutDate = addDaysToDateInputValue(formData.checkIn, 1);
 
   return (
     <div className="bg-surface text-on-surface font-body min-h-screen flex flex-col">
@@ -378,7 +458,7 @@ export default function BookingConfirmation() {
               PHÒNG {booking.physicalRoomNumber}
             </p>
             <p className="text-on-surface-variant font-body text-base">
-              Vui lòng kiểm tra lại lịch trình đã chọn. Sau khi xác nhận giữ chỗ, hệ thống sẽ giữ booking tối đa 2 phút để bạn tiếp tục đặt cọc hoặc thanh toán ở trang chi tiết đơn.
+              Vui lòng kiểm tra lại lịch trình đã chọn. Sau khi xác nhận giữ chỗ, hệ thống sẽ giữ booking trong khoảng thời gian chờ thanh toán hiện tại để bạn tiếp tục đặt cọc hoặc thanh toán ở trang chi tiết đơn.
             </p>
           </div>
 
@@ -399,7 +479,7 @@ export default function BookingConfirmation() {
                     name="checkIn"
                     value={formData.checkIn}
                     onChange={handleInputChange}
-                    min={new Date().toISOString().split('T')[0]}
+                    min={earliestCheckInDate}
                     className="w-full border-0 border-b border-outline-variant/40 focus:border-secondary bg-transparent py-2 px-0 focus:ring-0 font-body text-base text-on-surface transition-colors focus:outline-none opacity-50 cursor-not-allowed"
                     disabled
                   />
@@ -413,7 +493,7 @@ export default function BookingConfirmation() {
                     name="checkOut"
                     value={formData.checkOut}
                     onChange={handleInputChange}
-                    min={formData.checkIn || new Date().toISOString().split('T')[0]}
+                    min={earliestCheckOutDate}
                     className="w-full border-0 border-b border-outline-variant/40 focus:border-secondary bg-transparent py-2 px-0 focus:ring-0 font-body text-base text-on-surface transition-colors focus:outline-none opacity-50 cursor-not-allowed"
                     disabled
                   />
@@ -578,9 +658,9 @@ export default function BookingConfirmation() {
                     setCouponFeedback(null);
                     if (pricingSummary.couponCode && nextValue.trim() !== pricingSummary.couponCode) {
                       setPricingSummary({
-                        subtotal: bookingSubtotal,
+                        subtotal: pricingSummary.subtotal || bookingSubtotal,
                         discountAmount: 0,
-                        finalAmount: bookingSubtotal,
+                        finalAmount: pricingSummary.subtotal || bookingSubtotal,
                         couponCode: null,
                       });
                     }

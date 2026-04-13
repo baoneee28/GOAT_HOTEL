@@ -13,6 +13,9 @@ public record BookRoomRequest(
         String checkIn,
         @NotBlank(message = "Ngày trả phòng không được để trống.")
         String checkOut,
+        @NotNull(message = "Số khách không được để trống.")
+        @Positive(message = "Số khách phải lớn hơn 0.")
+        Integer guests,
         @Size(max = 50, message = "Luồng thanh toán không hợp lệ.")
         String paymentFlow,
         @Size(max = 50, message = "Mã giảm giá không hợp lệ.")

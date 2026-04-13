@@ -2,13 +2,10 @@ package com.hotel.controller.api;
 
 import com.hotel.dto.ReviewSubmitRequest;
 import com.hotel.entity.Booking;
-import com.hotel.entity.Coupon;
 import com.hotel.entity.Review;
 import com.hotel.entity.User;
 import com.hotel.repository.BookingRepository;
-import com.hotel.repository.CouponRepository;
 import com.hotel.repository.ReviewRepository;
-import com.hotel.service.CouponService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,12 +33,6 @@ public class ReviewApiController {
 
     @Autowired
     private BookingRepository bookingRepository;
-
-    @Autowired
-    private CouponRepository couponRepository;
-
-    @Autowired
-    private CouponService couponService;
 
     @PostMapping
     public ResponseEntity<?> submitReview(@Valid @RequestBody ReviewSubmitRequest request, HttpSession session) {
@@ -86,24 +77,15 @@ public class ReviewApiController {
 
         reviewRepository.save(review);
 
-        // Trả Voucher tự động nếu tồn tại Coupon đang chạy cho targetEvent = 'ON_REVIEW'
-        List<Coupon> activeReviewCoupons = couponRepository.findByIsActiveTrue()
-                .stream()
-                .filter(c -> "ON_REVIEW".equalsIgnoreCase(c.getTargetEvent()))
-                .filter(c -> c.getEndDate().isAfter(java.time.LocalDateTime.now()))
-                .toList();
-
+        // Review được lưu → booking này k còn tính vào per-user count của REVIEWSTAR nữa
+        // → REVIEWSTAR tự động unlock lại cho user (counter-based, không cần tạo UserCoupon)
         Map<String, Object> response = new HashMap<>();
         response.put("message", "Đánh giá của bạn đã được ghi nhận. Cảm ơn bạn!");
 
-        if (!activeReviewCoupons.isEmpty()) {
-            Coupon reward = activeReviewCoupons.get(0);
-            try {
-                couponService.assignCouponToUser(reward.getId(), user.getId(), null, null, "Thưởng đánh giá trải nghiệm");
-                response.put("rewardCoupon", reward);
-            } catch (Exception e) {
-                log.warn("Could not auto-assign review coupon for userId={} bookingId={}", user.getId(), bookingId, e);
-            }
+        // Thông báo user nếu booking vừa review từng dùng REVIEWSTAR → coupon đã được phục hồi
+        if (booking.getCouponCode() != null && "REVIEWSTAR".equalsIgnoreCase(booking.getCouponCode())) {
+            response.put("rewardGranted", true);
+            response.put("rewardMessage", "Mã REVIEWSTAR đã được phục hồi! Kiểm tra tại trang Mã giảm giá để dùng cho lần sau.");
         }
 
         return ResponseEntity.ok(response);

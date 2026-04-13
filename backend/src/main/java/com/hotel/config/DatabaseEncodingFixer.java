@@ -15,8 +15,49 @@ public class DatabaseEncodingFixer {
 
     @PostConstruct
     public void fixNvarchar() {
+        fixBookingDetailGuestCount();
         fixCouponData();
         fixCouponEventTypeData();
+    }
+
+    private void fixBookingDetailGuestCount() {
+        if (!tableExists("booking_details")) {
+            return;
+        }
+
+        try {
+            if (!columnExists("booking_details", "guest_count")) {
+                jdbcTemplate.execute("ALTER TABLE dbo.booking_details ADD guest_count INT NULL;");
+            }
+
+            if (!columnExists("booking_details", "guest_count")
+                    || !tableExists("rooms")
+                    || !tableExists("room_types")) {
+                return;
+            }
+
+            String roomTypeColumn = null;
+            if (columnExists("rooms", "type_id")) {
+                roomTypeColumn = "type_id";
+            } else if (columnExists("rooms", "room_type_id")) {
+                roomTypeColumn = "room_type_id";
+            }
+
+            if (roomTypeColumn == null) {
+                return;
+            }
+
+            jdbcTemplate.execute(
+                    "UPDATE bd " +
+                            "SET guest_count = COALESCE(rt.capacity, 1) " +
+                            "FROM dbo.booking_details bd " +
+                            "LEFT JOIN dbo.rooms r ON r.id = bd.room_id " +
+                            "LEFT JOIN dbo.room_types rt ON rt.id = r." + roomTypeColumn + " " +
+                            "WHERE bd.guest_count IS NULL;"
+            );
+        } catch (Exception e) {
+            System.err.println("Patch guest_count cho booking_details that bai: " + e.getMessage());
+        }
     }
 
     private void fixCouponData() {

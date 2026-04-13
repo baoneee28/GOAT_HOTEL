@@ -13,10 +13,6 @@ const FILTERS = [
 ];
 
 const MY_FILTERS = [
-  { id: 'available', label: 'Còn hạn' },
-  { id: 'reserved', label: 'Đang giữ chỗ' },
-  { id: 'used', label: 'Đã dùng' },
-  { id: 'expired', label: 'Hết hạn' },
   { id: 'all', label: 'Tất cả' },
 ];
 
@@ -250,7 +246,7 @@ export default function Coupons() {
   const { isAuthenticated } = useAuth();
   const [copiedCode, setCopiedCode] = useState('');
   const [myCoupons, setMyCoupons] = useState([]);
-  const [myFilter, setMyFilter] = useState('available');
+  const [myFilter, setMyFilter] = useState('all');
   const [mySummary, setMySummary] = useState({ all: 0, available: 0, reserved: 0, used: 0, expired: 0 });
   const [loadingMyCoupons, setLoadingMyCoupons] = useState(false);
   const [myCouponsError, setMyCouponsError] = useState('');
@@ -278,17 +274,44 @@ export default function Coupons() {
           withCredentials: true,
         });
 
-        if (!active) {
-          return;
+        if (!active) return;
+
+        let list = Array.isArray(res.data?.coupons) ? res.data.coupons : [];
+        let sum = res.data?.summary || { all: 0, available: 0, reserved: 0, used: 0, expired: 0 };
+
+        if (myFilter === 'available' || myFilter === 'all') {
+          try {
+            const rsRes = await axios.get(`${API_BASE}/api/coupons/reviewstar-status`, { withCredentials: true });
+            if (active && rsRes.data?.available && rsRes.data?.coupon) {
+              list = [
+                {
+                  id: 'reviewstar-auto',
+                  coupon: rsRes.data.coupon,
+                  status: 'available',
+                  source: 'review_auto',
+                  assignedAt: rsRes.data.coupon.createdAt || new Date().toISOString(),
+                  expiresAt: rsRes.data.coupon.endDate,
+                },
+                ...list
+              ];
+              sum = {
+                ...sum,
+                all: (sum.all || 0) + 1,
+                available: (sum.available || 0) + 1
+              };
+            }
+          } catch (e) {
+            console.error('Fetch reviewstar status failed:', e);
+          }
         }
 
-        setMyCoupons(Array.isArray(res.data?.coupons) ? res.data.coupons : []);
-        setMySummary(res.data?.summary || { all: 0, available: 0, reserved: 0, used: 0, expired: 0 });
+        if (active) {
+          setMyCoupons(list);
+          setMySummary(sum);
+        }
       } catch (fetchError) {
         console.error('Fetch my coupons failed:', fetchError);
-        if (!active) {
-          return;
-        }
+        if (!active) return;
         setMyCoupons([]);
         setMySummary({ all: 0, available: 0, reserved: 0, used: 0, expired: 0 });
         setMyCouponsError('Không thể tải danh sách coupon cá nhân lúc này.');
@@ -401,50 +424,15 @@ export default function Coupons() {
                     Danh sách coupon cá nhân
                   </h2>
                   <p className="mt-3 max-w-3xl text-sm leading-7 text-on-surface-variant">
-                    Mỗi lần staff hoặc admin phát coupon cho bạn, hệ thống sẽ tạo một lượt coupon riêng biệt. 
+                    Sau khi checkout và gửi đánh giá phòng, bạn sẽ tự động nhận được Voucher <strong>REVIEWSTAR ⭐</strong> tại đây.
+                    Các mã khác do admin cấp cũng hiện tại trang này khi bạn sở hữu.
                   </p>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-4">
-                  <div className="rounded-[24px] border border-outline-variant/14 bg-white/75 p-4">
-                    <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Còn hạn</p>
-                    <p className="mt-3 font-headline text-3xl text-primary">{mySummary.available || 0}</p>
-                  </div>
-                  <div className="rounded-[24px] border border-outline-variant/14 bg-white/75 p-4">
-                    <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Giữ chỗ</p>
-                    <p className="mt-3 font-headline text-3xl text-primary">{mySummary.reserved || 0}</p>
-                  </div>
-                  <div className="rounded-[24px] border border-outline-variant/14 bg-white/75 p-4">
-                    <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Đã dùng</p>
-                    <p className="mt-3 font-headline text-3xl text-primary">{mySummary.used || 0}</p>
-                  </div>
-                  <div className="rounded-[24px] border border-outline-variant/14 bg-white/75 p-4">
-                    <p className="font-label text-[0.58rem] uppercase tracking-[0.22em] text-on-surface-variant">Hết hạn</p>
-                    <p className="mt-3 font-headline text-3xl text-primary">{mySummary.expired || 0}</p>
-                  </div>
+                <div className="hidden">
                 </div>
               </div>
 
-              <div className="mt-8 flex flex-wrap gap-3">
-                {MY_FILTERS.map((filter) => {
-                  const isSelected = myFilter === filter.id;
-                  const count = mySummary[filter.id] ?? mySummary.all ?? 0;
-                  return (
-                    <button
-                      key={filter.id}
-                      type="button"
-                      onClick={() => setMyFilter(filter.id)}
-                      className={`rounded-full px-4 py-3 font-label text-[0.64rem] uppercase tracking-[0.22em] transition-all ${
-                        isSelected
-                          ? 'bg-secondary text-slate-950 shadow-[0_14px_30px_-18px_rgba(212,175,55,0.8)]'
-                          : 'border border-outline-variant/20 bg-white/70 text-primary/72 hover:border-secondary/35 hover:text-secondary'
-                      }`}
-                    >
-                      {filter.label} ({count})
-                    </button>
-                  );
-                })}
-              </div>
             </>
           )}
         </section>
@@ -476,9 +464,15 @@ export default function Coupons() {
                             <span className={`rounded-full px-4 py-2 font-label text-[0.6rem] uppercase tracking-[0.22em] ${statusMeta.className}`}>
                               {statusMeta.label}
                             </span>
-                            <span className="rounded-full border border-secondary/28 bg-secondary/10 px-3 py-2 font-label text-[0.56rem] uppercase tracking-[0.22em] text-secondary">
-                              Coupon của tôi
-                            </span>
+                            {String(item.source || '').startsWith('review_') ? (
+                              <span className="rounded-full border border-amber-400/40 bg-amber-400/12 px-3 py-2 font-label text-[0.56rem] uppercase tracking-[0.22em] text-amber-600">
+                                ⭐ Phần thưởng review
+                              </span>
+                            ) : (
+                              <span className="rounded-full border border-secondary/28 bg-secondary/10 px-3 py-2 font-label text-[0.56rem] uppercase tracking-[0.22em] text-secondary">
+                                Coupon của tôi
+                              </span>
+                            )}
                             <span className="rounded-full border border-outline-variant/16 bg-white/70 px-3 py-2 font-label text-[0.56rem] uppercase tracking-[0.22em] text-primary/54">
                               Lượt #{item.id}
                             </span>
@@ -563,9 +557,12 @@ export default function Coupons() {
               </>
             ) : (
               <div className="coupon-panel rounded-[28px] px-6 py-16 text-center">
-                <h3 className="font-headline text-3xl text-primary">Không có phiếu giảm giá tương ứng</h3>
+                <p className="text-4xl">⭐</p>
+                <h3 className="mt-4 font-headline text-3xl text-primary">Chưa có mã giảm giá</h3>
                 <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-on-surface-variant">
-                  Hiện tại bạn không có coupon nào trong trạng thái này.
+                  {myFilter === 'available'
+                    ? 'Hoàn thành lưu trú và gửi đánh giá phòng để tự động nhận Voucher REVIEWSTAR ⭐'
+                    : 'Không có phần giảm giá nào trong mục này.'}
                 </p>
               </div>
             )}

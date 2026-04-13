@@ -107,13 +107,34 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
            "WHERE b.couponCode IS NOT NULL AND UPPER(b.couponCode) = UPPER(:couponCode) " +
            "AND (" +
            "LOWER(b.status) IN ('confirmed', 'completed') " +
-           "OR (LOWER(b.status) = 'pending' AND (b.expiresAt IS NULL OR b.expiresAt > CURRENT_TIMESTAMP))" +
+           "OR (LOWER(b.status) = 'pending' AND (b.expiresAt IS NULL OR b.expiresAt > :now))" +
            ")")
-    long countActiveCouponUsages(@Param("couponCode") String couponCode);
+    long countActiveCouponUsages(@Param("couponCode") String couponCode, @Param("now") java.time.LocalDateTime now);
 
     @Query("SELECT COUNT(b) FROM Booking b " +
            "WHERE b.couponCode IS NOT NULL AND UPPER(b.couponCode) = UPPER(:couponCode)")
     long countAllCouponUsages(@Param("couponCode") String couponCode);
+
+    @Query("SELECT COUNT(b) FROM Booking b " +
+           "WHERE b.user.id = :userId AND b.couponCode IS NOT NULL AND UPPER(b.couponCode) = UPPER(:couponCode) " +
+           "AND (" +
+           "LOWER(b.status) IN ('confirmed', 'completed') " +
+           "OR (LOWER(b.status) = 'pending' AND (b.expiresAt IS NULL OR b.expiresAt > :now))" +
+           ")")
+    long countActiveCouponUsagesByUser(@Param("couponCode") String couponCode, @Param("userId") Integer userId, @Param("now") java.time.LocalDateTime now);
+
+    /**
+     * Đếm số lần user dùng coupon trong booking CHƯA được review.
+     * Dùng cho REVIEWSTAR: khi user review booking → count tự về 0 → coupon hiện lại.
+     */
+    @Query("SELECT COUNT(b) FROM Booking b " +
+           "WHERE b.user.id = :userId AND b.couponCode IS NOT NULL AND UPPER(b.couponCode) = UPPER(:couponCode) " +
+           "AND (" +
+           "LOWER(b.status) IN ('confirmed', 'completed') " +
+           "OR (LOWER(b.status) = 'pending' AND (b.expiresAt IS NULL OR b.expiresAt > :now))" +
+           ") " +
+           "AND NOT EXISTS (SELECT r FROM Review r WHERE r.booking.id = b.id)")
+    long countActiveCouponUsagesByUserExcludingReviewed(@Param("couponCode") String couponCode, @Param("userId") Integer userId, @Param("now") java.time.LocalDateTime now);
 
     @Query("SELECT COUNT(b) FROM BookingDetail bd JOIN bd.booking b " +
            "WHERE bd.room.id = :roomId AND (b.status = 'confirmed' OR (b.status = 'pending' AND b.expiresAt > :now)) " +

@@ -5,6 +5,7 @@ import com.hotel.entity.BookingDetail;
 import com.hotel.entity.Room;
 import com.hotel.entity.RoomType;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -21,6 +22,7 @@ public record BookingResponse(
         String paymentStatus,
         LocalDateTime createdAt,
         LocalDateTime expiresAt,
+        String pendingHoldDisplayText,
         List<BookingDetailResponse> details,
         Double paidAmount,
         Double remainingAmount,
@@ -54,6 +56,7 @@ public record BookingResponse(
                 booking.getPaymentStatus(),
                 booking.getCreatedAt(),
                 booking.getExpiresAt(),
+                resolvePendingHoldDisplayText(booking),
                 BookingDetailResponse.fromList(booking.getDetails()),
                 paidAmount,
                 remainingAmount,
@@ -98,6 +101,29 @@ public record BookingResponse(
         return Math.max(0.0, depositAmount - paidAmount);
     }
 
+    private static String resolvePendingHoldDisplayText(Booking booking) {
+        if (booking == null || booking.getCreatedAt() == null || booking.getExpiresAt() == null) {
+            return null;
+        }
+
+        long totalSeconds = Duration.between(booking.getCreatedAt(), booking.getExpiresAt()).getSeconds();
+        if (totalSeconds <= 0) {
+            return null;
+        }
+
+        if (totalSeconds < 60) {
+            return totalSeconds + " giây";
+        }
+
+        if (totalSeconds % 60 == 0) {
+            return (totalSeconds / 60) + " phút";
+        }
+
+        long minutes = totalSeconds / 60;
+        long seconds = totalSeconds % 60;
+        return minutes + " phút " + seconds + " giây";
+    }
+
     public record BookingDetailResponse(
             Integer id,
             RoomResponse room,
@@ -106,6 +132,7 @@ public record BookingResponse(
             LocalDateTime checkOut,
             LocalDateTime checkInActual,
             LocalDateTime checkOutActual,
+            Integer guestCount,
             Double totalHours
     ) {
 
@@ -122,6 +149,7 @@ public record BookingResponse(
                     detail.getCheckOut(),
                     detail.getCheckInActual(),
                     detail.getCheckOutActual(),
+                    detail.getGuestCount(),
                     detail.getTotalHours()
             );
         }

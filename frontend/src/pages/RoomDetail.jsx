@@ -3,6 +3,11 @@ import { Link, useParams, useNavigate, useLocation, useSearchParams } from 'reac
 import axios from 'axios';
 import API_BASE, { imageUrl, uploadedImageUrl, iconUrl, resolveRoomTypeSpec } from '../config';
 import HeroHeader from '../components/HeroHeader';
+import {
+  addDaysToDateInputValue,
+  getEarliestHotelCheckInDateValue,
+  normalizeHotelStayDates,
+} from '../utils/hotelStay';
 
 // Helper: lấy danh sách amenities từ API response (room.items[].item)
 const getRoomAmenities = (room) => {
@@ -51,13 +56,17 @@ export default function RoomDetail() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const initialStateRoom = location.state?.room ? location.state.room : (location.state?.id ? location.state : null);
+  const initialStay = normalizeHotelStayDates({
+    checkIn: location.state?.checkIn || searchParams.get('checkIn'),
+    checkOut: location.state?.checkOut || searchParams.get('checkOut'),
+  });
   const [room, setRoom] = useState(initialStateRoom);
   const [activeImg, setActiveImg] = useState(0);
   const [reviews, setReviews] = useState([]);
 
   const [formData, setFormData] = useState({
-    checkIn: location.state?.checkIn || searchParams.get('checkIn') || new Date().toISOString().split('T')[0],
-    checkOut: location.state?.checkOut || searchParams.get('checkOut') || new Date(Date.now() + 86400000).toISOString().split('T')[0],
+    checkIn: initialStay.checkIn,
+    checkOut: initialStay.checkOut,
     guests: location.state?.guests || searchParams.get('guests') || 2
   });
 
@@ -82,13 +91,33 @@ export default function RoomDetail() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'checkIn' || name === 'checkOut') {
+      setFormData((prev) => {
+        const normalizedStay = normalizeHotelStayDates({
+          checkIn: name === 'checkIn' ? value : prev.checkIn,
+          checkOut: name === 'checkOut' ? value : prev.checkOut,
+        });
+
+        return {
+          ...prev,
+          checkIn: normalizedStay.checkIn,
+          checkOut: normalizedStay.checkOut,
+        };
+      });
+      return;
+    }
+
     setFormData(prev => ({...prev, [name]: value}));
   };
 
   const handleContinue = (e) => {
     e.preventDefault();
-    const ci = new Date(formData.checkIn);
-    const co = new Date(formData.checkOut);
+    const normalizedStay = normalizeHotelStayDates({
+      checkIn: formData.checkIn,
+      checkOut: formData.checkOut,
+    });
+    const ci = new Date(normalizedStay.checkIn);
+    const co = new Date(normalizedStay.checkOut);
     const guests = Number(formData.guests);
     if(ci >= co) {
         if(window.Swal) window.Swal.fire('Lỗi', 'Ngày trả phòng phải sau ngày nhận phòng', 'warning');
@@ -100,21 +129,29 @@ export default function RoomDetail() {
         else alert('Số khách vượt quá sức chứa phòng');
         return;
     }
+    setFormData((prev) => ({
+      ...prev,
+      checkIn: normalizedStay.checkIn,
+      checkOut: normalizedStay.checkOut,
+    }));
     const query = new URLSearchParams({
-      checkIn: formData.checkIn,
-      checkOut: formData.checkOut,
+      checkIn: normalizedStay.checkIn,
+      checkOut: normalizedStay.checkOut,
       guests: String(guests),
     }).toString();
     navigate(`/rooms/${id}/available`, { 
       search: `?${query}`,
       state: { 
         roomData: room,
-        checkIn: formData.checkIn,
-        checkOut: formData.checkOut,
+        checkIn: normalizedStay.checkIn,
+        checkOut: normalizedStay.checkOut,
         guests
       } 
     });
   };
+
+  const earliestCheckInDate = getEarliestHotelCheckInDateValue();
+  const earliestCheckOutDate = addDaysToDateInputValue(formData.checkIn, 1);
 
   if (!room) return (
     <div className="min-h-screen flex items-center justify-center bg-surface">
@@ -170,7 +207,7 @@ export default function RoomDetail() {
               <span className="text-primary font-headline text-lg tracking-tight pointer-events-none">{formatDate(formData.checkIn)}</span>
               <div className="relative w-10 h-10 flex items-center justify-center bg-surface-container-low rounded-full group-hover:bg-secondary/10 transition-colors">
                 <span className="material-symbols-outlined text-secondary text-xl pointer-events-none">calendar_month</span>
-                <input required className="absolute inset-0 opacity-0 cursor-pointer" type="date" name="checkIn" value={formData.checkIn} onChange={handleInputChange} min={new Date().toISOString().split('T')[0]} />
+                <input required className="absolute inset-0 opacity-0 cursor-pointer" type="date" name="checkIn" value={formData.checkIn} onChange={handleInputChange} min={earliestCheckInDate} />
               </div>
             </div>
           </div>
@@ -183,7 +220,7 @@ export default function RoomDetail() {
               <span className="text-primary font-headline text-lg tracking-tight pointer-events-none">{formatDate(formData.checkOut)}</span>
               <div className="relative w-10 h-10 flex items-center justify-center bg-surface-container-low rounded-full group-hover:bg-secondary/10 transition-colors">
                 <span className="material-symbols-outlined text-secondary text-xl pointer-events-none">calendar_month</span>
-                <input required className="absolute inset-0 opacity-0 cursor-pointer" type="date" name="checkOut" value={formData.checkOut} onChange={handleInputChange} min={formData.checkIn || new Date().toISOString().split('T')[0]} />
+                <input required className="absolute inset-0 opacity-0 cursor-pointer" type="date" name="checkOut" value={formData.checkOut} onChange={handleInputChange} min={earliestCheckOutDate} />
               </div>
             </div>
           </div>

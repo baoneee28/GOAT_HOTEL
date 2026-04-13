@@ -145,10 +145,28 @@ BEGIN
         check_out DATETIME2 NULL,
         check_in_actual DATETIME2 NULL,
         check_out_actual DATETIME2 NULL,
+        guest_count INT NULL,
         total_hours FLOAT NULL CONSTRAINT DF_booking_details_total_hours DEFAULT 0,
         CONSTRAINT FK_booking_details_booking FOREIGN KEY (booking_id) REFERENCES dbo.bookings(id),
         CONSTRAINT FK_booking_details_room FOREIGN KEY (room_id) REFERENCES dbo.rooms(id)
     );
+END
+GO
+
+IF COL_LENGTH(N'dbo.booking_details', N'guest_count') IS NULL
+BEGIN
+    ALTER TABLE dbo.booking_details ADD guest_count INT NULL;
+END
+GO
+
+IF COL_LENGTH(N'dbo.booking_details', N'guest_count') IS NOT NULL
+BEGIN
+    UPDATE bd
+    SET guest_count = COALESCE(rt.capacity, 1)
+    FROM dbo.booking_details bd
+    LEFT JOIN dbo.rooms r ON r.id = bd.room_id
+    LEFT JOIN dbo.room_types rt ON rt.id = r.type_id
+    WHERE bd.guest_count IS NULL;
 END
 GO
 
